@@ -273,14 +273,3 @@ describe("reservation views", () => {
     expect(w.reduce((s, x) => s + x.days, 0)).toBe(273);
   });
 });
-
-describe("committed iCrew file", () => {
-  it("covers every day from 2025-01-01 to 2026-09-30 with the known total", async () => {
-    const { committedBookings } = await import("./bookings");
-    const rows = committedBookings();
-    expect(rows).toHaveLength(638);
-    expect(rows[0].key).toBe("2025-01-01");
-    expect(rows[637].key).toBe("2026-09-30");
-    expect(rows.reduce((s, r) => s + r.allEntries, 0)).toBe(49501);
-  });
-});

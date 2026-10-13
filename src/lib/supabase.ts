@@ -1,4 +1,3 @@
-import { committedBookings } from "./bookings";
 import {
   BAND_ORDER,
   type Band,
@@ -157,7 +156,7 @@ export async function loadLiveData(cfg: { url: string; key: string }): Promise<D
     source: "live",
     dataThrough: memberRows[0]?.data_through ?? "2026-09-27",
     members: memberRows.map(toMember),
-    totals: [...totalRows.map(toTotal).filter((t) => t.measure !== "icrew_bookings_by_day"), ...committedBookings()],
+    totals: totalRows.map(toTotal),
     door: {
       periods: periodRows.map(toPeriod),
       cells: cellRows.map(toCell),
