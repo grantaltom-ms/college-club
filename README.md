@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CCS member usage dashboard
 
-## Getting Started
+A password-protected web page for College Club Seattle that shows how members use the club: how often they visit, which days and hours are busy, and which members have gone quiet (with a CSV download for outreach).
 
-First, run the development server:
+It reads three tables in the CCS Supabase project: `members`, `club_totals` and (later) `door_visits` / `reservations`.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Set up
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. `npm install`
+2. Copy `.env.example` to `.env.local` and fill in:
+   - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (Supabase project settings, API). The service key is a master key. Keep it out of chat, email and Git.
+   - `DASHBOARD_PASSWORD`, the shared password for the page (any user name works).
+3. `npm run dev`, then open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+With no Supabase settings, local development shows clearly labelled **sample data** (invented members), so the pages can be tried without touching real names.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy (Vercel)
 
-## Learn More
+Add the three variables above in the Vercel project's Environment Variables, then deploy. In production the site refuses to open (503) if `DASHBOARD_PASSWORD` is missing, and the data endpoint returns an error rather than sample data if Supabase is not configured.
 
-To learn more about Next.js, take a look at the following resources:
+## Checks
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`npm run check` runs everything CI runs: lint, type check, unit tests, build, and browser tests (Playwright, against a production build with mocked data). Browser tests need Chromium: `npx playwright install chromium`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+GitHub Actions (`.github/workflows/ci.yml`) runs the same on every push and pull request.
 
-## Deploy on Vercel
+## How the numbers are counted
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Members: adult members on the iCrew roster (staff and juniors removed).
+- A visit: any day with a door entry or an iCrew booking. Door and iCrew match by name only.
+- Groups: no visits, under 1 a month, 1–2, 2–4, and 4+ a month.
+- Door data runs Jan 1 – Sep 27, 2026; bookings through Sep 30.
