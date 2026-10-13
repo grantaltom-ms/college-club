@@ -16,9 +16,9 @@ test("overview shows the headline and all five usage groups", async ({ page }) =
 test("navigation moves between all three pages and marks the current one", async ({ page }) => {
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Dashboard sections" });
-  await nav.getByRole("link", { name: "When people come" }).click();
+  await nav.getByRole("link", { name: "Timing" }).click();
   await expect(page).toHaveURL(/\/timing$/);
-  await expect(nav.getByRole("link", { name: "When people come" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Timing" })).toHaveAttribute("aria-current", "page");
   await nav.getByRole("link", { name: "Members" }).click();
   await expect(page).toHaveURL(/\/members$/);
   await nav.getByRole("link", { name: "Overview" }).click();
