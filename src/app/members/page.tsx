@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { WithData } from "@/components/DataProvider";
+import { useEffect, useMemo, useState } from "react";
 import { formatDay } from "@/lib/dates";
 import {
   BAND_COLORS,
@@ -21,12 +20,125 @@ import type { DashboardData } from "@/lib/types";
 
 const PAGE_SIZE = 25;
 
+type Gate =
+  | { status: "loading" }
+  | { status: "signed-out" }
+  | { status: "error"; message: string }
+  | { status: "ready"; data: DashboardData };
+
+async function fetchMembers(): Promise<Gate> {
+  try {
+    const res = await fetch("/api/members", { cache: "no-store" });
+    if (res.status === 401) return { status: "signed-out" };
+    const body = await res.json();
+    if (!res.ok) return { status: "error", message: body?.error ?? "The members could not be loaded." };
+    return { status: "ready", data: body as DashboardData };
+  } catch {
+    return { status: "error", message: "The members could not be loaded. Check your connection and try again." };
+  }
+}
+
 export default function MembersPage() {
+  const [gate, setGate] = useState<Gate>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMembers().then((next) => {
+      if (!cancelled) setGate(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function signOut() {
+    await fetch("/api/members/logout", { method: "POST" });
+    setGate({ status: "signed-out" });
+  }
+
   return (
     <>
       <h1 className="page-title">Members.</h1>
-      <WithData>{(data) => <Members data={data} />}</WithData>
+      {gate.status === "loading" && (
+        <p className="status" role="status">
+          Loading member data
+        </p>
+      )}
+      {gate.status === "error" && (
+        <div className="status-error" role="alert">
+          <p>{gate.message}</p>
+          <button type="button" className="link-button" onClick={() => fetchMembers().then(setGate)}>
+            Try again
+          </button>
+        </div>
+      )}
+      {gate.status === "signed-out" && <SignIn onSignedIn={() => fetchMembers().then(setGate)} />}
+      {gate.status === "ready" && (
+        <>
+          <p className="page-sub">
+            <button type="button" className="link-button" onClick={signOut}>
+              Sign out
+            </button>
+          </p>
+          <Members data={gate.data} />
+        </>
+      )}
     </>
+  );
+}
+
+function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/members/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setPassword("");
+        onSignedIn();
+        return;
+      }
+      const body = await res.json().catch(() => null);
+      setError(body?.error ?? "Could not sign in. Try again.");
+    } catch {
+      setError("Could not sign in. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="card signin" onSubmit={submit}>
+      <h2 className="card-title">Member names are private.</h2>
+      <p className="card-sub">Enter the password to see the list. The rest of the dashboard is open.</p>
+      <label htmlFor="members-password">Password</label>
+      <input
+        id="members-password"
+        className="search"
+        type="password"
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
+      {error && (
+        <p className="status-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="submit" className="chip" disabled={busy}>
+        {busy ? "Checking" : "Show members"}
+      </button>
+    </form>
   );
 }
 

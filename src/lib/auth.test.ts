@@ -1,30 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { checkAuth, safeEqual } from "./auth";
+import { SESSION_SECONDS, cookieValue, createSession, safeEqual, verifySession } from "./auth";
 
-const basic = (user: string, pass: string) => `Basic ${btoa(`${user}:${pass}`)}`;
+describe("sign-in tokens", () => {
+  const now = Date.UTC(2026, 9, 13, 12);
 
-describe("checkAuth", () => {
-  it("is open to anyone with the link while the gate is off", () => {
-    expect(checkAuth(null, undefined, false)).toBe("ok");
-    expect(checkAuth(null, "secret", false)).toBe("ok");
-    expect(checkAuth(basic("x", "wrong"), "secret", false)).toBe("ok");
+  it("accepts a fresh token made with the same password", async () => {
+    const token = await createSession("secret", now);
+    expect(await verifySession(token, "secret", now + 1000)).toBe(true);
   });
 
-  it("locks everything when the gate is on but no password is set", () => {
-    expect(checkAuth(null, undefined, true)).toBe("not-configured");
-    expect(checkAuth(basic("x", "y"), "", true)).toBe("not-configured");
+  it("rejects a different password, a missing password and a missing token", async () => {
+    const token = await createSession("secret", now);
+    expect(await verifySession(token, "other", now)).toBe(false);
+    expect(await verifySession(token, undefined, now)).toBe(false);
+    expect(await verifySession(undefined, "secret", now)).toBe(false);
   });
 
-  it("asks for a password when none, or the wrong one, is given", () => {
-    expect(checkAuth(null, "secret", true)).toBe("needs-password");
-    expect(checkAuth(basic("ccs", "nope"), "secret", true)).toBe("needs-password");
-    expect(checkAuth("Bearer abc", "secret", true)).toBe("needs-password");
-    expect(checkAuth("Basic !!!not-base64", "secret", true)).toBe("needs-password");
+  it("rejects an expired token", async () => {
+    const token = await createSession("secret", now);
+    expect(await verifySession(token, "secret", now + (SESSION_SECONDS + 5) * 1000)).toBe(false);
   });
 
-  it("accepts the right password under any user name, including passwords with colons", () => {
-    expect(checkAuth(basic("anyone", "secret"), "secret", true)).toBe("ok");
-    expect(checkAuth(basic("", "a:b"), "a:b", true)).toBe("ok");
+  it("rejects a token whose expiry was changed", async () => {
+    const token = await createSession("secret", now);
+    const [, signature] = token.split(".");
+    const later = String(Math.floor(now / 1000) + 999_999_999);
+    expect(await verifySession(`${later}.${signature}`, "secret", now)).toBe(false);
+  });
+
+  it("rejects junk", async () => {
+    for (const junk of ["", "abc", "123.", ".abc", "x.y", "12.34.56"]) {
+      expect(await verifySession(junk, "secret", now)).toBe(false);
+    }
+  });
+});
+
+describe("cookieValue", () => {
+  it("finds a cookie among several", () => {
+    expect(cookieValue("a=1; ccs_members=1.abc; b=2", "ccs_members")).toBe("1.abc");
+    expect(cookieValue(null, "ccs_members")).toBeUndefined();
+    expect(cookieValue("a=1", "ccs_members")).toBeUndefined();
   });
 });
 

@@ -10,7 +10,6 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: `http://localhost:${PORT}`,
-    httpCredentials: { username: "ccs", password: E2E_PASSWORD },
     trace: "retain-on-failure",
     // Locally the sandbox browser path can be supplied; in CI the installed Chromium is used.
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
@@ -23,7 +22,6 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     env: {
-      REQUIRE_PASSWORD: "1",
       DASHBOARD_PASSWORD: E2E_PASSWORD,
       // The browser tests replace /api/dashboard with sample data, so no database is touched.
       CCS_ALLOW_SAMPLE_DATA: "1",

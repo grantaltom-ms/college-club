@@ -738,3 +738,13 @@ main.frame {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.signin {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 28rem;
+}
+
+.signin label {
+  font-weight: 600;
+}

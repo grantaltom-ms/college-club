@@ -1,11 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
-import { mockDashboard } from "./helpers";
+import { openMembers } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
-  await mockDashboard(page);
-  await page.goto("/members");
-  await expect(page.getByText("Showing 1–25 of 550 members")).toBeVisible();
+  await openMembers(page);
 });
 
 const status = (page: import("@playwright/test").Page) => page.getByRole("status").filter({ hasText: /members|No members/ });
