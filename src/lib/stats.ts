@@ -304,6 +304,89 @@ export function bookingSeries(totals: ClubTotal[]): BookingDay[] {
     .map((t) => ({ day: t.key, bookings: t.allEntries, weekend: weekdayIndex(t.key) >= 5 }));
 }
 
+export interface BookingMonth {
+  key: string;
+  month: number;
+  label: string;
+  bookings: number;
+  /** True when every day of the month is in the data. */
+  complete: boolean;
+}
+
+/** Years with bookings, newest first. */
+export function bookingYears(totals: ClubTotal[]): number[] {
+  const years = new Set(series(totals, "icrew_bookings_by_day").map((t) => Number(t.key.slice(0, 4))));
+  return [...years].sort((a, b) => b - a);
+}
+
+/** All twelve months of a year; months the data has not reached have zero bookings. */
+export function bookingMonths(totals: ClubTotal[], year: number): BookingMonth[] {
+  const days = series(totals, "icrew_bookings_by_day").filter((t) => t.key.startsWith(`${year}-`));
+  return Array.from({ length: 12 }, (_, i) => {
+    const month = i + 1;
+    const key = `${year}-${pad2(month)}`;
+    const inMonth = days.filter((t) => t.key.startsWith(key));
+    const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return {
+      key,
+      month,
+      label: formatMonth(key),
+      bookings: inMonth.reduce((s, t) => s + t.allEntries, 0),
+      complete: inMonth.length === length,
+    };
+  });
+}
+
+export interface BookingYearOverYear {
+  year: number;
+  previousYear: number;
+  fromLabel: string;
+  toLabel: string;
+  thisYear: number;
+  lastYear: number;
+  change: number;
+}
+
+/** Newest year against the one before, over the months complete in both. */
+export function bookingYearOverYear(totals: ClubTotal[]): BookingYearOverYear | null {
+  const [year, previousYear] = bookingYears(totals);
+  if (year === undefined || previousYear === undefined) return null;
+  const now = bookingMonths(totals, year);
+  const before = bookingMonths(totals, previousYear);
+  const both = now.filter((m, i) => m.complete && before[i].complete);
+  if (both.length === 0) return null;
+  const thisYear = both.reduce((s, m) => s + m.bookings, 0);
+  const lastYear = both.reduce((s, m) => s + before[m.month - 1].bookings, 0);
+  return {
+    year,
+    previousYear,
+    fromLabel: both[0].label,
+    toLabel: both[both.length - 1].label,
+    thisYear,
+    lastYear,
+    change: lastYear ? Math.round((thisYear / lastYear - 1) * 100) : 0,
+  };
+}
+
+export interface BookingWeekday {
+  index: number;
+  name: string;
+  short: string;
+  days: number;
+  bookings: number;
+  perDay: number;
+}
+
+/** Average bookings for each day of the week, over the days in `year`. */
+export function bookingWeekdays(totals: ClubTotal[], year: number): BookingWeekday[] {
+  const days = series(totals, "icrew_bookings_by_day").filter((t) => t.key.startsWith(`${year}-`));
+  return WEEKDAY_NAMES.map((name, index) => {
+    const mine = days.filter((t) => weekdayIndex(t.key) === index);
+    const bookings = mine.reduce((s, t) => s + t.allEntries, 0);
+    return { index, name, short: WEEKDAYS[index], days: mine.length, bookings, perDay: mine.length ? bookings / mine.length : 0 };
+  });
+}
+
 /* ---------- Members ---------- */
 
 export type Preset = "all" | "no-visits" | "under-one" | "gone-quiet" | "new" | "no-fob";

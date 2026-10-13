@@ -7,7 +7,11 @@ import { WithData } from "@/components/DataProvider";
 import { HeatmapChart } from "@/components/HeatmapChart";
 import { WEEKDAYS, formatDay, weekdayIndex } from "@/lib/dates";
 import {
+  bookingMonths,
   bookingSeries,
+  bookingWeekdays,
+  bookingYearOverYear,
+  bookingYears,
   busiestSlots,
   doorPeriod,
   doorYears,
@@ -42,7 +46,13 @@ function Timing({ data }: { data: DashboardData }) {
   const weekdays = weekdaySeries(data.door, year);
   const hours = hourSeries(data.door, year);
   const heat = heatmap(data.door, year);
-  const bookings = bookingSeries(data.totals);
+  const bookings = bookingSeries(data.totals).slice(-92);
+  const bookingYoy = bookingYearOverYear(data.totals);
+  const bYears = bookingYears(data.totals).sort((a, b) => a - b);
+  const bookingsByYear = bYears.map((y) => ({ year: y, months: bookingMonths(data.totals, y) }));
+  const bookingMax = Math.max(0, ...bookingsByYear.flatMap((y) => y.months.filter((m) => m.complete).map((m) => m.bookings)));
+  const bookingWeek = bookingWeekdays(data.totals, bYears[bYears.length - 1] ?? year);
+  const bookingWeekYear = bYears[bYears.length - 1];
   const yoy = yearOverYear(data.door);
 
   const weekdayColumns: Column[] = weekdays.map((w) => ({
@@ -213,23 +223,94 @@ function Timing({ data }: { data: DashboardData }) {
           </aside>
         )}
 
+        {bookingsByYear.length > 0 && (
+          <>
+            <ChartCard
+              title="Reservations by month"
+              subtitle="All iCrew bookings, with each year on the same scale. Months that are not finished are left blank."
+              table={{
+                headers: ["Month", ...bookingsByYear.map((y) => String(y.year))],
+                rows: bookingsByYear[0].months.map((m, i) => [
+                  m.label,
+                  ...bookingsByYear.map((y) => {
+                    const row = y.months[i];
+                    return row.complete ? fmtInt(row.bookings) : row.bookings ? `${fmtInt(row.bookings)} (so far)` : "\u2014";
+                  }),
+                ]),
+              }}
+            >
+              <div className="chart-pair">
+                {bookingsByYear.map((y) => (
+                  <div key={y.year}>
+                    <h3>{y.year}</h3>
+                    <ColumnChart
+                      columns={y.months.map((m) => ({
+                        key: m.key,
+                        xLabel: m.label,
+                        value: m.complete ? m.bookings : 0,
+                        tooltip: m.complete ? [`${fmtInt(m.bookings)} reservations`, m.label] : ["Month not finished", m.label],
+                      }))}
+                      ariaLabel={`Reservations by month, ${y.year}`}
+                      baseColor={BASE}
+                      maxValue={bookingMax}
+                      height={200}
+                    />
+                  </div>
+                ))}
+              </div>
+            </ChartCard>
+
+            {bookingYoy && (
+              <aside className="callout" aria-label="Reservations compared with last year">
+                <h3>Reservations compared with last year</h3>
+                <p>
+                  From {bookingYoy.fromLabel} to {bookingYoy.toLabel}, reservations are {Math.abs(bookingYoy.change)}%{" "}
+                  {bookingYoy.change >= 0 ? "higher" : "lower"} in {bookingYoy.year} than in {bookingYoy.previousYear} (
+                  {fmtInt(bookingYoy.thisYear)} against {fmtInt(bookingYoy.lastYear)}).
+                </p>
+              </aside>
+            )}
+
+            <ChartCard
+              title={`Reservations on an average day, ${bookingWeekYear}`}
+              subtitle="Each weekday's total divided by how many of that weekday are in the data."
+              legend={legend}
+              table={{
+                headers: ["Day", "Average reservations per day", "Total reservations", "Days counted"],
+                rows: bookingWeek.map((w) => [w.name, fmtInt(w.perDay), fmtInt(w.bookings), w.days]),
+              }}
+            >
+              <ColumnChart
+                columns={bookingWeek.map((w) => ({
+                  key: w.short,
+                  xLabel: w.short,
+                  value: Math.round(w.perDay),
+                  emphasis: w.index >= 5,
+                  tooltip: [`${fmtInt(w.perDay)} reservations`, `${w.name}, average over ${w.days} days`],
+                }))}
+                ariaLabel="Average reservations per day, by day of the week"
+              />
+            </ChartCard>
+          </>
+        )}
+
         <ChartCard
-          title="Boat and class reservations per day"
-          subtitle="July 1 to September 30, 2026."
+          title="Reservations per day, recent"
+          subtitle="The last 92 days of data."
           legend={legend}
           table={{
             headers: ["Day", "Reservations"],
             rows: bookings.map((b) => [`${WEEKDAYS[weekdayIndex(b.day)]}, ${formatDay(b.day)}`, fmtInt(b.bookings)]),
           }}
         >
-          <ColumnChart columns={bookingColumns} ariaLabel="Boat and class reservations per day" />
+          <ColumnChart columns={bookingColumns} ariaLabel="Reservations per day, recent" />
         </ChartCard>
 
         <aside className="callout" aria-label="Limits of this data">
           <h3>Limits of this data</h3>
           <p>
             Door counts come from the front-door log with staff and non-person credentials removed, so they run lower
-            than the full log. Reservations are bookings, not attendance. Members are matched to door fobs by name, and
+            than the full log. Reservations come from the iCrew daily totals for all accounts, including staff and juniors, and are bookings, not attendance. Members are matched to door fobs by name, and
             the 2025 split by member uses today&apos;s roster.
           </p>
         </aside>

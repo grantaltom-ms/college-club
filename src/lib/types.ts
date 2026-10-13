@@ -77,7 +77,7 @@ export interface DashboardData {
   /** Last day of door data, YYYY-MM-DD. */
   dataThrough: string;
   members: Member[];
-  /** Boat and class bookings per day (from `club_totals`). */
+  /** iCrew bookings per day (all accounts), from src/data/icrew-bookings.json. */
   totals: ClubTotal[];
   door: DoorPattern;
 }

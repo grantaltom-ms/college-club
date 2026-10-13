@@ -13,9 +13,13 @@ test("timing page shows every chart and the weekend note", async ({ page }) => {
   await expect(group(page, "Door entries by hour of the day")).toBeVisible();
   await expect(group(page, "Door entries by month, 2025")).toBeVisible();
   await expect(group(page, "Door entries by month, 2026")).toBeVisible();
-  await expect(group(page, "Boat and class reservations per day")).toBeVisible();
+  await expect(group(page, "Reservations per day, recent")).toBeVisible();
+  await expect(group(page, "Reservations by month, 2025")).toBeVisible();
+  await expect(group(page, "Reservations by month, 2026")).toBeVisible();
+  await expect(group(page, "Average reservations per day, by day of the week")).toBeVisible();
+  await expect(page.getByText("Reservations compared with last year")).toBeVisible();
   await expect(page.getByText("Weekends are the quiet days")).toBeVisible();
-  await expect(page.getByText("Compared with last year")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Compared with last year", exact: true })).toBeVisible();
 });
 
 test("hovering a weekday bar shows its tooltip", async ({ page }) => {
@@ -75,4 +79,16 @@ test("the month table lists both years side by side", async ({ page }) => {
   await expect(card.getByRole("row")).toHaveCount(13);
   await expect(card.getByRole("row", { name: /^Oct/ })).toContainText("so far");
   await expect(card.getByRole("row", { name: /^Dec/ })).toContainText("—");
+});
+
+test("reservation charts switch to tables and back repeatedly", async ({ page }) => {
+  await page.goto("/timing");
+  const card = page.locator(".card", { hasText: "All iCrew bookings" });
+  for (let i = 0; i < 4; i++) {
+    await card.getByRole("button", { name: "View as table" }).click();
+    await expect(card.getByRole("columnheader")).toHaveText(["Month", "2025", "2026"]);
+    await expect(card.getByRole("row")).toHaveCount(13);
+    await card.getByRole("button", { name: "View as chart" }).click();
+    await expect(card.getByRole("table")).toHaveCount(0);
+  }
 });

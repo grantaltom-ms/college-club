@@ -48,3 +48,8 @@ export function formatMonth(key: string): string {
   const [, m] = key.split("-").map(Number);
   return MONTHS[m - 1];
 }
+
+/** The day `days` after `day` (negative goes back), as YYYY-MM-DD. */
+export function dayOffset(day: string, days: number): string {
+  return new Date(parseDay(day) + days * DAY_MS).toISOString().slice(0, 10);
+}

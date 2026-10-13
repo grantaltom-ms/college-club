@@ -131,13 +131,16 @@ function buildDoor(): DoorPattern {
 function buildTotals(): ClubTotal[] {
   const rows: ClubTotal[] = [];
   const rand = rng(7);
-  for (let i = 0; i < 92; i++) {
-    const day = dayOffset("2026-09-30", 91 - i);
+  const days = 638;
+  for (let i = 0; i < days; i++) {
+    const day = dayOffset("2026-09-30", days - 1 - i);
     const weekend = [0, 6].includes(new Date(`${day}T00:00:00Z`).getUTCDay());
+    const month = Number(day.slice(5, 7));
+    const season = month >= 5 && month <= 9 ? 1.2 : 0.7;
     rows.push({
       measure: "icrew_bookings_by_day",
       key: day,
-      allEntries: Math.round((weekend ? 45 : 110) * (0.6 + rand() * 0.8) * (i > 80 ? 0.4 : 1)),
+      allEntries: Math.round((weekend ? 45 : 110) * season * (0.6 + rand() * 0.8) * (day >= "2026-01-01" ? 0.85 : 1)),
       memberEntries: null,
     });
   }

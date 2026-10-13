@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { sampleData } from "./sample";
 import {
   bandSummary,
+  bookingMonths,
   bookingSeries,
+  bookingWeekdays,
+  bookingYearOverYear,
+  bookingYears,
   busiestSlots,
   doorYears,
   heatColor,
@@ -152,10 +156,10 @@ describe("door pattern", () => {
     expect(slots[1].perDay).toBeGreaterThanOrEqual(slots[2].perDay);
   });
 
-  it("flags weekend booking days and covers Jul 1 to Sep 30", () => {
+  it("flags weekend booking days and covers Jan 1, 2025 to Sep 30, 2026", () => {
     const days = bookingSeries(data.totals);
-    expect(days).toHaveLength(92);
-    expect(days[0].day).toBe("2026-07-01");
+    expect(days).toHaveLength(638);
+    expect(days[0].day).toBe("2025-01-01");
     expect(days.find((d) => d.day === "2026-07-04")?.weekend).toBe(true); // a Saturday
     expect(days.find((d) => d.day === "2026-07-06")?.weekend).toBe(false); // a Monday
   });
@@ -235,5 +239,48 @@ describe("CSV export", () => {
     const csv = membersToCsv([member({ name: 'Smith, "Bo"' }), member({ name: "=HYPERLINK(\"x\")" })]);
     expect(csv).toContain('"Smith, ""Bo"""');
     expect(csv).toContain("\"'=HYPERLINK(\"\"x\"\")\"");
+  });
+});
+
+describe("reservation views", () => {
+  it("finds both years, newest first", () => {
+    expect(bookingYears(data.totals)).toEqual([2026, 2025]);
+  });
+
+  it("marks months complete only when every day is present", () => {
+    const m26 = bookingMonths(data.totals, 2026);
+    expect(m26.filter((m) => m.complete).length).toBe(9);
+    expect(m26[9].bookings).toBe(0);
+    expect(bookingMonths(data.totals, 2025).every((m) => m.complete)).toBe(true);
+  });
+
+  it("month totals add up to the daily totals", () => {
+    const daily = bookingSeries(data.totals).reduce((s, d) => s + d.bookings, 0);
+    const monthly = [2025, 2026].flatMap((y) => bookingMonths(data.totals, y)).reduce((s, m) => s + m.bookings, 0);
+    expect(monthly).toBe(daily);
+  });
+
+  it("compares Jan to Sep of the two years", () => {
+    const yoy = bookingYearOverYear(data.totals)!;
+    expect(yoy.fromLabel).toBe("Jan");
+    expect(yoy.toLabel).toBe("Sep");
+    expect(yoy.thisYear).toBeLessThan(yoy.lastYear);
+  });
+
+  it("averages each weekday over the days it appears", () => {
+    const w = bookingWeekdays(data.totals, 2026);
+    expect(w).toHaveLength(7);
+    expect(w.reduce((s, x) => s + x.days, 0)).toBe(273);
+  });
+});
+
+describe("committed iCrew file", () => {
+  it("covers every day from 2025-01-01 to 2026-09-30 with the known total", async () => {
+    const { committedBookings } = await import("./bookings");
+    const rows = committedBookings();
+    expect(rows).toHaveLength(638);
+    expect(rows[0].key).toBe("2025-01-01");
+    expect(rows[637].key).toBe("2026-09-30");
+    expect(rows.reduce((s, r) => s + r.allEntries, 0)).toBe(49501);
   });
 });
