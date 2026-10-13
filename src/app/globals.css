@@ -748,3 +748,7 @@ main.frame {
 .signin label {
   font-weight: 600;
 }
+
+.card > .card-title:not(:first-child) {
+  margin-top: 1.75rem;
+}
