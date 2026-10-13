@@ -4,13 +4,15 @@ import { checkAuth, safeEqual } from "./auth";
 const basic = (user: string, pass: string) => `Basic ${btoa(`${user}:${pass}`)}`;
 
 describe("checkAuth", () => {
-  it("locks production when no password is set", () => {
-    expect(checkAuth(null, undefined, true)).toBe("not-configured");
-    expect(checkAuth(basic("x", "y"), "", true)).toBe("not-configured");
+  it("is open to anyone with the link while the gate is off", () => {
+    expect(checkAuth(null, undefined, false)).toBe("ok");
+    expect(checkAuth(null, "secret", false)).toBe("ok");
+    expect(checkAuth(basic("x", "wrong"), "secret", false)).toBe("ok");
   });
 
-  it("lets local development through when no password is set", () => {
-    expect(checkAuth(null, undefined, false)).toBe("ok");
+  it("locks everything when the gate is on but no password is set", () => {
+    expect(checkAuth(null, undefined, true)).toBe("not-configured");
+    expect(checkAuth(basic("x", "y"), "", true)).toBe("not-configured");
   });
 
   it("asks for a password when none, or the wrong one, is given", () => {

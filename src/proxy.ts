@@ -6,7 +6,7 @@ export function proxy(request: NextRequest) {
   const result = checkAuth(
     request.headers.get("authorization"),
     process.env.DASHBOARD_PASSWORD,
-    process.env.NODE_ENV === "production",
+    process.env.REQUIRE_PASSWORD === "1",
   );
   if (result === "ok") return NextResponse.next();
   if (result === "not-configured") {

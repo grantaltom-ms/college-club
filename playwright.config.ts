@@ -23,6 +23,7 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     env: {
+      REQUIRE_PASSWORD: "1",
       DASHBOARD_PASSWORD: E2E_PASSWORD,
       // The browser tests replace /api/dashboard with sample data, so no database is touched.
       CCS_ALLOW_SAMPLE_DATA: "1",

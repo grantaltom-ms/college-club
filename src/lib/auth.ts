@@ -9,11 +9,13 @@ export function safeEqual(a: string, b: string): boolean {
 export type AuthResult = "ok" | "needs-password" | "not-configured";
 
 /**
- * The dashboard lists member names, so production refuses to serve anything
- * until a password is set. Local development skips the check when none is set.
+ * The password gate is switched on with REQUIRE_PASSWORD=1. While it is off the
+ * dashboard is open to anyone with the link. Once it is on, nothing is served
+ * until DASHBOARD_PASSWORD is also set.
  */
-export function checkAuth(header: string | null, password: string | undefined, production: boolean): AuthResult {
-  if (!password) return production ? "not-configured" : "ok";
+export function checkAuth(header: string | null, password: string | undefined, required: boolean): AuthResult {
+  if (!required) return "ok";
+  if (!password) return "not-configured";
   if (!header?.startsWith("Basic ")) return "needs-password";
   let decoded = "";
   try {
