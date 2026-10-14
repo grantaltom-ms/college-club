@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { SignIn } from "@/components/SignIn";
 import { formatDay } from "@/lib/dates";
 import {
   BAND_COLORS,
@@ -72,7 +73,13 @@ export default function MembersPage() {
           </button>
         </div>
       )}
-      {gate.status === "signed-out" && <SignIn onSignedIn={() => fetchMembers().then(setGate)} />}
+      {gate.status === "signed-out" && <SignIn
+          id="members-password"
+          title="Member names are private."
+          text="Enter the password to see the list. The rest of the dashboard is open."
+          button="Show members"
+          onSignedIn={() => fetchMembers().then(setGate)}
+        />}
       {gate.status === "ready" && (
         <>
           <p className="page-sub">
@@ -84,61 +91,6 @@ export default function MembersPage() {
         </>
       )}
     </>
-  );
-}
-
-function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/members/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      if (res.ok) {
-        setPassword("");
-        onSignedIn();
-        return;
-      }
-      const body = await res.json().catch(() => null);
-      setError(body?.error ?? "Could not sign in. Try again.");
-    } catch {
-      setError("Could not sign in. Check your connection and try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form className="card signin" onSubmit={submit}>
-      <h2 className="card-title">Member names are private.</h2>
-      <p className="card-sub">Enter the password to see the list. The rest of the dashboard is open.</p>
-      <label htmlFor="members-password">Password</label>
-      <input
-        id="members-password"
-        className="search"
-        type="password"
-        autoComplete="current-password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
-      {error && (
-        <p className="status-error" role="alert">
-          {error}
-        </p>
-      )}
-      <button type="submit" className="chip" disabled={busy}>
-        {busy ? "Checking" : "Show members"}
-      </button>
-    </form>
   );
 }
 

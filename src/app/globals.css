@@ -615,6 +615,272 @@ main.frame {
   border-radius: 0 3px 3px 0;
 }
 
+/* ---------- Goals page ---------- */
+
+.goal-page-title {
+  font-size: clamp(26px, 5vw, 40px);
+  overflow-wrap: anywhere;
+}
+
+.goal-summary {
+  color: var(--slate);
+}
+
+.goal-group > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  cursor: pointer;
+}
+
+.goal-group-name {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.goal-group-count {
+  color: var(--slate);
+  font-size: 15px;
+}
+
+.goal-list,
+.goal-note-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goal-group .goal-list {
+  margin-top: 12px;
+}
+
+.goal-item {
+  padding: 10px 0;
+  border-top: 1px solid var(--grid);
+  min-width: 0;
+}
+
+.goal-level-2 {
+  padding-left: 12px;
+  border-left: 2px solid var(--oyster);
+}
+
+.goal-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.goal-toggle {
+  flex: 1 1 280px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.goal-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.goal-caret {
+  flex: none;
+  color: var(--waterloo);
+}
+
+.goal-status {
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--debonair);
+  border-radius: 4px;
+  background: var(--oyster-50);
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.goal-due,
+.goal-owner,
+.goal-progress {
+  font-size: 15px;
+  color: var(--slate);
+}
+
+.goal-due {
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.goal-due-overdue {
+  border-color: #c75a5a;
+  background: rgba(208, 59, 59, 0.1);
+  color: #8a2222;
+  font-weight: 600;
+}
+
+.goal-due-soon {
+  border-color: #d9a441;
+  background: rgba(237, 161, 0, 0.14);
+  color: #6b4a00;
+  font-weight: 600;
+}
+
+.goal-due-done {
+  color: var(--waterloo);
+}
+
+.goal-progress {
+  font-weight: 600;
+  color: var(--waterloo);
+}
+
+.goal-panel {
+  display: grid;
+  gap: 18px;
+  margin: 10px 0 4px 20px;
+  padding: 16px;
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  background: var(--oyster-50);
+}
+
+.goal-panel h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.goal-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.goal-field {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+}
+
+.goal-field-wide {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 641px) {
+  /* Group names are long, so the group box gets two columns where there is room. */
+  .goal-field-group {
+    grid-column: span 2;
+  }
+}
+
+.goal-field label,
+.goal-notes label {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.goal-field .search,
+.goal-add .search,
+.goal-textarea {
+  max-width: none;
+  width: 100%;
+}
+
+.goal-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-date .search {
+  flex: 1 1 150px;
+  width: auto;
+}
+
+.goal-submit {
+  justify-self: start;
+  margin-top: 10px;
+}
+
+.goal-add {
+  display: grid;
+  gap: 4px;
+}
+
+.goal-textarea {
+  display: block;
+  margin: 4px 0 0;
+  resize: vertical;
+}
+
+.goal-notes form {
+  display: grid;
+}
+
+.goal-note-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.goal-note-list li {
+  padding: 10px 12px;
+  border-left: 3px solid var(--debonair);
+  background: var(--card);
+}
+
+.goal-note-list time {
+  font-size: 14px;
+  color: var(--slate);
+}
+
+.goal-note-body {
+  margin: 2px 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.goal-subform {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--hairline);
+}
+
+.goal-confirm {
+  max-width: none;
+}
+
+.goal-delete {
+  justify-self: start;
+  color: #8a2222;
+}
+
+@media (max-width: 640px) {
+  .goal-panel {
+    margin-left: 0;
+    padding: 12px;
+  }
+  .goal-level-2 {
+    padding-left: 8px;
+  }
+}
+
 /* ---------- Notes ---------- */
 
 .callout {
