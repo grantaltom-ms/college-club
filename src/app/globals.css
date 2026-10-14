@@ -476,6 +476,76 @@ main.frame {
   }
 }
 
+/* ---------- Boat bars (Shells page) ---------- */
+
+.boats {
+  display: grid;
+}
+
+.boat-row {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--grid);
+}
+
+.boat-row:last-child {
+  border-bottom: 0;
+}
+
+.boat-name {
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.boat-name small {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--slate);
+}
+
+.boat-bars {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.boat-bar-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.boat-bar {
+  flex: none;
+  height: 12px;
+  min-width: 2px;
+  border-radius: 0 3px 3px 0;
+}
+
+.boat-count {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.boat-change {
+  text-align: right;
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .boat-row {
+    grid-template-columns: minmax(0, 1fr) 56px;
+  }
+  .boat-name {
+    grid-column: 1 / -1;
+  }
+}
+
 /* ---------- Notes ---------- */
 
 .callout {
