@@ -3,7 +3,7 @@ import { json, readBody, withStore } from "@/lib/roadmap-api";
 
 /** Add an item, or a subitem when `parentId` is given. */
 export async function POST(request: Request) {
-  return withStore(request, async (store) => {
+  return withStore(async (store) => {
     const read = await readBody(request);
     if ("response" in read) return read.response;
     const input = parseNewItem(read.body);

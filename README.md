@@ -1,6 +1,6 @@
 # CCS member usage dashboard
 
-A web page for College Club Seattle that shows how members use the club: how often they visit, which days and hours are busy, and which members have gone quiet (with a CSV download for outreach).
+A web page for College Club Seattle that shows how members use the club: how often they visit, which days and hours are busy, boat and shell use, reservations by type, email results, and a shared goals list. It shows counts only, never member names.
 
 It reads three tables in the CCS Supabase project: `members`, `club_totals` and (later) `door_visits` / `reservations`.
 
@@ -9,14 +9,14 @@ It reads three tables in the CCS Supabase project: `members`, `club_totals` and 
 1. `npm install`
 2. Copy `.env.example` to `.env.local` and fill in:
    - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (Supabase project settings, API). The service key is a master key. Keep it out of chat, email and Git.
-   - `DASHBOARD_PASSWORD`: the password for the Members page. Everything else is open to anyone with the link (the site is marked noindex). Public data has member names removed; names are only sent after a correct password.
+   - There is no password: every page is open to anyone with the link (the site is marked noindex). Member names are removed on the server before any data is sent.
 3. `npm run dev`, then open http://localhost:3000
 
 With no Supabase settings, local development shows clearly labelled **sample data** (invented members), so the pages can be tried without touching real names.
 
 ## Deploy (Vercel)
 
-Add the Supabase variables above in the Vercel project's Environment Variables, then deploy. The Members page stays locked (503) until `DASHBOARD_PASSWORD` is set. The data endpoint returns an error rather than sample data if Supabase is not configured.
+Add the Supabase variables above in the Vercel project's Environment Variables, then deploy. The data endpoint returns an error rather than sample data if Supabase is not configured.
 
 ## Loading the Shells and Reservations tabs
 
@@ -35,9 +35,9 @@ The prepare step runs on your own computer: shell rower names are swapped for sc
 
 `/goals` ("Goals and Action Items for Tech and Communications") is a living to-do list for the technology and member-communications work: items with a status, due date, owner and group, subitems under any item, and a running log of notes on each. Everything is edited on the page itself.
 
-- **Private.** It sits behind the same password as the Members page (`DASHBOARD_PASSWORD`, the `ccs_members` cookie), so signing in on either opens both. Every `/api/roadmap/*` address answers 401 without the cookie and 503 if no password is set. Nothing from the roadmap is in a public endpoint.
+- **Open.** There is no password: anyone with the link can read and change the roadmap, so share the link only with people who should be able to. The site is marked noindex, so search engines skip it.
 - **Set up once.** In the Supabase SQL editor, run `db/roadmap.sql` (the two tables), then `db/roadmap_seed.sql` (the starting content from the October 2026 meeting with Caitlin Sogn). The seed does nothing if the table already has rows, so running it twice is safe. The seed file is generated from `src/lib/roadmap-seed.ts` with `npm run roadmap:seed-sql`.
-- **Uses the same settings** as the rest of the site (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DASHBOARD_PASSWORD`); nothing new is needed.
+- **Uses the same settings** as the rest of the site (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`); nothing new is needed.
 - **In development** (or with `CCS_ALLOW_SAMPLE_DATA=1`) it uses an in-memory copy of the starting content instead of Supabase, so tests never touch the real database.
 - "Overdue" and "due soon" (today to 7 days ahead) use the visitor's own clock; "Due soon" also lists anything already overdue. Finishing every subitem shows "3 of 3 done" on the parent but never changes the parent's status.
 

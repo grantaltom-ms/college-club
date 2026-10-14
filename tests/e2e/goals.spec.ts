@@ -1,5 +1,4 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { E2E_PASSWORD } from "../../playwright.config";
 
 const PAGE_TITLE = "Goals and Action Items for Tech and Communications";
 const run = Date.now().toString(36);
@@ -7,12 +6,10 @@ let counter = 0;
 /** A title nobody else's test will use, since all tests share one in-memory list. */
 const unique = (label: string) => `${label} ${run}-${test.info().workerIndex}-${++counter}`;
 
-/** Signs in on the goals page. `today` pins the browser's clock so overdue and due-soon are predictable. */
+/** Opens the goals page. `today` pins the browser's clock so overdue and due-soon are predictable. */
 async function openGoals(page: Page, today?: string) {
   if (today) await page.clock.setFixedTime(new Date(`${today}T12:00:00`));
   await page.goto("/goals");
-  await page.getByLabel("Password").fill(E2E_PASSWORD);
-  await page.getByRole("button", { name: "Show goals" }).click();
   await expect(page.getByRole("form", { name: "Add an item" })).toBeVisible();
 }
 
@@ -50,27 +47,22 @@ const names = async (list: Locator) => list.evaluateAll((els) => els.map((e) => 
 
 test.describe("who can see it", () => {
   // Plain fetch carries no cookies, like a stranger who has only the link.
-  test("every roadmap address refuses strangers and bad cookies", async ({ baseURL }) => {
-    const id = "123e4567-e89b-42d3-a456-426614174000";
-    const calls: [string, string, unknown?][] = [
-      ["GET", "/api/roadmap"],
-      ["POST", "/api/roadmap/items", { title: "x" }],
-      ["PATCH", `/api/roadmap/items/${id}`, { status: "Done" }],
-      ["DELETE", `/api/roadmap/items/${id}`],
-      ["POST", `/api/roadmap/items/${id}/notes`, { body: "x" }],
-      ["DELETE", `/api/roadmap/notes/${id}`],
-    ];
-    for (const cookie of [undefined, "ccs_members=9999999999.deadbeef", "ccs_members=1.deadbeef"]) {
-      for (const [method, path, body] of calls) {
-        const res = await fetch(`${baseURL}${path}`, {
-          method,
-          headers: { ...(cookie ? { cookie } : {}), ...(body ? { "Content-Type": "application/json" } : {}) },
-          body: body ? JSON.stringify(body) : undefined,
-        });
-        expect(res.status, `${method} ${path} with ${cookie ?? "no cookie"}`).toBe(401);
-        expect((await res.json()).error).toMatch(/Sign in/);
-      }
-    }
+  test("anyone with the link can read and change the roadmap, with no password", async ({ baseURL }) => {
+    const read = await fetch(`${baseURL}/api/roadmap`);
+    expect(read.status).toBe(200);
+    expect((await read.json()).items.length).toBeGreaterThan(0);
+
+    const title = unique("Added with no password");
+    const post = (path: string, method: string, body?: unknown) =>
+      fetch(`${baseURL}${path}`, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+    const created = await post("/api/roadmap/items", "POST", { title });
+    expect(created.status).toBe(201);
+    const { item } = await created.json();
+    expect((await post(`/api/roadmap/items/${item.id}`, "PATCH", { status: "Done" })).status).toBe(200);
+    const note = await post(`/api/roadmap/items/${item.id}/notes`, "POST", { body: "hello" });
+    expect(note.status).toBe(201);
+    expect((await post(`/api/roadmap/notes/${(await note.json()).note.id}`, "DELETE")).status).toBe(200);
+    expect((await post(`/api/roadmap/items/${item.id}`, "DELETE")).status).toBe(200);
   });
 
   test("the public data endpoints carry none of the roadmap", async ({ baseURL }) => {
@@ -80,47 +72,21 @@ test.describe("who can see it", () => {
     }
   });
 
-  test("the page shows a password form, rejects a wrong password, and signing out locks it again", async ({ page }) => {
+  test("the page opens straight to the list: no password form and no sign-out button", async ({ page }) => {
     await page.goto("/goals");
     await expect(page.getByRole("heading", { level: 1, name: PAGE_TITLE, exact: true })).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
-    await expect(page.getByText("Pick 2-3 engagement tracks")).toHaveCount(0);
-
-    await page.getByLabel("Password").fill("wrong");
-    await page.getByRole("button", { name: "Show goals" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "That password is not right." })).toBeVisible();
-
-    for (let i = 0; i < 3; i++) {
-      await page.getByLabel("Password").fill(E2E_PASSWORD);
-      await page.getByRole("button", { name: "Show goals" }).click();
-      await expect(page.getByRole("form", { name: "Add an item" })).toBeVisible();
-      await page.getByRole("button", { name: "Sign out" }).click();
-      await expect(page.getByLabel("Password")).toBeVisible();
-      await expect(page.getByRole("form", { name: "Add an item" })).toHaveCount(0);
-    }
-  });
-
-  test("signing in on the Members page also opens the goals, and the nav has a Goals tab", async ({ page }) => {
-    await page.goto("/members");
-    await page.getByLabel("Password").fill(E2E_PASSWORD);
-    await page.getByRole("button", { name: "Show members" }).click();
-    await expect(page.getByText(/Showing 1–25 of 550 members/)).toBeVisible();
-    await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Goals" }).click();
-    await expect(page).toHaveURL(/\/goals$/);
     await expect(page.getByRole("form", { name: "Add an item" })).toBeVisible();
+    await expect(group(page, "Member engagement")).toBeVisible();
+    await expect(page.getByLabel("Password")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Goals" })).toHaveAttribute("aria-current", "page");
   });
 });
 
 test.describe("the roadmap API checks what it is sent", () => {
   test("bad input gets a plain sentence and a 4xx, never a crash", async ({ baseURL }) => {
-    const login = await fetch(`${baseURL}/api/members/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: E2E_PASSWORD }),
-    });
-    const cookie = (login.headers.get("set-cookie") ?? "").split(";")[0];
     const send = (method: string, path: string, body?: string) =>
-      fetch(`${baseURL}${path}`, { method, headers: { cookie, "Content-Type": "application/json" }, body });
+      fetch(`${baseURL}${path}`, { method, headers: { "Content-Type": "application/json" }, body });
     const missing = "00000000-0000-4000-8000-00000000dead";
 
     const cases: [string, string, string | undefined, number, RegExp][] = [

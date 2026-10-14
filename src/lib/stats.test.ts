@@ -11,18 +11,12 @@ import {
   doorYears,
   heatColor,
   heatmap,
-  filterMembers,
   headline,
   hourSeries,
   monthComparison,
-  matchesPreset,
   multiBooking,
-  membersToCsv,
   monthSeries,
-  paginate,
   percent,
-  presetCounts,
-  sortMembers,
   weekdaySeries,
   yearOverYear,
 } from "./stats";
@@ -188,83 +182,6 @@ describe("door pattern", () => {
     expect(days[0].day).toBe("2025-01-01");
     expect(days.find((d) => d.day === "2026-07-04")?.weekend).toBe(true); // a Saturday
     expect(days.find((d) => d.day === "2026-07-06")?.weekend).toBe(false); // a Monday
-  });
-});
-
-describe("member groups", () => {
-  it("builds the outreach groups from the member list", () => {
-    const counts = presetCounts(data.members, data.dataThrough);
-    expect(counts.all).toBe(550);
-    expect(counts["no-visits"]).toBe(63);
-    expect(counts["under-one"]).toBe(122);
-    expect(counts["no-fob"]).toBe(data.members.filter((m) => !m.ownFob).length);
-  });
-
-  it("calls someone 'gone quiet' only if they usually come monthly and have been away 45+ days", () => {
-    const base = "2026-09-27";
-    expect(matchesPreset(member({ lastVisit: "2026-08-01" }), "gone-quiet", base)).toBe(true);
-    expect(matchesPreset(member({ lastVisit: "2026-09-20" }), "gone-quiet", base)).toBe(false);
-    expect(matchesPreset(member({ lastVisit: "2026-08-01", visitsPerMonth: 0.5 }), "gone-quiet", base)).toBe(false);
-    expect(matchesPreset(member({ lastVisit: null }), "gone-quiet", base)).toBe(false);
-  });
-
-  it("treats 'new' as joined within 90 days", () => {
-    const base = "2026-09-27";
-    expect(matchesPreset(member({ joined: "2026-08-01" }), "new", base)).toBe(true);
-    expect(matchesPreset(member({ joined: "2026-05-01" }), "new", base)).toBe(false);
-    expect(matchesPreset(member({ joined: null }), "new", base)).toBe(false);
-  });
-
-  it("searches by name, ignoring case and spaces at the ends", () => {
-    const first = data.members[0].name;
-    const hits = filterMembers(data.members, { query: `  ${first.toUpperCase()} `, preset: "all", dataThrough: data.dataThrough });
-    expect(hits.map((m) => m.name)).toContain(first);
-  });
-
-  it("combines a group with a search", () => {
-    const hits = filterMembers(data.members, { query: "a", preset: "no-visits", dataThrough: data.dataThrough });
-    expect(hits.every((m) => m.band === "0 visits" && m.name.toLowerCase().includes("a"))).toBe(true);
-  });
-});
-
-describe("sorting and paging", () => {
-  const a = member({ name: "Ada", lastVisit: "2026-09-01" });
-  const b = member({ name: "Ben", lastVisit: null });
-  const c = member({ name: "Cy", lastVisit: "2026-08-01" });
-
-  it("puts members with no date last in either direction", () => {
-    expect(sortMembers([a, b, c], "lastVisit", "asc").map((m) => m.name)).toEqual(["Cy", "Ada", "Ben"]);
-    expect(sortMembers([a, b, c], "lastVisit", "desc").map((m) => m.name)).toEqual(["Ada", "Cy", "Ben"]);
-  });
-
-  it("sorts by name both ways and does not change the original list", () => {
-    const list = [c, a, b];
-    expect(sortMembers(list, "name", "desc").map((m) => m.name)).toEqual(["Cy", "Ben", "Ada"]);
-    expect(list.map((m) => m.name)).toEqual(["Cy", "Ada", "Ben"]);
-  });
-
-  it("pages through 550 members in 22 pages and keeps the page in range", () => {
-    const first = paginate(data.members, 1, 25);
-    expect(first.pages).toBe(22);
-    expect(first.rows).toHaveLength(25);
-    expect(paginate(data.members, 99, 25).page).toBe(22);
-    expect(paginate(data.members, 0, 25).page).toBe(1);
-    expect(paginate([], 1, 25)).toEqual({ rows: [], page: 1, pages: 1 });
-  });
-});
-
-describe("CSV export", () => {
-  it("writes a header and one line per member", () => {
-    const csv = membersToCsv([member({ name: "Ada Lovelace" })]);
-    const lines = csv.trim().split("\r\n");
-    expect(lines[0]).toBe("Name,Usage level,Visits per month,Last visit,Joined,Own door fob");
-    expect(lines[1]).toBe("Ada Lovelace,1–2 a month,1.50,2026-09-01,,Yes");
-  });
-
-  it("quotes commas and quotes, and defuses spreadsheet formulas", () => {
-    const csv = membersToCsv([member({ name: 'Smith, "Bo"' }), member({ name: "=HYPERLINK(\"x\")" })]);
-    expect(csv).toContain('"Smith, ""Bo"""');
-    expect(csv).toContain("\"'=HYPERLINK(\"\"x\"\")\"");
   });
 });
 

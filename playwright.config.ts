@@ -1,7 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3100;
-export const E2E_PASSWORD = "e2e-test-password";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -22,7 +21,6 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     env: {
-      DASHBOARD_PASSWORD: E2E_PASSWORD,
       // The browser tests replace /api/dashboard with sample data, so no database is touched.
       CCS_ALLOW_SAMPLE_DATA: "1",
     },

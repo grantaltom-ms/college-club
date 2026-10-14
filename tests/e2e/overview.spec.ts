@@ -19,8 +19,6 @@ test("navigation moves between the pages and marks the current one", async ({ pa
   await nav.getByRole("link", { name: "Timing" }).click();
   await expect(page).toHaveURL(/\/timing$/);
   await expect(nav.getByRole("link", { name: "Timing" })).toHaveAttribute("aria-current", "page");
-  await nav.getByRole("link", { name: "Members" }).click();
-  await expect(page).toHaveURL(/\/members$/);
   await nav.getByRole("link", { name: "Goals" }).click();
   await expect(page).toHaveURL(/\/goals$/);
   await expect(nav.getByRole("link", { name: "Goals" })).toHaveAttribute("aria-current", "page");

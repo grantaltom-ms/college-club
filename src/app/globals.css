@@ -933,12 +933,8 @@ main.frame {
   margin-bottom: 14px;
 }
 
-/* ---------- Members ---------- */
+/* ---------- Shared controls ---------- */
 
-.filters {
-  display: grid;
-  gap: 14px;
-}
 
 .search {
   width: 100%;
@@ -985,57 +981,13 @@ main.frame {
   color: var(--debonair);
 }
 
-.results-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
 
-.members-scroll {
-  overflow-x: auto;
-}
 
-.members-scroll .data-table td,
-.members-scroll .data-table th {
-  white-space: nowrap;
-}
 
-.sort-button {
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--cyberspace);
-}
 
-.sort-button:hover {
-  color: var(--waterloo);
-}
 
-.band-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 8px;
-  border-radius: 2px;
-}
 
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 14px;
-}
 
-.pager button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
 
 .muted {
   color: var(--slate);
@@ -1075,10 +1027,9 @@ main.frame {
   }
 }
 
-/* Let wide content (the member table) scroll inside its box instead of widening the page. */
+/* Let wide content (tables, charts) scroll inside its box instead of widening the page. */
 .stack,
-.stack > *,
-.members-scroll {
+.stack > * {
   min-width: 0;
   max-width: 100%;
 }
@@ -1149,15 +1100,7 @@ main.frame {
   }
 }
 
-.signin {
-  display: grid;
-  gap: 0.75rem;
-  max-width: 28rem;
-}
 
-.signin label {
-  font-weight: 600;
-}
 
 .card > .card-title:not(:first-child) {
   margin-top: 1.75rem;

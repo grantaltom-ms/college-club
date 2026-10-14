@@ -1,4 +1,4 @@
-import { countWeekdays, daysBetween, formatDay, formatMonth, weekdayIndex, WEEKDAYS, WEEKDAY_NAMES } from "./dates";
+import { countWeekdays, formatDay, formatMonth, weekdayIndex, WEEKDAYS, WEEKDAY_NAMES } from "./dates";
 import {
   BAND_ORDER,
   type Band,
@@ -469,104 +469,6 @@ export function bookingWeekdays(totals: ClubTotal[], year: number): BookingWeekd
     const bookings = mine.reduce((s, t) => s + t.allEntries, 0);
     return { index, name, short: WEEKDAYS[index], days: mine.length, bookings, perDay: mine.length ? bookings / mine.length : 0 };
   });
-}
-
-/* ---------- Members ---------- */
-
-export type Preset = "all" | "no-visits" | "under-one" | "gone-quiet" | "new" | "no-fob";
-
-export const PRESETS: { id: Preset; label: string; hint: string }[] = [
-  { id: "all", label: "Everyone", hint: "All adult members" },
-  { id: "no-visits", label: "No visits", hint: "No door entry or booking since January" },
-  { id: "under-one", label: "Under 1 a month", hint: "Visited, but less than once a month" },
-  { id: "gone-quiet", label: "Gone quiet", hint: "Visited at least monthly, but not in the last 45 days" },
-  { id: "new", label: "New", hint: "Joined in the last 90 days" },
-  { id: "no-fob", label: "No fob", hint: "No door fob on file, so only bookings are counted" },
-];
-
-export function matchesPreset(m: Member, preset: Preset, dataThrough: string): boolean {
-  switch (preset) {
-    case "all":
-      return true;
-    case "no-visits":
-      return m.band === "0 visits";
-    case "under-one":
-      return m.band === "Under 1/month";
-    case "gone-quiet":
-      return m.visitsPerMonth >= 1 && m.lastVisit !== null && daysBetween(m.lastVisit, dataThrough) >= 45;
-    case "new":
-      return m.joined !== null && daysBetween(m.joined, dataThrough) <= 90 && daysBetween(m.joined, dataThrough) >= 0;
-    case "no-fob":
-      return !m.ownFob;
-  }
-}
-
-export function presetCounts(members: Member[], dataThrough: string): Record<Preset, number> {
-  const counts = {} as Record<Preset, number>;
-  for (const p of PRESETS) counts[p.id] = members.filter((m) => matchesPreset(m, p.id, dataThrough)).length;
-  return counts;
-}
-
-export function filterMembers(members: Member[], opts: { query: string; preset: Preset; dataThrough: string }): Member[] {
-  const q = opts.query.trim().toLowerCase();
-  return members.filter(
-    (m) => matchesPreset(m, opts.preset, opts.dataThrough) && (q === "" || m.name.toLowerCase().includes(q)),
-  );
-}
-
-export type SortKey = "name" | "band" | "lastVisit" | "joined";
-export type SortDir = "asc" | "desc";
-
-export function sortMembers(members: Member[], key: SortKey, dir: SortDir): Member[] {
-  const sign = dir === "asc" ? 1 : -1;
-  const compare = (a: Member, b: Member): number => {
-    switch (key) {
-      case "name":
-        return a.name.localeCompare(b.name, "en", { sensitivity: "base" });
-      case "band":
-        return BAND_ORDER.indexOf(a.band) - BAND_ORDER.indexOf(b.band) || a.visitsPerMonth - b.visitsPerMonth;
-      case "lastVisit":
-      case "joined": {
-        const av = a[key];
-        const bv = b[key];
-        // Missing dates always sort last, whichever direction is chosen.
-        if (av === null && bv === null) return 0;
-        if (av === null) return 2 * sign;
-        if (bv === null) return -2 * sign;
-        return av.localeCompare(bv);
-      }
-    }
-  };
-  return [...members].sort((a, b) => sign * compare(a, b) || a.name.localeCompare(b.name));
-}
-
-export function paginate<T>(items: T[], page: number, pageSize: number): { rows: T[]; page: number; pages: number } {
-  const pages = Math.max(1, Math.ceil(items.length / pageSize));
-  const safePage = Math.min(Math.max(1, page), pages);
-  return { rows: items.slice((safePage - 1) * pageSize, safePage * pageSize), page: safePage, pages };
-}
-
-/** Quote a CSV field, and defuse values a spreadsheet would run as a formula. */
-function csvField(value: string): string {
-  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
-
-export function membersToCsv(members: Member[]): string {
-  const header = ["Name", "Usage level", "Visits per month", "Last visit", "Joined", "Own door fob"];
-  const lines = members.map((m) =>
-    [
-      m.name,
-      BAND_LABELS[m.band],
-      m.visitsPerMonth.toFixed(2),
-      m.lastVisit ?? "",
-      m.joined ?? "",
-      m.ownFob ? "Yes" : "No",
-    ]
-      .map(csvField)
-      .join(","),
-  );
-  return [header.join(","), ...lines].join("\r\n") + "\r\n";
 }
 
 /** "Jan 1 – Sep 27, 2026" for the member data, which starts on January 1. */

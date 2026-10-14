@@ -5,7 +5,7 @@ type Context = { params: Promise<{ id: string }> };
 
 /** Change any of title, group, status, due date and owner. */
 export async function PATCH(request: Request, { params }: Context) {
-  return withStore(request, async (store) => {
+  return withStore(async (store) => {
     const { id } = await params;
     const read = await readBody(request);
     if ("response" in read) return read.response;
@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: Context) {
 
 /** Deletes the item together with its subitems and notes. */
 export async function DELETE(request: Request, { params }: Context) {
-  return withStore(request, async (store) => {
+  return withStore(async (store) => {
     const { id } = await params;
     await store.deleteItem(id);
     return json({ ok: true });

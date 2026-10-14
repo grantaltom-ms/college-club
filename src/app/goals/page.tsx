@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { SignIn } from "@/components/SignIn";
 import {
   FILTERS,
   LIMITS,
@@ -49,7 +48,6 @@ async function api(method: string, url: string, body?: unknown): Promise<unknown
 
 type Gate =
   | { status: "loading" }
-  | { status: "signed-out" }
   | { status: "error"; message: string }
   | { status: "ready"; data: RoadmapData };
 
@@ -57,7 +55,6 @@ async function fetchRoadmap(): Promise<Gate> {
   try {
     return { status: "ready", data: (await api("GET", "/api/roadmap")) as RoadmapData };
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return { status: "signed-out" };
     return { status: "error", message: error instanceof Error ? error.message : "The goals could not be loaded." };
   }
 }
@@ -83,14 +80,9 @@ export default function GoalsPage() {
   /** Fetches the latest list. Throws (so the caller can show the problem) if it cannot, keeping what is on screen. */
   const reload = useCallback(async () => {
     const next = await fetchRoadmap();
-    if (next.status === "ready" || next.status === "signed-out") setGate(next);
+    if (next.status === "ready") setGate(next);
     else throw new ApiError(0, next.status === "error" ? next.message : "The goals could not be loaded.");
   }, []);
-
-  async function signOut() {
-    await fetch("/api/members/logout", { method: "POST" });
-    setGate({ status: "signed-out" });
-  }
 
   return (
     <>
@@ -108,37 +100,25 @@ export default function GoalsPage() {
           </button>
         </div>
       )}
-      {gate.status === "signed-out" && (
-        <SignIn
-          id="goals-password"
-          title="The goals are private."
-          text="Enter the password to see and change them. This is the same password as the Members page."
-          button="Show goals"
-          onSignedIn={() => fetchRoadmap().then(setGate)}
-        />
-      )}
       {gate.status === "ready" && (
         <>
           <p className="page-sub">
             Planning for technology and member communications, from the October 2026 meeting with Caitlin Sogn. Everything here can be
-            changed on this page.{" "}
-            <button type="button" className="link-button" onClick={signOut}>
-              Sign out
-            </button>
+            changed on this page.
           </p>
           {gate.data.source === "sample" && (
             <p className="sample-banner" role="note">
               Sample list. Changes here are only kept in memory for testing, not saved.
             </p>
           )}
-          <Roadmap data={gate.data} reload={reload} onSignedOut={() => setGate({ status: "signed-out" })} />
+          <Roadmap data={gate.data} reload={reload} />
         </>
       )}
     </>
   );
 }
 
-function Roadmap({ data, reload, onSignedOut }: { data: RoadmapData; reload: () => Promise<void>; onSignedOut: () => void }) {
+function Roadmap({ data, reload }: { data: RoadmapData; reload: () => Promise<void> }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [error, setError] = useState<string | null>(null);
   // Today comes from the visitor's own clock every time, never a fixed date.
@@ -152,12 +132,11 @@ function Roadmap({ data, reload, onSignedOut }: { data: RoadmapData; reload: () 
         await reload();
         return true;
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) onSignedOut();
-        else setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+        setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
         return false;
       }
     },
-    [reload, onSignedOut],
+    [reload],
   );
 
   const groups = useMemo(() => buildGroups(data.items), [data.items]);
