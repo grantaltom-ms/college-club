@@ -56,6 +56,8 @@ function dayOffset(base: string, back: number): string {
 
 function buildMembers(): Member[] {
   const rand = rng(1910);
+  // Separate stream so the booking fields never shift the rest of the sample data.
+  const rand2 = rng(2026);
   const members: Member[] = [];
   let n = 0;
   for (const band of BAND_ORDER) {
@@ -68,14 +70,22 @@ function buildMembers(): Member[] {
       const first = FIRST[n % FIRST.length];
       const last = LAST[Math.floor(n / FIRST.length) % LAST.length];
       const suffix = Math.floor(n / (FIRST.length * LAST.length));
+      const doorEntries = ownFob ? Math.round(visitDays * (1 + rand() * 0.3)) : 0;
+      const bookingDays = Math.floor(rand() * Math.min(visitDays, 40));
+      // About a third of people who book now and then book twice in a day.
+      const bookings = bookingDays + (bookingDays > 0 && rand2() < 0.3 ? 1 + Math.floor(rand2() * 12) : 0);
       members.push({
         // Names are unique and sort predictably; a numeral keeps any repeats apart.
         name: suffix ? `${first} ${last} ${suffix + 1}` : `${first} ${last}`,
         band,
         visitsPerMonth: Math.round((visitDays / 8.8) * 100) / 100,
         visitDays,
-        doorEntries: ownFob ? Math.round(visitDays * (1 + rand() * 0.3)) : 0,
-        bookingDays: Math.floor(rand() * Math.min(visitDays, 40)),
+        doorEntries,
+        bookingDays,
+        bookings,
+        earlyShare: ownFob && visitDays > 0 ? Math.round(rand2() * 100) / 100 : null,
+        weekendShare: ownFob && visitDays > 0 ? Math.round(rand2() * 60) / 100 : null,
+        household: rand2() < 0.03,
         lastVisit: visitDays === 0 ? null : dayOffset(DATA_THROUGH, Math.floor(rand() * (band === "4+/month" ? 70 : 200))),
         ownFob,
         joined: rand() < 0.45 ? dayOffset(DATA_THROUGH, Math.floor(rand() * 900)) : null,

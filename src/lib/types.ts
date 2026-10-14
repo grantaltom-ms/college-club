@@ -17,6 +17,14 @@ export interface Member {
   doorEntries: number;
   /** Days with a boat/class booking, Jul 1 to Sep 30. */
   bookingDays: number;
+  /** Boat/class bookings (not days), Jul 1 to Sep 30. More than bookingDays means some day had 2+. */
+  bookings: number;
+  /** Share of door entries between 4 and 8am, 0 to 1. Null when the member has no door data. */
+  earlyShare: number | null;
+  /** Share of door entries on weekends, 0 to 1. Null when the member has no door data. */
+  weekendShare: number | null;
+  /** Shared account for two or more people (name like "A & B"), so double bookings are expected. */
+  household: boolean;
   lastVisit: string | null;
   /** True when the member has their own Brivo door fob. */
   ownFob: boolean;

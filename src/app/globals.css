@@ -189,7 +189,8 @@ main.frame {
   border-bottom: 2px solid var(--waterloo);
 }
 
-.hero-number {
+.hero-number,
+.hero-number-sub {
   font-family: var(--display);
   font-weight: 600;
   font-size: clamp(88px, 14vw, 152px);

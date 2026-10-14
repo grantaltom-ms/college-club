@@ -15,6 +15,7 @@ import {
   headline,
   hourSeries,
   matchesPreset,
+  multiBooking,
   membersToCsv,
   monthSeries,
   paginate,
@@ -36,6 +37,10 @@ function member(overrides: Partial<Member>): Member {
     visitDays: 13,
     doorEntries: 14,
     bookingDays: 2,
+    bookings: 2,
+    earlyShare: 0.2,
+    weekendShare: 0.1,
+    household: false,
     lastVisit: "2026-09-01",
     ownFob: true,
     joined: null,
@@ -271,5 +276,30 @@ describe("reservation views", () => {
     const w = bookingWeekdays(data.totals, 2026);
     expect(w).toHaveLength(7);
     expect(w.reduce((s, x) => s + x.days, 0)).toBe(273);
+  });
+});
+
+describe("multiBooking", () => {
+  const wfc = { bookingDays: 10, bookings: 16, earlyShare: 0.1, weekendShare: 0.1 };
+  it("counts members who booked twice in a day and the work-from-club pattern", () => {
+    const members = [
+      member({ bookingDays: 0, bookings: 0 }),
+      member({ bookingDays: 5, bookings: 5 }),
+      member({ bookingDays: 5, bookings: 7 }),
+      member(wfc),
+      member({ ...wfc, earlyShare: 0.8 }),
+      member({ ...wfc, household: true }),
+      member({ ...wfc, earlyShare: null, weekendShare: null }),
+    ];
+    const r = multiBooking(members);
+    expect(r).toMatchObject({ total: 7, booked: 6, multiDay: 5, often: 4, workFromClub: 1, earlyBirds: 1, households: 1, unknown: 1 });
+    expect(r.multiDayShare).toBe(83);
+  });
+  it("is stable on repeated use and with no bookings", () => {
+    expect(multiBooking([])).toMatchObject({ booked: 0, multiDayShare: 0, workFromClub: 0 });
+    const a = multiBooking(data.members);
+    for (let i = 0; i < 5; i++) expect(multiBooking(data.members)).toEqual(a);
+    expect(a.workFromClub).toBeLessThanOrEqual(a.often);
+    expect(a.multiDay).toBeLessThanOrEqual(a.booked);
   });
 });

@@ -19,6 +19,9 @@ interface MemberRow {
   visit_days: number | null;
   door_entries: number | null;
   icrew_booking_days_jul_sep: number | null;
+  icrew_bookings_jul_sep?: number | null;
+  door_share_early_4to8am?: number | string | null;
+  door_share_weekend?: number | string | null;
   last_visit: string | null;
   own_brivo_fob: boolean;
   joined: string | null;
@@ -84,6 +87,17 @@ async function fetchAll<T>(cfg: { url: string; key: string }, table: string, ord
   }
 }
 
+function share(v: number | string | null | undefined): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Names like "Trevor & Tia Dyer", "Chris/Bridget Backschies" or "Eva and John Dougherty". */
+export function isHouseholdName(name: string): boolean {
+  return /[&/]|\band\b/i.test(name);
+}
+
 export function toMember(r: MemberRow): Member {
   const band = BAND_ORDER.includes(r.usage_band as Band) ? (r.usage_band as Band) : "0 visits";
   return {
@@ -93,6 +107,10 @@ export function toMember(r: MemberRow): Member {
     visitDays: r.visit_days ?? 0,
     doorEntries: r.door_entries ?? 0,
     bookingDays: r.icrew_booking_days_jul_sep ?? 0,
+    bookings: r.icrew_bookings_jul_sep ?? r.icrew_booking_days_jul_sep ?? 0,
+    earlyShare: share(r.door_share_early_4to8am),
+    weekendShare: share(r.door_share_weekend),
+    household: isHouseholdName(r.member_name),
     lastVisit: r.last_visit,
     ownFob: r.own_brivo_fob,
     joined: r.joined,
