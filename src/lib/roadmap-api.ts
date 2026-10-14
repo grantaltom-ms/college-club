@@ -1,4 +1,3 @@
-import { SESSION_COOKIE, cookieValue, verifySession } from "./auth";
 import { RoadmapError, memoryStore, SupabaseStore, type RoadmapStore } from "./roadmap-store";
 import { liveConfig } from "./supabase";
 
@@ -15,15 +14,6 @@ export function getStore(): RoadmapStore | null {
   const cfg = liveConfig();
   if (cfg) return new SupabaseStore(cfg);
   if (process.env.NODE_ENV !== "production" || process.env.CCS_ALLOW_SAMPLE_DATA === "1") return memoryStore();
-  return null;
-}
-
-/** Null when the visitor is signed in; otherwise the response to send back (503 with no password set, 401 without the cookie). */
-export async function requireSignIn(request: Request): Promise<Response | null> {
-  const password = process.env.DASHBOARD_PASSWORD;
-  if (!password) return json({ error: "The goals page is locked until a password is set." }, 503);
-  const token = cookieValue(request.headers.get("cookie"), SESSION_COOKIE);
-  if (!(await verifySession(token, password))) return json({ error: "Sign in to see and change the goals." }, 401);
   return null;
 }
 
@@ -44,12 +34,10 @@ export async function readBody(request: Request): Promise<{ body: unknown } | { 
 }
 
 /**
- * Every roadmap route goes through here: sign-in check first, then the storage, then your code.
- * Anything unexpected becomes a plain sentence, never a stack trace.
+ * Every roadmap route goes through here: pick the storage, run your code, and turn anything unexpected
+ * into a plain sentence, never a stack trace. The roadmap is open to anyone with the link (no password).
  */
-export async function withStore(request: Request, run: (store: RoadmapStore) => Promise<Response>): Promise<Response> {
-  const denied = await requireSignIn(request);
-  if (denied) return denied;
+export async function withStore(run: (store: RoadmapStore) => Promise<Response>): Promise<Response> {
   const store = getStore();
   if (!store) {
     return json({ error: "The database connection is not set up. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." }, 500);
