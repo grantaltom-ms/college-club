@@ -5,7 +5,11 @@ import {
   extremes,
   filteredSummary,
   isWeekly,
+  listSize,
   loadCampaigns,
+  quarterOf,
+  weeklyByMonthOfYear,
+  weeklyByQuarter,
   mailchimpConfig,
   sampleEmail,
   summarize,
@@ -92,6 +96,52 @@ describe("numbers", () => {
     expect(f.campaigns).toBe(1);
     expect(f.rawOpenRate).toBe(60);
     expect(f.filteredOpenRate).toBe(30);
+  });
+
+  it("groups Watercoolers by quarter in order and leaves one-off emails out", () => {
+    expect(quarterOf("2024-02-14")).toBe("2024 Q1");
+    expect(quarterOf("2024-12-31")).toBe("2024 Q4");
+    const list = [
+      camp({ sentOn: "2025-07-01", weekly: true, uniqueClicks: 2 }),
+      camp({ sentOn: "2025-01-07", weekly: true, uniqueClicks: 4 }),
+      camp({ sentOn: "2025-02-11", weekly: true, uniqueClicks: 6 }),
+      camp({ sentOn: "2025-02-12", weekly: false, uniqueClicks: 50 }),
+    ];
+    const q = weeklyByQuarter(list);
+    expect(q.map((s) => s.label)).toEqual(["2025 Q1", "2025 Q3"]);
+    expect(q[0].campaigns).toBe(2);
+    expect(q[0].clickRate).toBeCloseTo(5);
+    expect(weeklyByQuarter([camp({})])).toEqual([]);
+  });
+
+  it("pools Watercoolers by month of the year across years", () => {
+    const list = [
+      camp({ sentOn: "2024-08-06", weekly: true, uniqueClicks: 1 }),
+      camp({ sentOn: "2025-08-05", weekly: true, uniqueClicks: 3 }),
+      camp({ sentOn: "2025-08-05", weekly: false, uniqueClicks: 99 }),
+    ];
+    const m = weeklyByMonthOfYear(list);
+    expect(m).toHaveLength(12);
+    expect(m[7].label).toBe("Aug");
+    expect(m[7].campaigns).toBe(2);
+    expect(m[7].clickRate).toBeCloseTo(2);
+    expect(m[0].campaigns).toBe(0);
+    expect(m[0].clickRate).toBe(0);
+  });
+
+  it("tracks list size from the latest Watercoolers and flags unsubscribe spikes", () => {
+    const list = [
+      camp({ id: "old", sentOn: "2026-07-01", weekly: true }),
+      camp({ id: "jump", sentOn: "2026-08-12", weekly: true, delivered: 1919, unsubscribes: 58, bounces: 116 }),
+      camp({ id: "calm", sentOn: "2026-08-19", weekly: true, delivered: 1861, unsubscribes: 5 }),
+      camp({ id: "notice", sentOn: "2026-08-20", weekly: false, delivered: 400, unsubscribes: 40 }),
+    ];
+    const pts = listSize(list, 2);
+    expect(pts.map((p) => p.id)).toEqual(["jump", "calm"]);
+    expect(pts[0].spike).toBe(true);
+    expect(pts[1].spike).toBe(false);
+    expect(pts[0].bounces).toBe(116);
+    expect(listSize(list, 10)).toHaveLength(3);
   });
 
   it("spots Watercooler titles case-insensitively", () => {
