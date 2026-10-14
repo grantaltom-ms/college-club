@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChartCard } from "@/components/ChartCard";
 import { ColumnChart, type Column } from "@/components/ColumnChart";
+import { GroupedColumnChart } from "@/components/GroupedColumnChart";
 import { WithData } from "@/components/DataProvider";
 import { HeatmapChart } from "@/components/HeatmapChart";
 import { WEEKDAYS, formatDay, weekdayIndex } from "@/lib/dates";
@@ -18,7 +19,7 @@ import {
   fmtInt,
   heatmap,
   hourSeries,
-  monthSeries,
+  monthComparison,
   periodRange,
   weekdaySeries,
   yearOverYear,
@@ -27,6 +28,8 @@ import type { DashboardData } from "@/lib/types";
 
 const BASE = "#536872";
 const EMPHASIS = "#2b3a42";
+/** Older year light, newest year dark, so this year stands out next to last year. */
+const YEAR_COLORS = ["#a7b3b9", EMPHASIS];
 
 export default function TimingPage() {
   return (
@@ -82,29 +85,32 @@ function Timing({ data }: { data: DashboardData }) {
     tooltip: [`${fmtInt(b.bookings)} bookings`, `${WEEKDAYS[weekdayIndex(b.day)]}, ${formatDay(b.day)}`],
   }));
 
-  const monthsByYear = years
-    .slice()
-    .sort((a, b) => a - b)
-    .map((y) => ({ year: y, months: monthSeries(data.door, y) }));
-  const monthMax = Math.max(0, ...monthsByYear.flatMap((m) => m.months.filter((p) => p.complete).map((p) => p.entries)));
-  const monthColumns = (months: ReturnType<typeof monthSeries>): Column[] =>
-    months.map((m) => ({
-      key: m.key,
-      xLabel: m.label,
-      value: m.complete ? m.entries : 0,
-      tooltip: m.complete
-        ? [`${fmtInt(m.entries)} entries`, m.label, `${fmtInt(m.people)} different people`]
-        : [m.entries ? "Month not finished" : "No data yet", m.label],
-    }));
-  const monthTable = monthsByYear.length
-    ? monthsByYear[0].months.map((m, i) => [
-        m.label,
-        ...monthsByYear.map((y) => {
-          const row = y.months[i];
-          return row.complete ? fmtInt(row.entries) : row.entries ? `${fmtInt(row.entries)} (so far)` : "\u2014";
-        }),
-      ])
-    : [];
+  const compare = monthComparison(data.door);
+  const yearColors = compare.years.map((_, i) => YEAR_COLORS[Math.max(0, YEAR_COLORS.length - compare.years.length + i)]);
+  const monthCell = (m: ReturnType<typeof monthComparison>["rows"][number]["years"][number]) =>
+    m.complete ? fmtInt(m.entries) : m.entries ? `${fmtInt(m.entries)} (so far)` : "\u2014";
+  const changeText = (change: number | null) => (change === null ? "\u2014" : `${change > 0 ? "+" : ""}${change}%`);
+  const newest = compare.years[compare.years.length - 1];
+  const oldest = compare.years[0];
+  const monthGroups = compare.rows.map((r) => ({
+    key: String(r.month),
+    xLabel: r.label,
+    values: r.years.map((m) => (m.complete ? m.entries : 0)),
+    tooltip: [
+      r.change === null ? r.label : `${r.label}: ${Math.abs(r.change)}% ${r.change >= 0 ? "higher" : "lower"} in ${newest}`,
+      ...r.years.map((m, i) => {
+        const y = compare.years[i];
+        if (m.complete) return `${y}: ${fmtInt(m.entries)} entries`;
+        return m.entries ? `${y}: ${fmtInt(m.entries)} so far, month not finished` : `${y}: no data yet`;
+      }),
+    ] as [string, ...string[]],
+  }));
+  const monthTable = compare.rows.map((r) => [
+    r.label,
+    ...r.years.map(monthCell),
+    ...(compare.years.length > 1 ? [changeText(r.change)] : []),
+  ]);
+  const monthHeaders = ["Month", ...compare.years.map(String), ...(compare.years.length > 1 ? [`Change, ${oldest} to ${newest}`] : [])];
 
   const sat = weekdays[5];
   const sun = weekdays[6];
@@ -193,23 +199,19 @@ function Timing({ data }: { data: DashboardData }) {
 
         <ChartCard
           title="Door entries by month"
-          subtitle="Both years on the same scale. Months that are not finished yet are left blank."
-          table={{ headers: ["Month", ...monthsByYear.map((y) => String(y.year))], rows: monthTable }}
+          subtitle={
+            compare.years.length > 1
+              ? `Each month with ${compare.years.join(" and ")} side by side, on the same scale. Months not finished yet are left blank.`
+              : "Months not finished yet are left blank."
+          }
+          legend={compare.years.map((y, i) => ({ label: String(y), color: yearColors[i] }))}
+          table={{ headers: monthHeaders, rows: monthTable }}
         >
-          <div className="chart-pair">
-            {monthsByYear.map((y) => (
-              <div key={y.year}>
-                <h3>{y.year}</h3>
-                <ColumnChart
-                  columns={monthColumns(y.months)}
-                  ariaLabel={`Door entries by month, ${y.year}`}
-                  baseColor={BASE}
-                  maxValue={monthMax}
-                  height={200}
-                />
-              </div>
-            ))}
-          </div>
+          <GroupedColumnChart
+            groups={monthGroups}
+            colors={yearColors}
+            ariaLabel={`Door entries by month, ${compare.years.join(" and ")}`}
+          />
         </ChartCard>
 
         {yoy && (

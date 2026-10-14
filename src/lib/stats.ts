@@ -203,6 +203,34 @@ export function monthSeries(door: DoorPattern, year: number): MonthPoint[] {
   });
 }
 
+export interface MonthCompareRow {
+  month: number;
+  label: string;
+  /** One point per year, oldest year first. */
+  years: MonthPoint[];
+  /** Percent change from the oldest to the newest year, when both have the month in full. */
+  change: number | null;
+}
+
+/** Each month with every year's door entries next to each other, oldest year first. */
+export function monthComparison(door: DoorPattern): { years: number[]; rows: MonthCompareRow[] } {
+  const years = doorYears(door).slice().sort((a, b) => a - b);
+  const series = years.map((y) => monthSeries(door, y));
+  const rows = Array.from({ length: 12 }, (_, i) => {
+    const points = series.map((s) => s[i]);
+    const first = points[0];
+    const last = points[points.length - 1];
+    const comparable = points.length > 1 && first.complete && last.complete && first.entries > 0;
+    return {
+      month: i + 1,
+      label: first?.label ?? "",
+      years: points,
+      change: comparable ? Math.round((last.entries / first.entries - 1) * 100) : null,
+    };
+  });
+  return { years, rows: series.length ? rows : [] };
+}
+
 export interface YearOverYear {
   year: number;
   previousYear: number;

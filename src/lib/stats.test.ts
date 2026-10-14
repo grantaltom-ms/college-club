@@ -14,6 +14,7 @@ import {
   filterMembers,
   headline,
   hourSeries,
+  monthComparison,
   matchesPreset,
   multiBooking,
   membersToCsv,
@@ -125,6 +126,26 @@ describe("door pattern", () => {
     expect(yoy.thisYear).toBe(sum(now.map((m) => m.entries)));
     expect(yoy.lastYear).toBe(sum(before.map((m) => m.entries)));
     expect(yoy.change).toBe(Math.round((yoy.thisYear / yoy.lastYear - 1) * 100));
+  });
+
+  it("lines up each month across years with the change where both are finished", () => {
+    const c = monthComparison(data.door);
+    expect(c.years).toEqual([2025, 2026]);
+    expect(c.rows).toHaveLength(12);
+    const mar = c.rows[2];
+    expect(mar.label).toBe("Mar");
+    expect(mar.years.map((m) => m.key)).toEqual(["2025-03", "2026-03"]);
+    expect(mar.change).toBe(Math.round((mar.years[1].entries / mar.years[0].entries - 1) * 100));
+    expect(c.rows[9].change).toBeNull(); // October 2026 is not finished
+    expect(c.rows[11].change).toBeNull(); // December 2026 has not happened
+    for (let i = 0; i < 3; i++) expect(monthComparison(data.door)).toEqual(c);
+  });
+
+  it("compares nothing with only one year, and nothing with no data", () => {
+    const one = monthComparison({ ...data.door, periods: [data.door.periods[0]] });
+    expect(one.years).toHaveLength(1);
+    expect(one.rows.every((r) => r.change === null)).toBe(true);
+    expect(monthComparison({ ...data.door, periods: [], months: [] }).rows).toEqual([]);
   });
 
   it("has no year-over-year figure when there is only one year", () => {

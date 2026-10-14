@@ -336,6 +336,10 @@ main.frame {
   white-space: nowrap;
 }
 
+.chart-tip-below {
+  transform: translate(-50%, 0);
+}
+
 .chart-tip strong {
   display: block;
   color: #fff;
