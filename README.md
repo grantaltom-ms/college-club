@@ -18,6 +18,19 @@ With no Supabase settings, local development shows clearly labelled **sample dat
 
 Add the Supabase variables above in the Vercel project's Environment Variables, then deploy. The Members page stays locked (503) until `DASHBOARD_PASSWORD` is set. The data endpoint returns an error rather than sample data if Supabase is not configured.
 
+## Loading the Shells and Reservations tabs
+
+These two tabs read their own tables, filled from iCrew exports. Neither table holds a name.
+
+| Tab | Table | iCrew export | Prepare it with |
+|---|---|---|---|
+| Shells | `shell_outings` | Shell usage (`ccs_shellusage.csv`) | `npm run shells:prepare -- ccs_shellusage.csv shell_outings.csv` |
+| Reservations | `reservation_counts` | Reservations (`ccs_Reservations.csv`) | `npm run reservations:prepare -- ccs_Reservations.csv reservation_counts.csv` |
+
+First time: run `db/shell_outings.sql` and `db/reservation_counts.sql` in the Supabase SQL editor. To load or refresh a tab: run its prepare command, `truncate` the table, then import the output CSV with the Supabase Table Editor. Until a table is loaded, its tab shows a plain "could not be loaded" message and the rest of the site is unaffected.
+
+The prepare step runs on your own computer: shell rower names are swapped for scrambled codes (used only on the server to count different people), and reservations are reduced to counts per day, start hour and type.
+
 ## Checks
 
 `npm run check` runs everything CI runs: lint, type check, unit tests, build, and browser tests (Playwright, against a production build with mocked data). Browser tests need Chromium: `npx playwright install chromium`.
