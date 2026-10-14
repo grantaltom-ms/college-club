@@ -11,9 +11,12 @@ import {
   filteredSummary,
   fmtDate,
   fmtPct,
+  listSize,
   openRate,
   recentSends,
   unsubRate,
+  weeklyByMonthOfYear,
+  weeklyByQuarter,
   weeklyVsOther,
   type Campaign,
   type EmailData,
@@ -153,6 +156,10 @@ function Email({ data }: { data: EmailData }) {
   const filtered = filteredSummary(campaigns);
   const recent = recentSends(campaigns, 12);
   const hasFiltered = recent.some((c) => c.filteredOpens !== null);
+  const quarters = weeklyByQuarter(campaigns);
+  const months = weeklyByMonthOfYear(campaigns);
+  const list = listSize(campaigns, 30);
+  const spikes = list.filter((p) => p.spike).length;
 
   if (campaigns.length === 0) {
     return <p className="status">No sent emails were found for this audience.</p>;
@@ -205,6 +212,74 @@ function Email({ data }: { data: EmailData }) {
           <p className="card-sub">The Watercooler is steady. One-off emails with a single clear ask do much better.</p>
           <SummaryTable list={groups} />
         </section>
+
+        {quarters.length > 0 && (
+          <ChartCard
+            title="Watercooler click rate by quarter"
+            subtitle="Only the weekly newsletter, so the line is not pulled around by one-off surveys and notices. Hover a column for the number of sends behind it."
+            table={{ headers: SUMMARY_HEADERS.map((h, i) => (i === 0 ? "Quarter" : h)), rows: summaryRows(quarters) }}
+          >
+            <ColumnChart
+              columns={quarters.map((q) => ({
+                key: q.label,
+                xLabel: q.label.endsWith("Q1") ? q.label.slice(0, 4) : null,
+                value: Math.round(q.clickRate * 10) / 10,
+                emphasis: q.label === quarters[quarters.length - 1].label,
+                tooltip: [`${fmtPct(q.clickRate)} clicked`, q.label, `${fmtInt(q.campaigns)} sends, ${fmtInt(q.delivered)} delivered`, `${fmtPct(q.openRate)} opened (raw)`],
+              }))}
+              ariaLabel="Watercooler click rate by quarter"
+              tick={(n) => `${n}%`}
+            />
+          </ChartCard>
+        )}
+
+        <ChartCard
+          title="Watercooler click rate by month of the year"
+          subtitle="All years pooled, by the month the email went out. A low summer or a low winter says when members stop reading, which matters for off-season events."
+          table={{ headers: SUMMARY_HEADERS.map((h, i) => (i === 0 ? "Month" : h)), rows: summaryRows(months) }}
+        >
+          <ColumnChart
+            columns={months.map((m) => ({
+              key: m.label,
+              xLabel: m.label,
+              value: Math.round(m.clickRate * 10) / 10,
+              tooltip: [`${fmtPct(m.clickRate)} clicked`, m.label, `${fmtInt(m.campaigns)} sends, ${fmtInt(m.delivered)} delivered`],
+            }))}
+            ariaLabel="Watercooler click rate by month of the year"
+            tick={(n) => `${n}%`}
+          />
+        </ChartCard>
+
+        {list.length > 0 && (
+          <ChartCard
+            title={`List size, last ${list.length} Watercoolers`}
+            subtitle={
+              spikes > 0
+                ? `Emails delivered per send. Dark columns are sends where more than half a percent of readers unsubscribed (${spikes} of ${list.length}).`
+                : "Emails delivered per send. A column is darkened when more than half a percent of readers unsubscribe; none did here."
+            }
+            legend={[
+              { label: "Delivered", color: "#536872" },
+              { label: "Unsubscribes above 0.5%", color: "#8c3b2f" },
+            ]}
+            table={{
+              headers: ["Sent", "Delivered", "Bounced", "Unsubscribed"],
+              rows: list.map((p) => [fmtDate(p.sentOn), fmtInt(p.delivered), fmtInt(p.bounces), fmtInt(p.unsubscribes)]),
+            }}
+          >
+            <ColumnChart
+              columns={list.map((p, i) => ({
+                key: p.id,
+                xLabel: i % 5 === 0 || i === list.length - 1 ? fmtDate(p.sentOn).replace(/, \d{4}$/, "") : null,
+                value: p.delivered,
+                emphasis: p.spike,
+                tooltip: [`${fmtInt(p.delivered)} delivered`, fmtDate(p.sentOn), `${fmtInt(p.unsubscribes)} unsubscribed, ${fmtInt(p.bounces)} bounced`],
+              }))}
+              ariaLabel={`List size, last ${list.length} Watercoolers`}
+              emphasisColor="#8c3b2f"
+            />
+          </ChartCard>
+        )}
 
         <section className="card" aria-label="Best and worst emails by click rate">
           <h2 className="card-title">Best five by click rate</h2>

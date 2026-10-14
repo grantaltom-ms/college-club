@@ -149,6 +149,54 @@ export function weeklyVsOther(campaigns: Campaign[]): Summary[] {
   ];
 }
 
+/** "2024-02-14" -> "2024 Q1". */
+export function quarterOf(day: string): string {
+  const month = Number(day.slice(5, 7));
+  return `${day.slice(0, 4)} Q${Math.ceil(month / 3)}`;
+}
+
+/** Watercooler results by calendar quarter, oldest first. One kind of email, so the trend is not muddied by one-off sends. */
+export function weeklyByQuarter(campaigns: Campaign[]): Summary[] {
+  const weekly = campaigns.filter((c) => c.weekly);
+  const quarters = [...new Set(weekly.map((c) => quarterOf(c.sentOn)))].sort();
+  return quarters.map((q) => summarize(q, weekly.filter((c) => quarterOf(c.sentOn) === q)));
+}
+
+export const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+/** Watercooler results by month of the year, all years pooled: does the newsletter land differently in the off season? */
+export function weeklyByMonthOfYear(campaigns: Campaign[]): Summary[] {
+  const weekly = campaigns.filter((c) => c.weekly);
+  return MONTH_LABELS.map((label, i) =>
+    summarize(label, weekly.filter((c) => Number(c.sentOn.slice(5, 7)) === i + 1)),
+  );
+}
+
+export interface ListPoint {
+  id: string;
+  sentOn: string;
+  delivered: number;
+  bounces: number;
+  unsubscribes: number;
+  /** True when more than half a percent of the delivered emails unsubscribed: a send worth asking about. */
+  spike: boolean;
+}
+
+/** Delivered count per Watercooler for the most recent sends, oldest first. The delivered count is the best proxy for list size. */
+export function listSize(campaigns: Campaign[], count: number): ListPoint[] {
+  return campaigns
+    .filter((c) => c.weekly)
+    .slice(-count)
+    .map((c) => ({
+      id: c.id,
+      sentOn: c.sentOn,
+      delivered: c.delivered,
+      bounces: c.bounces,
+      unsubscribes: c.unsubscribes,
+      spike: pct(c.unsubscribes, c.delivered) > 0.5,
+    }));
+}
+
 export const clickRate = (c: Campaign) => pct(c.uniqueClicks, c.delivered);
 export const openRate = (c: Campaign) => pct(c.uniqueOpens, c.delivered);
 export const filteredOpenRate = (c: Campaign) => (c.filteredOpens === null ? null : pct(c.filteredOpens, c.delivered));
