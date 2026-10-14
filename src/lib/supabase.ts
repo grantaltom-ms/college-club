@@ -1,3 +1,4 @@
+import { sameDateCutoff, type Outing, type RowerCount, type ShellData } from "./shells";
 import {
   BAND_ORDER,
   type Band,
@@ -73,7 +74,7 @@ export function liveConfig(): { url: string; key: string } | null {
   return url && key ? { url: url.replace(/\/$/, ""), key } : null;
 }
 
-async function fetchAll<T>(cfg: { url: string; key: string }, table: string, order: string): Promise<T[]> {
+export async function fetchAll<T>(cfg: { url: string; key: string }, table: string, order: string): Promise<T[]> {
   const rows: T[] = [];
   for (let offset = 0; ; offset += PAGE) {
     const res = await fetch(`${cfg.url}/rest/v1/${table}?select=*&order=${order}&limit=${PAGE}&offset=${offset}`, {
@@ -181,4 +182,63 @@ export async function loadLiveData(cfg: { url: string; key: string }): Promise<D
       months: monthRows.map(toDoorMonth),
     },
   };
+}
+
+/* ---------- Shell outings ---------- */
+
+export interface ShellRow {
+  boat: string;
+  seats: number | null;
+  day: string;
+  /** "member" for a member's own row, "team" for camps and team sessions. */
+  kind: string;
+  minutes: number | null;
+  /** "07:00:00" or "07:00". */
+  start_time: string | null;
+  /** Scrambled code for the rower (never their name). Only used here, on the server, to count people. */
+  rower_key: string | null;
+}
+
+/** The browser gets the boat, day and time only: no rower code, so no way back to a person. */
+export function toOuting(r: ShellRow): Outing {
+  const hour = r.start_time ? Number(r.start_time.slice(0, 2)) : NaN;
+  return {
+    boat: r.boat,
+    seats: r.seats ?? 1,
+    day: r.day,
+    team: r.kind === "team",
+    minutes: r.minutes ?? 0,
+    startHour: Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null,
+  };
+}
+
+/** Different rowers per year, whole year and Jan 1 to the same day as `through`. */
+export function countRowers(rows: ShellRow[], through: string): RowerCount[] {
+  const years = [...new Set(rows.map((r) => Number(r.day.slice(0, 4))))].sort((a, b) => a - b);
+  return years.map((year) => {
+    const inYear = rows.filter((r) => r.rower_key && r.day.startsWith(`${year}-`));
+    const cutoff = sameDateCutoff(year, through);
+    return {
+      year,
+      rowers: new Set(inYear.map((r) => r.rower_key)).size,
+      sameDates: new Set(inYear.filter((r) => r.day <= cutoff).map((r) => r.rower_key)).size,
+    };
+  });
+}
+
+/** Outings up to today (later bookings are left out until they happen). */
+export function toShellData(rows: ShellRow[], today: string): ShellData {
+  const kept = rows.filter((r) => r.day <= today);
+  const through = kept.reduce((max, r) => (r.day > max ? r.day : max), "");
+  return {
+    source: "live",
+    through,
+    outings: kept.map(toOuting),
+    rowers: countRowers(kept, through),
+  };
+}
+
+export async function loadShells(cfg: { url: string; key: string }, today = new Date().toISOString().slice(0, 10)): Promise<ShellData> {
+  const rows = await fetchAll<ShellRow>(cfg, "shell_outings", "day.asc,id.asc");
+  return toShellData(rows, today);
 }
