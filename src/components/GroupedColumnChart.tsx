@@ -1,0 +1,112 @@
+"use client";
+
+import { useState } from "react";
+import { barPath, compact, niceScale } from "./ColumnChart";
+import { useElementWidth } from "./useElementWidth";
+
+export interface ColumnGroup {
+  key: string;
+  xLabel: string;
+  /** One bar per series, in the same order as `colors`. Zero leaves a gap. */
+  values: number[];
+  /** First line is shown large; the rest are details. */
+  tooltip: [string, ...string[]];
+}
+
+interface Props {
+  groups: ColumnGroup[];
+  colors: string[];
+  ariaLabel: string;
+  height?: number;
+  tick?: (n: number) => string;
+}
+
+const MARGIN = { top: 10, right: 8, bottom: 30, left: 44 };
+
+/** Columns in groups (one group per month, one bar per year), so each month compares side by side. */
+export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, tick = compact }: Props) {
+  const [ref, width] = useElementWidth<HTMLDivElement>();
+  const [active, setActive] = useState<number | null>(null);
+
+  const innerW = Math.max(0, width - MARGIN.left - MARGIN.right);
+  const innerH = height - MARGIN.top - MARGIN.bottom;
+  const { top, ticks } = niceScale(Math.max(0, ...groups.flatMap((g) => g.values)));
+  const slot = groups.length ? innerW / groups.length : 0;
+  const series = colors.length;
+  const barW = Math.max(2, Math.min(22, (slot - 8) / series - 2));
+  const groupW = barW * series + 2 * (series - 1);
+  // On a phone there is no room for "Jan Feb Mar", so use one letter each.
+  const narrow = slot < 36;
+  const yOf = (v: number) => MARGIN.top + innerH - (v / top) * innerH;
+
+  const activeGroup = active === null ? null : groups[active];
+  const tipX = active === null ? 0 : Math.min(Math.max(MARGIN.left + slot * active + slot / 2, 90), width - 90);
+  const tipY = activeGroup ? yOf(Math.max(...activeGroup.values)) - 8 : 0;
+
+  return (
+    <div className="chart-wrap" ref={ref}>
+      {width > 0 && (
+        <svg
+          className="chart-svg"
+          width={width}
+          height={height}
+          role="group"
+          aria-label={ariaLabel}
+          onPointerLeave={() => setActive(null)}
+        >
+          {ticks.map((t) => (
+            <g key={t}>
+              <line x1={MARGIN.left} x2={width - MARGIN.right} y1={yOf(t)} y2={yOf(t)} stroke={t === 0 ? "#c9c1ac" : "#e6e1d4"} strokeWidth={1} />
+              <text x={MARGIN.left - 8} y={yOf(t) + 4} textAnchor="end">
+                {tick(t)}
+              </text>
+            </g>
+          ))}
+          {groups.map((g, i) => {
+            const left = MARGIN.left + slot * i + (slot - groupW) / 2;
+            return (
+              <g key={g.key}>
+                {g.values.map((v, s) =>
+                  v > 0 ? (
+                    <path
+                      key={s}
+                      d={barPath(left + s * (barW + 2), yOf(v), barW, innerH - (yOf(v) - MARGIN.top))}
+                      fill={colors[s]}
+                      opacity={active === null || active === i ? 1 : 0.55}
+                    />
+                  ) : null,
+                )}
+                <text x={MARGIN.left + slot * i + slot / 2} y={height - 8} textAnchor="middle">
+                  {narrow ? g.xLabel.slice(0, 1) : g.xLabel}
+                </text>
+                <rect
+                  className="col-hit"
+                  x={MARGIN.left + slot * i}
+                  y={MARGIN.top}
+                  width={slot}
+                  height={innerH}
+                  tabIndex={0}
+                  role="img"
+                  aria-label={g.tooltip.join(", ")}
+                  onPointerEnter={() => setActive(i)}
+                  onFocus={() => setActive(i)}
+                  onBlur={() => setActive(null)}
+                />
+              </g>
+            );
+          })}
+        </svg>
+      )}
+      {activeGroup && (
+        <div className="chart-tip" style={{ left: tipX, top: tipY }} role="status">
+          <strong>{activeGroup.tooltip[0]}</strong>
+          {activeGroup.tooltip.slice(1).map((line) => (
+            <span key={line} style={{ display: "block" }}>
+              {line}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
