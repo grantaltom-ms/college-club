@@ -1,7 +1,7 @@
 "use client";
 
 import { WithData } from "@/components/DataProvider";
-import { BAND_COLORS, bandSummary, dataRange, fmtInt, headline } from "@/lib/stats";
+import { BAND_COLORS, bandSummary, dataRange, fmtInt, headline, multiBooking } from "@/lib/stats";
 import type { DashboardData } from "@/lib/types";
 
 export default function OverviewPage() {
@@ -16,6 +16,7 @@ export default function OverviewPage() {
 function Overview({ data }: { data: DashboardData }) {
   const rows = bandSummary(data.members);
   const h = headline(data.members);
+  const mb = multiBooking(data.members);
   const widest = Math.max(1, ...rows.map((r) => r.members));
 
   return (
@@ -79,6 +80,43 @@ function Overview({ data }: { data: DashboardData }) {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="card" aria-labelledby="multi-title" data-testid="multi-booking">
+          <div className="card-head">
+            <div>
+              <h2 className="card-title" id="multi-title">
+                Members who book more than once in a day
+              </h2>
+              <p className="card-sub">
+                Reservations from July to September. A day with one or more bookings counts as one visit; this
+                tile looks at the people who book several times on the same day.
+              </p>
+            </div>
+          </div>
+          <div className="hero">
+            <p className="hero-number-sub num" data-testid="multi-share">
+              {mb.multiDayShare}%
+            </p>
+            <div className="hero-copy">
+              <p className="hero-lead">
+                of the {fmtInt(mb.booked)} members who booked ({fmtInt(mb.multiDay)}) booked more than once on at
+                least one day.
+              </p>
+              <p className="hero-support" data-testid="multi-wfc">
+                {fmtInt(mb.workFromClub)} members ({mb.workFromClubShareOfBooked}% of those who booked,{" "}
+                {mb.workFromClubShareOfAll}% of all {fmtInt(mb.total)}) look like they use the club as a place to
+                work: they double-book often, come on weekday daytimes or evenings, and are not a shared account.
+              </p>
+            </div>
+          </div>
+          <p className="card-sub">
+            How we tell: the reservation export has no start times, so we count a member as double-booking when
+            they have more bookings than booking days. {fmtInt(mb.often)} do it often (5 or more extra bookings).
+            We set aside {fmtInt(mb.earlyBirds)} who mostly arrive 4 to 8am (rowers booking two boats),{" "}
+            {fmtInt(mb.households)} shared accounts for two people, and {fmtInt(mb.unknown)} with no door data. A
+            double booking can also be a boat plus a class, so treat this as a good estimate, not a count.
+          </p>
         </section>
 
         <section aria-labelledby="stands-out">

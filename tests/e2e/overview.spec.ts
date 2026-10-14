@@ -39,3 +39,17 @@ test("shows a plain error and recovers when the data fails to load", async ({ pa
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.locator(".hero-number")).toHaveText("185");
 });
+
+test("multi-booking tile shows shares and stays correct across repeated visits", async ({ page }) => {
+  await page.goto("/");
+  const tile = page.getByTestId("multi-booking");
+  await expect(tile.getByRole("heading", { name: "Members who book more than once in a day" })).toBeVisible();
+  const first = await page.getByTestId("multi-share").innerText();
+  expect(first).toMatch(/^\d+%$/);
+  await expect(page.getByTestId("multi-wfc")).toContainText("look like they use the club as a place to work");
+  for (let i = 0; i < 4; i++) {
+    await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Timing" }).click();
+    await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Overview" }).click();
+    await expect(page.getByTestId("multi-share")).toHaveText(first);
+  }
+});

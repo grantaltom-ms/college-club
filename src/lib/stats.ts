@@ -85,6 +85,62 @@ export function headline(members: Member[]): Headline {
   };
 }
 
+/* ---------- Several reservations in one day ---------- */
+
+/** Extra bookings (beyond one per day) that make a repeat habit rather than a one-off. */
+export const OFTEN_EXTRA_BOOKINGS = 5;
+
+export interface MultiBooking {
+  total: number;
+  /** Members with at least one booking in the period. */
+  booked: number;
+  /** Booked 2+ times on at least one day. */
+  multiDay: number;
+  multiDayShare: number;
+  /** Did it often: at least OFTEN_EXTRA_BOOKINGS extra bookings. */
+  often: number;
+  /** Often, weekday daytime or evening door pattern, not a shared account. */
+  workFromClub: number;
+  workFromClubShareOfBooked: number;
+  workFromClubShareOfAll: number;
+  /** Often, but mostly early-morning arrivals (rowers booking two boats). */
+  earlyBirds: number;
+  /** Shared accounts that book twice for two people. */
+  households: number;
+  /** Often, but no door data, so we can't tell. */
+  unknown: number;
+}
+
+/**
+ * The reservation export has no start times, so "more bookings than booking days" is the only
+ * way to see someone booked twice in a day. Door-time shares then separate people who seem to
+ * be working from the club from early-morning rowers and shared accounts.
+ */
+export function multiBooking(members: Member[]): MultiBooking {
+  const booked = members.filter((m) => m.bookingDays > 0);
+  const extra = (m: Member) => m.bookings - m.bookingDays;
+  const multiDay = booked.filter((m) => extra(m) > 0);
+  const often = multiDay.filter((m) => extra(m) >= OFTEN_EXTRA_BOOKINGS);
+  const households = often.filter((m) => m.household);
+  const rest = often.filter((m) => !m.household);
+  const known = rest.filter((m) => m.earlyShare !== null && m.weekendShare !== null);
+  const earlyBirds = known.filter((m) => (m.earlyShare as number) >= 0.5);
+  const workFromClub = known.filter((m) => (m.earlyShare as number) < 0.5 && (m.weekendShare as number) < 0.5);
+  return {
+    total: members.length,
+    booked: booked.length,
+    multiDay: multiDay.length,
+    multiDayShare: percent(multiDay.length, booked.length),
+    often: often.length,
+    workFromClub: workFromClub.length,
+    workFromClubShareOfBooked: percent(workFromClub.length, booked.length),
+    workFromClubShareOfAll: percent(workFromClub.length, members.length),
+    earlyBirds: earlyBirds.length,
+    households: households.length,
+    unknown: rest.length - known.length,
+  };
+}
+
 /* ---------- When people come ---------- */
 
 function series(totals: ClubTotal[], measure: ClubTotal["measure"]): ClubTotal[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toCell, toDoorMonth, toMember, toPeriod, toTotal } from "./supabase";
+import { isHouseholdName, toCell, toDoorMonth, toMember, toPeriod, toTotal } from "./supabase";
 
 describe("database rows to dashboard data", () => {
   it("maps a members row, turning blanks into zeros and keeping dates", () => {
@@ -28,6 +28,10 @@ describe("database rows to dashboard data", () => {
     expect(m.name).toBe("Test Person");
     expect(m.visitsPerMonth).toBeCloseTo(4.07);
     expect(m.bookingDays).toBe(0);
+    expect(m.bookings).toBe(0);
+    expect(m.earlyShare).toBeNull();
+    expect(m.weekendShare).toBeNull();
+    expect(m.household).toBe(false);
     expect(m.monthly).toEqual([0, 0, 1, 0, 2, 4, 20, 5, 4]);
     expect(m.lastVisit).toBe("2026-09-26");
   });
@@ -66,5 +70,43 @@ describe("database rows to dashboard data", () => {
       memberEntries: 2404,
       people: 325,
     });
+  });
+});
+
+describe("multi-booking fields", () => {
+  const base = {
+    member_name: "Trevor & Tia Dyer",
+    usage_band: "4+/month",
+    visits_per_month: 5,
+    visit_days: 40,
+    door_entries: 40,
+    icrew_booking_days_jul_sep: 10,
+    icrew_bookings_jul_sep: 18,
+    door_share_early_4to8am: "0.25",
+    door_share_weekend: 0.1,
+    last_visit: null,
+    own_brivo_fob: true,
+    joined: null,
+    icrew_member_type: null,
+    data_through: "2026-09-27",
+    visit_days_2026_01: 0, visit_days_2026_02: 0, visit_days_2026_03: 0, visit_days_2026_04: 0, visit_days_2026_05: 0,
+    visit_days_2026_06: 0, visit_days_2026_07: 0, visit_days_2026_08: 0, visit_days_2026_09: 0,
+  };
+  it("reads bookings, door shares and household flag", () => {
+    const m = toMember(base);
+    expect(m.bookings).toBe(18);
+    expect(m.earlyShare).toBe(0.25);
+    expect(m.weekendShare).toBe(0.1);
+    expect(m.household).toBe(true);
+  });
+  it("spots shared account names only", () => {
+    expect(isHouseholdName("Chris/Bridget Backschies")).toBe(true);
+    expect(isHouseholdName("Eva and John Dougherty")).toBe(true);
+    expect(isHouseholdName("Alexander Anderson")).toBe(false);
+  });
+  it("falls back to booking days when the bookings column is missing", () => {
+    const { icrew_bookings_jul_sep, ...rest } = base;
+    void icrew_bookings_jul_sep;
+    expect(toMember(rest).bookings).toBe(10);
   });
 });
