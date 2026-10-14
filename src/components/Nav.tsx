@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/reservations", label: "Reservations" },
   { href: "/email", label: "Email" },
   { href: "/members", label: "Members" },
+  { href: "/goals", label: "Goals" },
 ];
 
 export function Nav() {

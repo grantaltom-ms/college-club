@@ -13,7 +13,7 @@ test("overview shows the headline and all five usage groups", async ({ page }) =
   await expect(page.getByRole("note")).toContainText("Sample data");
 });
 
-test("navigation moves between all three pages and marks the current one", async ({ page }) => {
+test("navigation moves between the pages and marks the current one", async ({ page }) => {
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Dashboard sections" });
   await nav.getByRole("link", { name: "Timing" }).click();
@@ -21,6 +21,10 @@ test("navigation moves between all three pages and marks the current one", async
   await expect(nav.getByRole("link", { name: "Timing" })).toHaveAttribute("aria-current", "page");
   await nav.getByRole("link", { name: "Members" }).click();
   await expect(page).toHaveURL(/\/members$/);
+  await nav.getByRole("link", { name: "Goals" }).click();
+  await expect(page).toHaveURL(/\/goals$/);
+  await expect(nav.getByRole("link", { name: "Goals" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { level: 1, name: "Goals and Action Items for Tech and Communications", exact: true })).toBeVisible();
   await nav.getByRole("link", { name: "Overview" }).click();
   await expect(page.locator(".hero-number")).toHaveText("185");
 });
