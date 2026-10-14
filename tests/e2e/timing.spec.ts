@@ -40,6 +40,25 @@ test("hovering the day-and-hour grid names the day, hour and average", async ({ 
   await expect(tip).toContainText("over 40 days");
 });
 
+test("grid tooltips stay fully inside the chart, top rows included, across many hovers", async ({ page }) => {
+  await page.goto("/timing");
+  const heat = group(page, "Average door entries by day of the week and hour");
+  for (const day of ["Monday", "Tuesday", "Saturday", "Sunday"]) {
+    for (const hour of ["5 am", "6 am", "7 am"]) {
+      await heat.getByRole("img", { name: new RegExp(`^${day} ${hour}:`) }).hover();
+      const tip = page.getByRole("status").filter({ hasText: `${day}, ${hour}` });
+      await expect(tip).toBeVisible();
+      // Wait for the tip to settle (it is hidden while it measures where it fits).
+      await expect(tip).toHaveCSS("visibility", "visible");
+      // Measure both after hovering, since hovering can scroll the page.
+      const frame = (await page.locator(".heat-scroll").first().boundingBox())!;
+      const box = (await tip.boundingBox())!;
+      expect(box.y).toBeGreaterThanOrEqual(frame.y);
+      expect(box.y + box.height).toBeLessThanOrEqual(frame.y + frame.height);
+    }
+  }
+});
+
 test("switching year changes the day counts, and back again, many times", async ({ page }) => {
   await page.goto("/timing");
   const card = page.locator(".card", { hasText: "Door entries on an average day" });
