@@ -36,14 +36,15 @@ export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, ti
 
   const innerW = Math.max(0, width - MARGIN.left - MARGIN.right);
   const innerH = height - MARGIN.top - MARGIN.bottom;
-  const heightOf = (g: ColumnGroup) => (stacked ? g.values.reduce((sum, v) => sum + v, 0) : Math.max(0, ...g.values));
+  // Rounded so shares that add up to 100 (plus a speck of float error) don't push the axis to the next step.
+  const heightOf = (g: ColumnGroup) => Math.round((stacked ? g.values.reduce((sum, v) => sum + v, 0) : Math.max(0, ...g.values)) * 1e6) / 1e6;
   const { top, ticks } = niceScale(Math.max(0, ...groups.map(heightOf)));
   const slot = groups.length ? innerW / groups.length : 0;
   const series = stacked ? 1 : colors.length;
   const barW = Math.max(2, Math.min(stacked ? 28 : 22, (slot - 8) / series - 2));
   const groupW = barW * series + 2 * (series - 1);
-  // On a phone there is no room for "Jan Feb Mar", so use one letter each.
-  const narrow = slot < 36;
+  // When every column has a label and they are crowded (a phone), use one letter each.
+  const narrow = slot < 36 && groups.every((g) => g.xLabel);
   const yOf = (v: number) => MARGIN.top + innerH - (v / top) * innerH;
 
   const activeGroup = active === null ? null : groups[active];
@@ -126,6 +127,8 @@ export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, ti
 function Stack({ values, colors, x, width, yOf, dim }: { values: number[]; colors: string[]; x: number; width: number; yOf: (v: number) => number; dim: boolean }) {
   const topIndex = values.reduce((last, v, i) => (v > 0 ? i : last), -1);
   // Running totals: part s spans from starts[s] to starts[s] + values[s].
+  // A thin surface-colored line separates the parts, but only on bars wide enough to spare it.
+  const gap = width >= 8;
   const starts = values.map((_, s) => values.slice(0, s).reduce((sum, v) => sum + v, 0));
   return (
     <>
@@ -135,9 +138,9 @@ function Stack({ values, colors, x, width, yOf, dim }: { values: number[]; color
         const y = yOf(from + v);
         const h = yOf(from) - y;
         return s === topIndex ? (
-          <path key={s} d={barPath(x, y, width, h)} fill={colors[s]} opacity={dim ? 0.55 : 1} />
+          <path key={s} d={barPath(x, y, width, h)} fill={colors[s]} stroke={gap ? "#ffffff" : undefined} strokeWidth={gap ? 1.5 : undefined} opacity={dim ? 0.55 : 1} />
         ) : (
-          <rect key={s} x={x} y={y} width={width} height={h} fill={colors[s]} opacity={dim ? 0.55 : 1} />
+          <rect key={s} x={x} y={y} width={width} height={h} fill={colors[s]} stroke={gap ? "#ffffff" : undefined} strokeWidth={gap ? 1.5 : undefined} opacity={dim ? 0.55 : 1} />
         );
       })}
     </>

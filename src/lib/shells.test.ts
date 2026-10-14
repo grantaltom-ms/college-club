@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { convert, parseCsv, rowerKey, to24h } from "./shell-import";
+import { convert, parseCsv, rowerKey, to24h } from "./icrew-import";
 import {
   byBoat,
   byStartHour,
