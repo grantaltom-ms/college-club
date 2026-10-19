@@ -142,3 +142,36 @@ describe("preparing the iCrew reservations export", () => {
     expect(() => convertReservations("Name,Date\nx,01-01-2026")).toThrow(/no "StartTime" column/);
   });
 });
+
+describe("top types and other", () => {
+  it("keeps the busiest types, adds the rest up as Other, and keeps every total", async () => {
+    const { byMonth, collapseTypes, sampleReservations, typesByVolume } = await import("./reservations");
+    const data = sampleReservations();
+    const all = new Set(data.types);
+    const months = byMonth(data, all);
+    const v = collapseTypes(data, months, 4);
+    expect(v.types).toHaveLength(5);
+    expect(v.types[4]).toBe("Other");
+    const busiest = typesByVolume(data).slice(0, 4).map((i) => data.types[i]);
+    expect([...v.types.slice(0, 4)].sort()).toEqual([...busiest].sort());
+    v.buckets.forEach((b, i) => expect(b.total).toBe(months[i].total));
+    // Asking again gives the same answer.
+    expect(collapseTypes(data, months, 4)).toEqual(v);
+  });
+
+  it("leaves short lists alone", async () => {
+    const { collapseTypes } = await import("./reservations");
+    const data = { source: "sample" as const, first: "2026-01-01", through: "2026-01-02", types: ["A", "B"], cells: [] };
+    const out = collapseTypes(data, [], 4);
+    expect(out.types).toEqual(["A", "B"]);
+  });
+
+  it("names what drives the peak and what leads a set of buckets", async () => {
+    const { driverOf, topTypeIn } = await import("./reservations");
+    const b = (key: string, counts: number[]) => ({ key, label: key, axis: key, counts, total: counts.reduce((s, n) => s + n, 0), complete: true });
+    const buckets = [b("Jan", [100, 10]), b("Feb", [100, 10]), b("Jul", [120, 300])];
+    expect(driverOf(["Gym", "Dock"], buckets, buckets[2])).toBe("Dock");
+    expect(topTypeIn(["Gym", "Dock"], buckets.slice(0, 2))).toBe("Gym");
+    expect(topTypeIn(["Gym", "Dock"], [])).toBeNull();
+  });
+});

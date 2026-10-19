@@ -197,6 +197,79 @@ export function listSize(campaigns: Campaign[], count: number): ListPoint[] {
     }));
 }
 
+export interface ListJump {
+  /** Delivered on the Watercooler before the jump and on the first one after it. */
+  from: number;
+  to: number;
+  /** Date of the first send after the jump. */
+  on: string;
+  /** Watercoolers from the jump on, and how many of them had unsubscribes above half a percent. */
+  sendsSince: number;
+  spikesSince: number;
+}
+
+/** The biggest one-step rise in list size, when the list grew by at least 30% between two Watercoolers in a row. */
+export function listJump(points: ListPoint[]): ListJump | null {
+  let best: ListJump | null = null;
+  let bestRatio = 1.3;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1].delivered;
+    const ratio = prev ? points[i].delivered / prev : 0;
+    if (ratio >= bestRatio) {
+      bestRatio = ratio;
+      const since = points.slice(i);
+      best = { from: prev, to: points[i].delivered, on: points[i].sentOn, sendsSince: since.length, spikesSince: since.filter((p) => p.spike).length };
+    }
+  }
+  return best;
+}
+
+/** One email sent to two segments on the same day shows up as two sends; this adds them back into one row. */
+export function mergeSegments(campaigns: Campaign[]): Campaign[] {
+  const merged = new Map<string, Campaign>();
+  for (const c of campaigns) {
+    const key = `${c.sentOn}|${(c.subject || c.title).trim().toLowerCase()}`;
+    const prev = merged.get(key);
+    if (!prev) {
+      merged.set(key, { ...c });
+      continue;
+    }
+    prev.sent += c.sent;
+    prev.bounces += c.bounces;
+    prev.delivered += c.delivered;
+    prev.uniqueOpens += c.uniqueOpens;
+    prev.filteredOpens = prev.filteredOpens === null || c.filteredOpens === null ? null : prev.filteredOpens + c.filteredOpens;
+    prev.uniqueClicks += c.uniqueClicks;
+    prev.unsubscribes += c.unsubscribes;
+  }
+  return [...merged.values()];
+}
+
+/** Lowest and highest month for the Watercooler click rate, all years pooled. */
+export function seasonRange(months: Summary[]): { low: Summary; high: Summary } | null {
+  const used = months.filter((m) => m.campaigns > 0);
+  if (used.length < 2) return null;
+  const sorted = [...used].sort((a, b) => a.clickRate - b.clickRate);
+  return { low: sorted[0], high: sorted[sorted.length - 1] };
+}
+
+/** Watercooler click rate for the newest finished quarter (by `through`) and the same quarter a year before. */
+export function quarterVsYearAgo(quarters: Summary[], through?: string): { now: Summary; yearAgo: Summary | null } | null {
+  const finished = (label: string) => {
+    if (!through) return true;
+    const [y, q] = label.split(" Q").map(Number);
+    const endMonth = q * 3;
+    const end = `${y}-${String(endMonth).padStart(2, "0")}-${String(new Date(Date.UTC(y, endMonth, 0)).getUTCDate()).padStart(2, "0")}`;
+    return end <= through;
+  };
+  const done = quarters.filter((s) => finished(s.label));
+  const now = done[done.length - 1];
+  if (!now) return null;
+  const [y, q] = now.label.split(" ");
+  const yearAgo = quarters.find((s) => s.label === `${Number(y) - 1} ${q}`) ?? null;
+  return { now, yearAgo };
+}
+
 export const clickRate = (c: Campaign) => pct(c.uniqueClicks, c.delivered);
 export const openRate = (c: Campaign) => pct(c.uniqueOpens, c.delivered);
 export const filteredOpenRate = (c: Campaign) => (c.filteredOpens === null ? null : pct(c.filteredOpens, c.delivered));
@@ -204,7 +277,7 @@ export const unsubRate = (c: Campaign) => pct(c.unsubscribes, c.delivered);
 
 /** Best and worst by click rate, ignoring small sends where one click swings the rate. */
 export function extremes(campaigns: Campaign[], count: number, minDelivered = 100) {
-  const ranked = campaigns.filter((c) => c.delivered >= minDelivered).sort((a, b) => clickRate(b) - clickRate(a));
+  const ranked = mergeSegments(campaigns).filter((c) => c.delivered >= minDelivered).sort((a, b) => clickRate(b) - clickRate(a));
   return { best: ranked.slice(0, count), worst: ranked.slice(-count).reverse() };
 }
 

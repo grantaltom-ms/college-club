@@ -41,6 +41,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return <Context.Provider value={{ state, reload }}>{children}</Context.Provider>;
 }
 
+/** The dashboard data once it has loaded, or null, for pages that only use it as an extra. */
+export function useDashboard(): DashboardData | null {
+  const ctx = useContext(Context);
+  return ctx?.state.status === "ready" ? ctx.state.data : null;
+}
+
 /** Renders children only once data has loaded; shows plain loading and error states otherwise. */
 export function WithData({ children }: { children: (data: DashboardData) => ReactNode }) {
   const ctx = useContext(Context);

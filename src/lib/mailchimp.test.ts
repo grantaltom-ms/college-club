@@ -79,10 +79,10 @@ describe("numbers", () => {
 
   it("ignores small sends when picking best and worst", () => {
     const list = [
-      camp({ id: "tiny", delivered: 10, uniqueClicks: 10 }),
-      camp({ id: "top", uniqueClicks: 30 }),
-      camp({ id: "mid", uniqueClicks: 5 }),
-      camp({ id: "low", uniqueClicks: 0 }),
+      camp({ id: "tiny", subject: "tiny", delivered: 10, uniqueClicks: 10 }),
+      camp({ id: "top", subject: "top", uniqueClicks: 30 }),
+      camp({ id: "mid", subject: "mid", uniqueClicks: 5 }),
+      camp({ id: "low", subject: "low", uniqueClicks: 0 }),
     ];
     const { best, worst } = extremes(list, 1);
     expect(best[0].id).toBe("top");
@@ -189,5 +189,54 @@ describe("sample email data", () => {
     expect(d.campaigns.some((c) => c.weekly)).toBe(true);
     expect(d.campaigns.some((c) => !c.weekly)).toBe(true);
     expect(byYear(d.campaigns).length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("list jump, merged segments and season", () => {
+  const point = (id: string, delivered: number, spike = false) => ({ id, sentOn: `2026-0${id}-01`, delivered, bounces: 0, unsubscribes: 0, spike });
+
+  it("finds the biggest one-step rise and counts the high-unsubscribe sends after it", async () => {
+    const { listJump } = await import("./mailchimp");
+    const jump = listJump([point("1", 1000), point("2", 1010), point("3", 1900, true), point("4", 1850, true), point("5", 1800)]);
+    expect(jump).toEqual({ from: 1010, to: 1900, on: "2026-03-01", sendsSince: 3, spikesSince: 2 });
+    expect(listJump([point("1", 1000), point("2", 1100), point("3", 1200)])).toBeNull();
+    expect(listJump([])).toBeNull();
+  });
+
+  it("adds an email sent to two lists on one day back into one row", async () => {
+    const { mergeSegments, clickRate } = await import("./mailchimp");
+    const c = (id: string, delivered: number, clicks: number, day = "2025-09-18") => ({
+      id, title: id, subject: "Update to ACH Billing", sentOn: day, sent: delivered, bounces: 0, delivered,
+      uniqueOpens: delivered, filteredOpens: null, uniqueClicks: clicks, unsubscribes: 0, weekly: false,
+    });
+    const merged = mergeSegments([c("a", 100, 33), c("b", 194, 64), c("c", 50, 5, "2025-09-19")]);
+    expect(merged).toHaveLength(2);
+    expect(merged[0].delivered).toBe(294);
+    expect(clickRate(merged[0])).toBeCloseTo((97 / 294) * 100);
+  });
+
+  it("names the lowest and highest month, and the same quarter a year before", async () => {
+    const { seasonRange, quarterVsYearAgo } = await import("./mailchimp");
+    const s = (label: string, clickRate: number, campaigns = 4) => ({ label, campaigns, delivered: 1000, openRate: 50, clickRate, unsubRate: 0 });
+    const range = seasonRange([s("Jan", 2.9), s("May", 3.6), s("Sep", 2.6), s("Dec", 0, 0)]);
+    expect(range?.low.label).toBe("Sep");
+    expect(range?.high.label).toBe("May");
+    expect(seasonRange([s("Jan", 2)])).toBeNull();
+    const q = quarterVsYearAgo([s("2025 Q3", 4.5), s("2026 Q2", 2.9), s("2026 Q3", 3.7)]);
+    expect(q?.now.label).toBe("2026 Q3");
+    expect(q?.yearAgo?.label).toBe("2025 Q3");
+    expect(quarterVsYearAgo([s("2026 Q3", 3)])?.yearAgo).toBeNull();
+    // A quarter still under way is skipped once the last data day is known.
+    const withQ4 = [s("2025 Q3", 4.5), s("2026 Q3", 2.9), s("2026 Q4", 3.7)];
+    expect(quarterVsYearAgo(withQ4, "2026-10-14")?.now.label).toBe("2026 Q3");
+    expect(quarterVsYearAgo(withQ4, "2026-12-31")?.now.label).toBe("2026 Q4");
+    expect(quarterVsYearAgo(withQ4, "2025-08-01")).toBeNull();
+  });
+
+  it("the sample data has the August jump the page leads with", async () => {
+    const { listJump, listSize, sampleEmail } = await import("./mailchimp");
+    const jump = listJump(listSize(sampleEmail().campaigns, 30));
+    expect(jump).not.toBeNull();
+    expect(jump!.on >= "2026-08-12").toBe(true);
   });
 });

@@ -4,18 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { ChartCard } from "@/components/ChartCard";
 import { GroupedColumnChart } from "@/components/GroupedColumnChart";
 import { formatDay } from "@/lib/dates";
+import { useDashboard } from "@/components/DataProvider";
 import {
   asShare,
   byHour,
   byMonth,
-  byWeek,
   byWeekday,
+  collapseTypes,
+  driverOf,
+  topTypeIn,
   typeColor,
   typeSummary,
   type Bucket,
   type ReservationData,
 } from "@/lib/reservations";
-import { fmtInt } from "@/lib/stats";
+import { bookingYearOverYear, fmtInt } from "@/lib/stats";
 
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; data: ReservationData };
 
@@ -73,18 +76,35 @@ export default function ReservationsPage() {
 
 type Mode = "count" | "share";
 
+/** How many of the busiest types get their own color before the rest are added up as "Other". */
+const TOP_TYPES = 4;
+
+interface View {
+  types: string[];
+  colors: string[];
+  buckets: Bucket[];
+}
+
+/** In the default view the busiest few types keep their color and the rest become "Other". */
+function shape(data: ReservationData, buckets: Bucket[], picking: boolean): View {
+  return picking ? { types: data.types, colors: data.types.map(typeColor), buckets } : collapseTypes(data, buckets, TOP_TYPES);
+}
+
 function Reservations({ data }: { data: ReservationData }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(data.types));
   const [mode, setMode] = useState<Mode>("count");
-  const colors = useMemo(() => data.types.map(typeColor), [data.types]);
+  const [picking, setPicking] = useState(false);
+  const dashboard = useDashboard();
+  const yoy = dashboard ? bookingYearOverYear(dashboard.totals) : null;
   const chosen = data.types.filter((t) => selected.has(t));
   const share = mode === "share";
 
-  const weeks = useMemo(() => byWeek(data, selected), [data, selected]);
-  const months = useMemo(() => byMonth(data, selected), [data, selected]);
-  const weekdays = useMemo(() => byWeekday(data, selected), [data, selected]);
-  const hours = useMemo(() => byHour(data, selected), [data, selected]);
-  const summary = useMemo(() => typeSummary(data, selected), [data, selected]);
+  const allSelected = useMemo(() => new Set(data.types), [data.types]);
+  const active = picking ? selected : allSelected;
+  const months = useMemo(() => shape(data, byMonth(data, active), picking), [data, active, picking]);
+  const weekdays = useMemo(() => shape(data, byWeekday(data, active), picking), [data, active, picking]);
+  const hours = useMemo(() => shape(data, byHour(data, active), picking), [data, active, picking]);
+  const summary = useMemo(() => typeSummary(data, active), [data, active]);
   const total = summary.reduce((s, r) => s + r.total, 0);
 
   const toggle = (type: string) =>
@@ -96,7 +116,7 @@ function Reservations({ data }: { data: ReservationData }) {
     });
 
   /** One chart column per bucket: stacked counts, or each type's share of the column. */
-  const groups = (buckets: Bucket[]) =>
+  const groups = ({ types, buckets }: View) =>
     buckets.map((b) => ({
       key: b.key,
       xLabel: b.axis,
@@ -104,21 +124,52 @@ function Reservations({ data }: { data: ReservationData }) {
       tooltip: [
         b.total ? `${fmtInt(b.total)} reservations` : "No reservations",
         b.label,
-        ...data.types.flatMap((t, i) => (b.counts[i] > 0 ? [`${t}: ${fmtInt(b.counts[i])} (${Math.round((b.counts[i] / b.total) * 100)}%)`] : [])),
+        ...types.flatMap((t, i) => (b.counts[i] > 0 ? [`${t}: ${fmtInt(b.counts[i])} (${Math.round((b.counts[i] / b.total) * 100)}%)`] : [])),
       ] as [string, ...string[]],
     }));
 
-  const table = (first: string, buckets: Bucket[]) => ({
-    headers: [first, ...chosen, "Total"],
-    rows: buckets.map((b) => [b.label, ...chosen.map((t) => fmtInt(b.counts[data.types.indexOf(t)])), fmtInt(b.total)]),
-  });
+  const table = (first: string, v: View) => {
+    const shown = v.types.filter((t, i) => t === "Other" || !picking || selected.has(t) || v.buckets.some((b) => b.counts[i] > 0));
+    const cols = picking ? chosen : shown;
+    return {
+      headers: [first, ...cols, "Total"],
+      rows: v.buckets.map((b) => [b.label, ...cols.map((t) => fmtInt(b.counts[v.types.indexOf(t)])), fmtInt(b.total)]),
+    };
+  };
 
   const tick = share ? (n: number) => `${n}%` : undefined;
-  const chart = (buckets: Bucket[], label: string) => (
-    <GroupedColumnChart groups={groups(buckets)} colors={colors} ariaLabel={label} stacked tick={tick} height={280} />
+  const chart = (v: View, label: string) => (
+    <GroupedColumnChart groups={groups(v)} colors={v.colors} ariaLabel={label} stacked tick={tick} height={280} />
   );
-  const how = share ? "Each column shows the mix: what share of that column each type is." : "Each column stacks the chosen types.";
+  const legend = (v: View) => v.types.map((t, i) => ({ label: t, color: v.colors[i] }));
+  const how = share
+    ? "Each column shows the mix: what share of that column each type is."
+    : picking
+      ? "Each column stacks the chosen types."
+      : `Each column stacks the ${TOP_TYPES} busiest types, with the rest as Other.`;
   const top = summary[0];
+
+  const peakMonth = months.buckets.filter((b) => b.complete).reduce<Bucket | null>((best, b) => (!best || b.total > best.total ? b : best), null);
+  const monthDriver = peakMonth ? driverOf(months.types, months.buckets, peakMonth) : null;
+  const monthTitle = peakMonth
+    ? `Reservations peak in ${peakMonth.label}${monthDriver && monthDriver !== "Other" ? `, driven by ${monthDriver.toLowerCase()}` : ""}`
+    : "By month";
+  const busiestDay = weekdays.buckets.reduce<Bucket | null>((best, b) => (!best || b.total > best.total ? b : best), null);
+  const weekendTop = topTypeIn(weekdays.types, weekdays.buckets.slice(5));
+  const weekdayTop = topTypeIn(weekdays.types, weekdays.buckets.slice(0, 5));
+  const dayTitle =
+    busiestDay && weekendTop && weekdayTop && weekendTop !== weekdayTop
+      ? `${weekdayTop} leads on weekdays; ${weekendTop.toLowerCase()} leads on weekends`
+      : busiestDay
+        ? `Busiest on ${busiestDay.label}`
+        : "By day of the week";
+  const hourNum = (b: Bucket) => Number(b.key);
+  const morningTop = topTypeIn(hours.types, hours.buckets.filter((b) => hourNum(b) < 10));
+  const laterTop = topTypeIn(hours.types, hours.buckets.filter((b) => hourNum(b) >= 15));
+  const hourTitle =
+    morningTop && laterTop && morningTop !== laterTop
+      ? `${morningTop} leads early mornings; ${laterTop.toLowerCase()} leads late afternoons`
+      : "By hour of the day";
 
   return (
     <>
@@ -134,6 +185,16 @@ function Reservations({ data }: { data: ReservationData }) {
 
       <div className="stack">
         <div className="filter-bar">
+          <div className="filter-row" role="group" aria-label="View">
+            <span className="filter-label">Types</span>
+            <button type="button" className="chip" aria-pressed={!picking} onClick={() => setPicking(false)}>
+              Top {TOP_TYPES} and other
+            </button>
+            <button type="button" className="chip" aria-pressed={picking} onClick={() => setPicking(true)}>
+              Pick types
+            </button>
+          </div>
+          {picking && (
           <div className="filter-row" role="group" aria-label="Reservation types">
             <span className="filter-label">Show</span>
             {data.types.map((type) => (
@@ -156,6 +217,7 @@ function Reservations({ data }: { data: ReservationData }) {
               None
             </button>
           </div>
+          )}
           <div className="filter-row" role="group" aria-label="Measure">
             <span className="filter-label">Charts show</span>
             <button type="button" className="chip" aria-pressed={!share} onClick={() => setMode("count")}>
@@ -167,7 +229,7 @@ function Reservations({ data }: { data: ReservationData }) {
           </div>
         </div>
 
-        {chosen.length === 0 ? (
+        {picking && chosen.length === 0 ? (
           <p className="status" role="status">
             Pick at least one type above to see it.
           </p>
@@ -179,9 +241,15 @@ function Reservations({ data }: { data: ReservationData }) {
               </p>
               <div className="hero-copy">
                 <p className="hero-lead">
-                  reservations{chosen.length === data.types.length ? "" : ` for ${chosen.length === 1 ? chosen[0] : `${chosen.length} types`}`}, {formatDay(data.first)} to{" "}
+                  reservations{!picking || chosen.length === data.types.length ? "" : ` for ${chosen.length === 1 ? chosen[0] : `${chosen.length} types`}`}, {formatDay(data.first)} to{" "}
                   {formatDay(data.through)}.
                 </p>
+                {yoy && (!picking || chosen.length === data.types.length) && (
+                  <p className="hero-support" data-testid="res-yoy">
+                    From {yoy.fromLabel} to {yoy.toLabel}, reservations are {Math.abs(yoy.change)}% {yoy.change >= 0 ? "higher" : "lower"} than in{" "}
+                    {yoy.previousYear} ({fmtInt(yoy.thisYear)} against {fmtInt(yoy.lastYear)}).
+                  </p>
+                )}
                 {top && (
                   <p className="hero-support">
                     {top.type} is the most reserved{chosen.length > 1 ? `, ${top.share}% of these` : ""}. It is busiest on {top.peakWeekday}s, starting at{" "}
@@ -236,23 +304,15 @@ function Reservations({ data }: { data: ReservationData }) {
               </div>
             </section>
 
-            <ChartCard
-              title="Over time, week by week"
-              subtitle={`${how} The first and last weeks are part weeks.`}
-              table={table("Week", weeks)}
-            >
-              {chart(weeks, "Reservations by type, week by week")}
-            </ChartCard>
-
-            <ChartCard title="By month" subtitle={`${how} The latest month is not finished.`} table={table("Month", months)}>
+            <ChartCard title={monthTitle} subtitle={`${how} The latest month is not finished.`} legend={legend(months)} table={table("Month", months)}>
               {chart(months, "Reservations by type, by month")}
             </ChartCard>
 
-            <ChartCard title="By day of the week" subtitle={`${how} Totals over the whole period.`} table={table("Day", weekdays)}>
+            <ChartCard title={dayTitle} subtitle={`${how} Totals over the whole period.`} legend={legend(weekdays)} table={table("Day", weekdays)}>
               {chart(weekdays, "Reservations by type, by day of the week")}
             </ChartCard>
 
-            <ChartCard title="By hour of the day" subtitle={`${how} By the hour a reservation starts.`} table={table("Start hour", hours)}>
+            <ChartCard title={hourTitle} subtitle={`${how} By the hour a reservation starts.`} legend={legend(hours)} table={table("Start hour", hours)}>
               {chart(hours, "Reservations by type, by start hour")}
             </ChartCard>
           </>

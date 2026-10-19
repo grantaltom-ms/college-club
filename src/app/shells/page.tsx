@@ -6,12 +6,11 @@ import { ColumnChart, type Column } from "@/components/ColumnChart";
 import { GroupedColumnChart } from "@/components/GroupedColumnChart";
 import { formatDay } from "@/lib/dates";
 import {
+  boatChanges,
   byBoat,
   byStartHour,
-  byWeekday,
   changePct,
   monthCompare,
-  monthTimeline,
   seatLabel,
   shellYears,
   yearToDate,
@@ -19,8 +18,6 @@ import {
 } from "@/lib/shells";
 import { fmtInt } from "@/lib/stats";
 
-const MEMBER = "#2b3a42";
-const TEAM = "#b9a77c";
 const BASE = "#536872";
 /** Older year light, newest year dark, the same as the Timing page. */
 const YEAR_COLORS = ["#a7b3b9", "#2b3a42"];
@@ -98,27 +95,16 @@ function Shells({ data }: { data: ShellData }) {
   const rowersNow = data.rowers.find((r) => r.year === now?.year);
   const rowersBefore = before ? data.rowers.find((r) => r.year === before.year) : undefined;
 
-  const timeline = monthTimeline(data.outings, data.through);
   const compare = monthCompare(data.outings, data.through);
   const boats = byBoat(data.outings, data.through);
   const boatMax = Math.max(1, ...boats.rows.flatMap((b) => b.sameDates));
   const hours = byStartHour(data.outings, year);
-  const weekdays = byWeekday(data.outings, year);
+  const [allBoats, setAllBoats] = useState(false);
+  const changes = boatChanges(boats.rows);
   const newest = compare.years[compare.years.length - 1];
   const oldest = compare.years[0];
 
   if (!now) return <p className="status">There are no shell outings yet.</p>;
-
-  const timelineGroups = timeline.map((m) => ({
-    key: m.key,
-    xLabel: m.month === 1 ? String(m.year) : null,
-    values: [m.member, m.team],
-    tooltip: [
-      `${fmtInt(m.member + m.team)} outings${m.complete ? "" : " so far"}`,
-      `${m.label} ${m.year}`,
-      `${fmtInt(m.member)} member rows, ${fmtInt(m.team)} camp or team`,
-    ] as [string, ...string[]],
-  }));
 
   const compareGroups = compare.rows.map((r) => ({
     key: String(r.month),
@@ -141,14 +127,23 @@ function Shells({ data }: { data: ShellData }) {
     value: h.outings,
     tooltip: [`${fmtInt(h.outings)} outings`, `Starting ${h.label}`],
   }));
-  const weekdayColumns: Column[] = weekdays.map((w) => ({
-    key: w.short,
-    xLabel: w.short,
-    value: w.outings,
-    emphasis: w.index >= 5,
-    tooltip: [`${fmtInt(w.outings)} outings`, `${w.name}s in ${year}`],
-  }));
   const peak = [...hours].sort((a, b) => b.outings - a.outings)[0];
+  const hourTotal = hours.reduce((sum, h) => sum + h.outings, 0);
+  const early = hours.filter((h) => h.hour < 9).reduce((sum, h) => sum + h.outings, 0);
+  const earlyShare = hourTotal ? Math.round((early / hourTotal) * 100) : 0;
+  const finished = compare.rows.filter((r) => r.change !== null);
+  const lower = finished.filter((r) => (r.change ?? 0) < 0);
+  const higher = finished.filter((r) => (r.change ?? 0) > 0);
+  const compareTitle =
+    finished.length === 0
+      ? "Each month against last year"
+      : lower.length > higher.length
+        ? `Fewer outings than ${oldest} in ${lower.length} of ${finished.length} finished months`
+        : `More outings than ${oldest} in ${higher.length} of ${finished.length} finished months`;
+  const exceptions = (lower.length > higher.length ? higher : lower).map((r) => `${r.label} (${changeText(r.change)})`);
+  const shownBoats = allBoats ? boats.rows : boats.rows.slice(0, 10);
+  const boatLine = (b: (typeof boats.rows)[number]) =>
+    `${b.boat} (${b.sameDates.map(fmtInt).join(" \u2192 ")})`;
 
   return (
     <>
@@ -188,30 +183,10 @@ function Shells({ data }: { data: ShellData }) {
           </div>
         </section>
 
-        <ChartCard
-          title="Outings every month"
-          subtitle="Each column is a month, split into members rowing on their own and camps or team sessions. The last month is not finished."
-          legend={[
-            { label: "Member rows", color: MEMBER },
-            { label: "Camps and team sessions", color: TEAM },
-          ]}
-          table={{
-            headers: ["Month", "Member rows", "Camps and team", "All outings"],
-            rows: timeline.map((m) => [
-              `${m.label} ${m.year}${m.complete ? "" : " (so far)"}`,
-              fmtInt(m.member),
-              fmtInt(m.team),
-              fmtInt(m.member + m.team),
-            ]),
-          }}
-        >
-          <GroupedColumnChart groups={timelineGroups} colors={[MEMBER, TEAM]} ariaLabel="Shell outings every month" stacked />
-        </ChartCard>
-
         {compare.years.length > 1 && (
           <ChartCard
-            title="Each month against last year"
-            subtitle={`All outings in ${compare.years.join(" and ")}, side by side on one scale. Months not finished yet are left blank.`}
+            title={compareTitle}
+            subtitle={`All outings in ${compare.years.join(" and ")}, side by side on one scale.${exceptions.length ? ` The exception${exceptions.length > 1 ? "s" : ""}: ${exceptions.join(", ")}.` : ""} Months not finished yet are left blank.`}
             legend={compare.years.map((y, i) => ({ label: String(y), color: yearColor(i, compare.years.length) }))}
             table={{
               headers: ["Month", ...compare.years.map(String), `Change, ${oldest} to ${newest}`],
@@ -230,8 +205,51 @@ function Shells({ data }: { data: ShellData }) {
           </ChartCard>
         )}
 
+        {boats.years.length > 1 && (
+          <section className="card" aria-labelledby="boat-changes-title" data-testid="boat-changes">
+            <h2 className="card-title" id="boat-changes-title">
+              Boats that changed most
+            </h2>
+            <p className="card-sub">
+              Outings from Jan 1 to {cutoffLabel}, {boats.years[0]} {"\u2192"} {boats.years[boats.years.length - 1]}.
+            </p>
+            <dl className="change-list">
+              {changes.drops.length > 0 && (
+                <>
+                  <dt>Biggest drops</dt>
+                  <dd>{changes.drops.map(boatLine).join("; ")}</dd>
+                </>
+              )}
+              {changes.gains.length > 0 && (
+                <>
+                  <dt>Biggest gains</dt>
+                  <dd>{changes.gains.map(boatLine).join("; ")}</dd>
+                </>
+              )}
+              {changes.started.length > 0 && (
+                <>
+                  <dt>New this year</dt>
+                  <dd>{changes.started.map(boatLine).join("; ")}</dd>
+                </>
+              )}
+              {changes.stopped.length > 0 && (
+                <>
+                  <dt>No outings this year</dt>
+                  <dd>{changes.stopped.map(boatLine).join("; ")}</dd>
+                </>
+              )}
+            </dl>
+            {changes.started.length > 0 && changes.stopped.length > 0 && (
+              <p className="card-sub">
+                A boat that is new this year next to one with no outings may be the same boat renamed in iCrew. It is
+                worth checking with staff, since a rename would change the boat figures above.
+              </p>
+            )}
+          </section>
+        )}
+
         <ChartCard
-          title="Outings by boat"
+          title={allBoats ? `All ${boats.rows.length} boats` : `The ${Math.min(10, boats.rows.length)} busiest boats`}
           subtitle={`Jan 1 to ${cutoffLabel} in each year, so the years compare fairly. Busiest boat this year first.`}
           legend={boats.years.map((y, i) => ({ label: String(y), color: yearColor(i, boats.years.length) }))}
           table={{
@@ -240,7 +258,7 @@ function Shells({ data }: { data: ShellData }) {
           }}
         >
           <div className="boats num" role="list" aria-label="Outings by boat">
-            {boats.rows.map((b) => (
+            {shownBoats.map((b) => (
               <div className="boat-row" role="listitem" key={b.boat} data-boat={b.boat}>
                 <span className="boat-name">
                   {b.boat}
@@ -267,6 +285,11 @@ function Shells({ data }: { data: ShellData }) {
               </div>
             ))}
           </div>
+          {boats.rows.length > 10 && (
+            <button type="button" className="link-button show-more" onClick={() => setAllBoats(!allBoats)}>
+              {allBoats ? "Show the top 10" : `Show all ${boats.rows.length} boats`}
+            </button>
+          )}
         </ChartCard>
 
         {years.length > 1 && (
@@ -279,22 +302,13 @@ function Shells({ data }: { data: ShellData }) {
           </div>
         )}
 
-        <div className="chart-pair">
-          <ChartCard
-            title={`When boats go out, ${year}`}
-            subtitle={peak ? `By the hour each outing started. Busiest start: ${peak.label}.` : "By the hour each outing started."}
-            table={{ headers: ["Start hour", "Outings"], rows: hours.map((h) => [h.label, fmtInt(h.outings)]) }}
-          >
-            <ColumnChart columns={hourColumns} ariaLabel={`Shell outings by start hour, ${year}`} baseColor={BASE} height={220} />
-          </ChartCard>
-          <ChartCard
-            title={`Day of the week, ${year}`}
-            subtitle="Outings on each day of the week. Weekends in the darker color."
-            table={{ headers: ["Day", "Outings"], rows: weekdays.map((w) => [w.name, fmtInt(w.outings)]) }}
-          >
-            <ColumnChart columns={weekdayColumns} ariaLabel={`Shell outings by day of the week, ${year}`} height={220} />
-          </ChartCard>
-        </div>
+        <ChartCard
+          title={`${earlyShare}% of outings in ${year} started before 9 am`}
+          subtitle={peak ? `By the hour each outing started. Busiest start: ${peak.label}.` : "By the hour each outing started."}
+          table={{ headers: ["Start hour", "Outings"], rows: hours.map((h) => [h.label, fmtInt(h.outings)]) }}
+        >
+          <ColumnChart columns={hourColumns} ariaLabel={`Shell outings by start hour, ${year}`} baseColor={BASE} height={220} />
+        </ChartCard>
 
         <aside className="callout" aria-label="Limits of this data">
           <h3>Limits of this data</h3>
