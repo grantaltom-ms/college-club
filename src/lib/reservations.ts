@@ -204,6 +204,49 @@ export function typeSummary(data: ReservationData, selected: ReadonlySet<string>
     .sort((a, b) => b.total - a.total || a.type.localeCompare(b.type));
 }
 
+/** Index of every type, busiest first, over the whole period. */
+export function typesByVolume(data: ReservationData): number[] {
+  const totals = data.types.map(() => 0);
+  for (const c of data.cells) totals[c[2]] += c[3];
+  return data.types.map((_, i) => i).sort((a, b) => totals[b] - totals[a] || a - b);
+}
+
+/**
+ * Keeps the `keep` busiest types as they are and adds the rest into one "Other" column, so a chart shows a few
+ * colors instead of nine. Returns the type names and colors that go with the new counts.
+ */
+export function collapseTypes(data: ReservationData, buckets: Bucket[], keep: number): { types: string[]; colors: string[]; buckets: Bucket[] } {
+  const order = typesByVolume(data);
+  if (order.length <= keep + 1) return { types: data.types, colors: data.types.map(typeColor), buckets };
+  const kept = order.slice(0, keep).sort((a, b) => a - b);
+  const rest = order.slice(keep);
+  return {
+    types: [...kept.map((i) => data.types[i]), "Other"],
+    colors: [...kept.map((i) => typeColor(data.types[i])), OTHER_COLOR],
+    buckets: buckets.map((b) => {
+      const counts = [...kept.map((i) => b.counts[i]), rest.reduce((s, i) => s + b.counts[i], 0)];
+      return { ...b, counts, total: counts.reduce((s, n) => s + n, 0) };
+    }),
+  };
+}
+
+/** The type that adds the most to `peak` above the average of the other buckets: what drives a busy month or hour. */
+export function driverOf(types: string[], buckets: Bucket[], peak: Bucket): string | null {
+  const others = buckets.filter((b) => b.key !== peak.key && b.complete);
+  if (others.length === 0) return null;
+  const lift = types.map((_, i) => peak.counts[i] - others.reduce((s, b) => s + b.counts[i], 0) / others.length);
+  const best = lift.reduce((bi, v, i) => (v > lift[bi] ? i : bi), 0);
+  return lift[best] > 0 ? types[best] : null;
+}
+
+/** The type with the most reservations in a set of buckets, for example morning hours or weekend days. */
+export function topTypeIn(types: string[], buckets: Bucket[]): string | null {
+  if (buckets.length === 0) return null;
+  const sums = types.map((_, i) => buckets.reduce((s, b) => s + b.counts[i], 0));
+  const best = sums.reduce((bi, v, i) => (v > sums[bi] ? i : bi), 0);
+  return sums[best] > 0 ? types[best] : null;
+}
+
 /** Percent of each column's total, so every column is the same height and shows the mix. */
 export function asShare(counts: number[], total: number): number[] {
   return counts.map((n) => (total ? (n / total) * 100 : 0));

@@ -4,16 +4,18 @@ import { useEffect, useState } from "react";
 import { ChartCard } from "@/components/ChartCard";
 import { ColumnChart } from "@/components/ColumnChart";
 import {
-  byYear,
-  clickRate,
   extremes,
   filteredOpenRate,
   filteredSummary,
   fmtDate,
   fmtPct,
+  clickRate,
+  listJump,
   listSize,
   openRate,
+  quarterVsYearAgo,
   recentSends,
+  seasonRange,
   unsubRate,
   weeklyByMonthOfYear,
   weeklyByQuarter,
@@ -22,6 +24,7 @@ import {
   type EmailData,
   type Summary,
 } from "@/lib/mailchimp";
+import { formatDay } from "@/lib/dates";
 import { fmtInt } from "@/lib/stats";
 
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; data: EmailData };
@@ -150,20 +153,33 @@ function CampaignTable({ list, filtered = false }: { list: Campaign[]; filtered?
 
 function Email({ data }: { data: EmailData }) {
   const { campaigns } = data;
-  const years = byYear(campaigns);
   const groups = weeklyVsOther(campaigns);
-  const { best, worst } = extremes(campaigns, 5);
+  const { best } = extremes(campaigns, 5);
   const filtered = filteredSummary(campaigns);
   const recent = recentSends(campaigns, 12);
   const hasFiltered = recent.some((c) => c.filteredOpens !== null);
   const quarters = weeklyByQuarter(campaigns);
-  const months = weeklyByMonthOfYear(campaigns);
+  const season = seasonRange(weeklyByMonthOfYear(campaigns));
   const list = listSize(campaigns, 30);
   const spikes = list.filter((p) => p.spike).length;
+  const jump = listJump(list);
+  const q = quarterVsYearAgo(quarters, data.through);
+  const [weekly, other] = groups;
+  const latest = list[list.length - 1];
 
   if (campaigns.length === 0) {
     return <p className="status">No sent emails were found for this audience.</p>;
   }
+
+  const groupTitle =
+    weekly.campaigns && other.campaigns
+      ? other.clickRate > weekly.clickRate
+        ? `One-off emails get more clicks than the Watercooler (${fmtPct(other.clickRate)} against ${fmtPct(weekly.clickRate)})`
+        : `The Watercooler gets more clicks than one-off emails (${fmtPct(weekly.clickRate)} against ${fmtPct(other.clickRate)})`
+      : "Weekly Watercooler against everything else";
+  const quarterTitle = q
+    ? `Watercooler clicks: ${fmtPct(q.now.clickRate)} in ${q.now.label}${q.yearAgo ? `, against ${fmtPct(q.yearAgo.clickRate)} a year before` : ""}`
+    : "Watercooler click rate by quarter";
 
   return (
     <>
@@ -178,77 +194,21 @@ function Email({ data }: { data: EmailData }) {
       )}
 
       <div className="stack">
-        <aside className="callout" aria-label="About open rates">
-          <h3>Open rates run too high</h3>
-          <p>
-            Apple Mail and security software open emails automatically, so the opened figures count some people who
-            never read the email.
-            {filtered
-              ? ` Since ${fmtDate(filtered.since)}, Mailchimp can remove those: across ${fmtInt(filtered.campaigns)} emails the raw open rate is ${fmtPct(filtered.rawOpenRate)} and the filtered one is ${fmtPct(filtered.filteredOpenRate)}.`
-              : " Mailchimp has no filtered figure for these emails."}{" "}
-            Clicks are the more honest measure.
-          </p>
-        </aside>
-
-        <ChartCard
-          title="Click rate by year"
-          subtitle="Share of delivered emails where someone clicked a link."
-          table={{ headers: SUMMARY_HEADERS.map((h, i) => (i === 0 ? "Year" : h)), rows: summaryRows(years) }}
-        >
-          <ColumnChart
-            columns={years.map((y) => ({
-              key: y.label,
-              xLabel: y.label,
-              value: Math.round(y.clickRate * 10) / 10,
-              tooltip: [`${fmtPct(y.clickRate)} clicked`, y.label, `${fmtInt(y.campaigns)} emails, ${fmtInt(y.delivered)} delivered`],
-            }))}
-            ariaLabel="Click rate by year"
-            tick={(n) => `${n}%`}
-          />
-        </ChartCard>
-
-        <section className="card" aria-label="Weekly Watercooler compared with everything else">
-          <h2 className="card-title">Weekly Watercooler against everything else</h2>
-          <p className="card-sub">The Watercooler is steady. One-off emails with a single clear ask do much better.</p>
-          <SummaryTable list={groups} />
-        </section>
-
-        {quarters.length > 0 && (
-          <ChartCard
-            title="Watercooler click rate by quarter"
-            subtitle="Only the weekly newsletter, so the line is not pulled around by one-off surveys and notices. Hover a column for the number of sends behind it."
-            table={{ headers: SUMMARY_HEADERS.map((h, i) => (i === 0 ? "Quarter" : h)), rows: summaryRows(quarters) }}
-          >
-            <ColumnChart
-              columns={quarters.map((q) => ({
-                key: q.label,
-                xLabel: q.label.endsWith("Q1") ? q.label.slice(0, 4) : null,
-                value: Math.round(q.clickRate * 10) / 10,
-                emphasis: q.label === quarters[quarters.length - 1].label,
-                tooltip: [`${fmtPct(q.clickRate)} clicked`, q.label, `${fmtInt(q.campaigns)} sends, ${fmtInt(q.delivered)} delivered`, `${fmtPct(q.openRate)} opened (raw)`],
-              }))}
-              ariaLabel="Watercooler click rate by quarter"
-              tick={(n) => `${n}%`}
-            />
-          </ChartCard>
+        {latest && (
+          <section className="hero" aria-label="Headline">
+            <p className="hero-number num" data-testid="email-reach">
+              {fmtInt(latest.delivered)}
+            </p>
+            <div className="hero-copy">
+              <p className="hero-lead">people got the latest Watercooler, on {formatDay(latest.sentOn, true)}.</p>
+              <p className="hero-support" data-testid="email-jump">
+                {jump
+                  ? `The list jumped from ${fmtInt(jump.from)} to ${fmtInt(jump.to)} on ${formatDay(jump.on, true)}. ${jump.spikesSince} of the ${jump.sendsSince} Watercoolers since then had more than half a percent of readers unsubscribe.`
+                  : `${spikes} of the last ${list.length} Watercoolers had more than half a percent of readers unsubscribe.`}
+              </p>
+            </div>
+          </section>
         )}
-
-        <ChartCard
-          title="Watercooler click rate by month of the year"
-          subtitle="All years pooled, by the month the email went out. A low summer or a low winter says when members stop reading, which matters for off-season events."
-          table={{ headers: SUMMARY_HEADERS.map((h, i) => (i === 0 ? "Month" : h)), rows: summaryRows(months) }}
-        >
-          <ColumnChart
-            columns={months.map((m) => ({
-              key: m.label,
-              xLabel: m.label,
-              value: Math.round(m.clickRate * 10) / 10,
-              tooltip: [`${fmtPct(m.clickRate)} clicked`, m.label, `${fmtInt(m.campaigns)} sends, ${fmtInt(m.delivered)} delivered`],
-            }))}
-            ariaLabel="Watercooler click rate by month of the year"
-            tick={(n) => `${n}%`}
-          />
-        </ChartCard>
 
         {list.length > 0 && (
           <ChartCard
@@ -281,13 +241,36 @@ function Email({ data }: { data: EmailData }) {
           </ChartCard>
         )}
 
-        <section className="card" aria-label="Best and worst emails by click rate">
+        <section className="card" aria-label="Weekly Watercooler compared with everything else">
+          <h2 className="card-title">{groupTitle}</h2>
+          <p className="card-sub">Every send since {fmtDate(campaigns[0].sentOn)}. One-off emails usually carry a single clear ask.</p>
+          <SummaryTable list={groups} />
+        </section>
+
+        {quarters.length > 0 && (
+          <ChartCard
+            title={quarterTitle}
+            subtitle="Only the weekly newsletter, so the trend is not pulled around by one-off surveys and notices. Hover a column for the number of sends behind it."
+            table={{ headers: SUMMARY_HEADERS.map((h, i) => (i === 0 ? "Quarter" : h)), rows: summaryRows(quarters) }}
+          >
+            <ColumnChart
+              columns={quarters.map((qq) => ({
+                key: qq.label,
+                xLabel: qq.label.endsWith("Q1") ? qq.label.slice(0, 4) : null,
+                value: Math.round(qq.clickRate * 10) / 10,
+                emphasis: qq.label === q?.now.label,
+                tooltip: [`${fmtPct(qq.clickRate)} clicked`, qq.label, `${fmtInt(qq.campaigns)} sends, ${fmtInt(qq.delivered)} delivered`, `${fmtPct(qq.openRate)} opened (raw)`],
+              }))}
+              ariaLabel="Watercooler click rate by quarter"
+              tick={(n) => `${n}%`}
+            />
+          </ChartCard>
+        )}
+
+        <section className="card" aria-label="Best emails by click rate">
           <h2 className="card-title">Best five by click rate</h2>
-          <p className="card-sub">Sends of 100 or more. Surveys and billing notices that need action lead.</p>
+          <p className="card-sub">Sends of 100 or more. An email sent to two lists on the same day counts once.</p>
           <CampaignTable list={best} />
-          <h2 className="card-title">Lowest five by click rate</h2>
-          <p className="card-sub">Mostly notices with no link in them, so a low rate says little about quality.</p>
-          <CampaignTable list={worst} />
         </section>
 
         <section className="card" aria-label="Most recent emails">
@@ -299,9 +282,19 @@ function Email({ data }: { data: EmailData }) {
         <aside className="callout" aria-label="Limits of this data">
           <h3>Limits of this data</h3>
           <p>
-            Rates are totals divided by delivered emails, so they can differ slightly from the figures Mailchimp shows
-            per email. Best send time cannot be judged because almost every Watercooler goes out Tuesday at about 5:30
-            pm. The list size changed sharply in August 2026.
+            Open rates run too high: Apple Mail and security software open emails automatically, so the opened figures
+            count some people who never read the email.
+            {filtered
+              ? ` Since ${fmtDate(filtered.since)}, Mailchimp can remove those: across ${fmtInt(filtered.campaigns)} emails the raw open rate is ${fmtPct(filtered.rawOpenRate)} and the filtered one is ${fmtPct(filtered.filteredOpenRate)}.`
+              : ""}{" "}
+            Clicks are the more honest measure.
+          </p>
+          <p>
+            {season
+              ? `Watercooler clicks ${season.high.clickRate - season.low.clickRate < 1.5 ? "barely change" : "change"} with the season: from ${fmtPct(season.low.clickRate)} in ${season.low.label} to ${fmtPct(season.high.clickRate)} in ${season.high.label}, all years pooled. `
+              : ""}
+            Best send time cannot be judged because almost every Watercooler goes out Tuesday at about 5:30 pm. Rates are
+            totals divided by delivered emails, so they can differ slightly from the figures Mailchimp shows per email.
           </p>
         </aside>
       </div>

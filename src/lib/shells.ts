@@ -175,6 +175,27 @@ export function byBoat(outings: Outing[], through: string): { years: number[]; r
   return { years, rows };
 }
 
+export interface BoatChanges {
+  /** Biggest falls and rises in outings against the earlier year, by count, largest first. */
+  drops: BoatRow[];
+  gains: BoatRow[];
+  /** Boats with outings this year and none in the earlier year, and the reverse. Often a new or retired boat, sometimes a renamed one. */
+  started: BoatRow[];
+  stopped: BoatRow[];
+}
+
+/** The boats whose use changed most between the first and last year in `rows`. */
+export function boatChanges(rows: BoatRow[], count = 3): BoatChanges {
+  const diff = (b: BoatRow) => b.sameDates[b.sameDates.length - 1] - b.sameDates[0];
+  const both = rows.filter((b) => b.sameDates.length > 1 && b.sameDates[0] > 0 && b.sameDates[b.sameDates.length - 1] > 0);
+  return {
+    drops: both.filter((b) => diff(b) < 0).sort((a, b) => diff(a) - diff(b)).slice(0, count),
+    gains: both.filter((b) => diff(b) > 0).sort((a, b) => diff(b) - diff(a)).slice(0, count),
+    started: rows.filter((b) => b.sameDates.length > 1 && b.sameDates[0] === 0 && b.sameDates[b.sameDates.length - 1] > 0),
+    stopped: rows.filter((b) => b.sameDates.length > 1 && b.sameDates[0] > 0 && b.sameDates[b.sameDates.length - 1] === 0),
+  };
+}
+
 /* ---------- When boats go out ---------- */
 
 export interface HourCount {

@@ -1,41 +1,26 @@
 import { expect, test } from "@playwright/test";
 
-test("the email page shows the year chart, the groups and the best and lowest emails", async ({ page }) => {
+test("the email page leads with list size and the jump, then the comparisons", async ({ page }) => {
   await page.goto("/email");
   await expect(page.getByRole("heading", { level: 1, name: "Email." })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Click rate by year", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Open rates run too high" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Weekly Watercooler against everything else" })).toBeVisible();
+  await expect(page.getByTestId("email-reach")).toHaveText(/^[\d,]+$/);
+  await expect(page.getByTestId("email-jump")).toContainText("The list jumped from");
+  await expect(page.getByRole("group", { name: /^List size, last \d+ Watercoolers$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /(One-off emails get more clicks than the Watercooler|The Watercooler gets more clicks than one-off emails)/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Watercooler clicks: [\d.]+% in \d{4} Q\d/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Best five by click rate" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Most recent twelve" })).toBeVisible();
+  // The open-rate warning moved to the notes at the end; the flat charts and the lowest five are gone.
+  await expect(page.getByRole("complementary", { name: "Limits of this data" })).toContainText("Open rates run too high");
+  await expect(page.getByRole("group", { name: "Click rate by year", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Watercooler click rate by month of the year" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Lowest five by click rate" })).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: "Loading" })).toHaveCount(0);
 });
 
-test("the year table opens and closes repeatedly", async ({ page }) => {
+test("the quarter and list size views switch to tables and back repeatedly", async ({ page }) => {
   await page.goto("/email");
-  const card = page.locator(".card", { hasText: "Share of delivered emails" });
-  for (let i = 0; i < 4; i++) {
-    await card.getByRole("button", { name: "View as table" }).click();
-    await expect(card.getByRole("columnheader").first()).toHaveText("Year");
-    await card.getByRole("button", { name: "View as chart" }).click();
-    await expect(card.getByRole("table")).toHaveCount(0);
-  }
-});
-
-test("the Watercooler trend, season and list size views show and switch to tables", async ({ page }) => {
-  await page.goto("/email");
-  await expect(page.getByRole("group", { name: "Watercooler click rate by quarter" })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Watercooler click rate by month of the year" })).toBeVisible();
-  await expect(page.getByRole("group", { name: /^List size, last \d+ Watercoolers$/ })).toBeVisible();
-
-  // The month chart always has twelve columns, one per month, in calendar order.
-  const season = page.locator(".card", { hasText: "by month of the year" });
-  await expect(season.locator(".col-hit")).toHaveCount(12);
-  await season.locator(".col-hit").first().hover();
-  await expect(season.getByRole("status")).toContainText("Jan");
-
-  // Table and chart views can be switched repeatedly on the new cards without losing anything.
-  const quarterCard = page.locator(".card", { hasText: "by quarter" });
+  const quarterCard = page.locator(".card", { hasText: "Only the weekly newsletter" });
   for (let i = 0; i < 3; i++) {
     await quarterCard.getByRole("button", { name: "View as table" }).click();
     await expect(quarterCard.getByRole("columnheader").first()).toHaveText("Quarter");

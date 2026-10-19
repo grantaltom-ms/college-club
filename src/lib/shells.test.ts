@@ -161,3 +161,21 @@ describe("preparing the iCrew export", () => {
     expect(() => convert("Name,Date\nx,2026-01-01")).toThrow(/no "Seats" column/);
   });
 });
+
+describe("boatChanges", () => {
+  it("sorts drops and gains by count and finds boats that started or stopped", async () => {
+    const { boatChanges } = await import("./shells");
+    const row = (boat: string, a: number, b: number) => ({ boat, seats: 1, sameDates: [a, b], change: null });
+    const c = boatChanges([row("A", 242, 156), row("B", 183, 105), row("C", 61, 149), row("D", 0, 75), row("E", 148, 0), row("F", 10, 10), row("G", 98, 15)], 2);
+    expect(c.drops.map((r) => r.boat)).toEqual(["A", "G"]);
+    expect(c.gains.map((r) => r.boat)).toEqual(["C"]);
+    expect(c.started.map((r) => r.boat)).toEqual(["D"]);
+    expect(c.stopped.map((r) => r.boat)).toEqual(["E"]);
+  });
+
+  it("has nothing to compare with a single year", async () => {
+    const { boatChanges } = await import("./shells");
+    const c = boatChanges([{ boat: "A", seats: 1, sameDates: [12], change: null }]);
+    expect(c).toEqual({ drops: [], gains: [], started: [], stopped: [] });
+  });
+});

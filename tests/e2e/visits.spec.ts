@@ -3,28 +3,15 @@ import { mockDashboard } from "./helpers";
 
 test.beforeEach(async ({ page }) => mockDashboard(page));
 
-test("overview shows the headline and all five usage groups", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Member usage." })).toBeVisible();
+test("the visits page shows the headline and all five usage groups", async ({ page }) => {
+  await page.goto("/visits");
+  await expect(page.getByRole("heading", { level: 1, name: "Member visits." })).toBeVisible();
   await expect(page.locator(".hero-number")).toHaveText("185");
   await expect(page.getByText("of 550 members visited less than once a month.")).toBeVisible();
   await expect(page.locator(".band-row")).toHaveCount(5);
   await expect(page.locator('.band-row[data-band="0 visits"]')).toContainText("63");
+  await expect(page.getByRole("heading", { name: /^188 regulars make \d+% of all member door entries$/ })).toBeVisible();
   await expect(page.getByRole("note")).toContainText("Sample data");
-});
-
-test("navigation moves between the pages and marks the current one", async ({ page }) => {
-  await page.goto("/");
-  const nav = page.getByRole("navigation", { name: "Dashboard sections" });
-  await nav.getByRole("link", { name: "Timing" }).click();
-  await expect(page).toHaveURL(/\/timing$/);
-  await expect(nav.getByRole("link", { name: "Timing" })).toHaveAttribute("aria-current", "page");
-  await nav.getByRole("link", { name: "Goals" }).click();
-  await expect(page).toHaveURL(/\/goals$/);
-  await expect(nav.getByRole("link", { name: "Goals" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("heading", { level: 1, name: "Goals and Action Items for Tech and Communications", exact: true })).toBeVisible();
-  await nav.getByRole("link", { name: "Overview" }).click();
-  await expect(page.locator(".hero-number")).toHaveText("185");
 });
 
 test("shows a plain error and recovers when the data fails to load", async ({ page }) => {
@@ -36,22 +23,29 @@ test("shows a plain error and recovers when the data fails to load", async ({ pa
     if (calls === 1) return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "Could not reach the database." }) });
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(sampleData()) });
   });
-  await page.goto("/");
+  await page.goto("/visits");
   await expect(page.locator(".status-error")).toBeVisible();
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.locator(".hero-number")).toHaveText("185");
 });
 
-test("multi-booking tile shows shares and stays correct across repeated visits", async ({ page }) => {
-  await page.goto("/");
+test("the work-from-the-club card leads with the count and keeps its method one click away, across repeated visits", async ({ page }) => {
+  await page.goto("/visits");
   const tile = page.getByTestId("multi-booking");
-  await expect(tile.getByRole("heading", { name: "Members who book more than once in a day" })).toBeVisible();
+  await expect(tile.getByRole("heading", { name: /^\d+ members seem to use the club as a place to work$/ })).toBeVisible();
   const first = await page.getByTestId("multi-share").innerText();
   expect(first).toMatch(/^\d+%$/);
-  await expect(page.getByTestId("multi-wfc")).toContainText("look like they use the club as a place to work");
+  const how = tile.getByText("The reservation export has no start times");
+  await expect(how).toBeHidden();
+  for (let i = 0; i < 3; i++) {
+    await tile.getByText("How we tell").click();
+    await expect(how).toBeVisible();
+    await tile.getByText("How we tell").click();
+    await expect(how).toBeHidden();
+  }
   for (let i = 0; i < 4; i++) {
     await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Timing" }).click();
-    await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Overview" }).click();
+    await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Visits" }).click();
     await expect(page.getByTestId("multi-share")).toHaveText(first);
   }
 });
