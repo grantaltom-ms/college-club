@@ -29,7 +29,12 @@ export interface Member {
   /** True when the member has their own Brivo door fob. */
   ownFob: boolean;
   joined: string | null;
+  /** Membership type from the QuickBooks member list: Resident, Intermediate or Non-Resident. */
   memberType: string | null;
+  /** The date the member's QuickBooks record was created, YYYY-MM-DD. */
+  qbCreatedOn: string | null;
+  /** Joined this year and has no visit yet: a waitlist member who has not started. Left out of the usage groups. */
+  notStarted: boolean;
   /** Visit days for Jan..Sep (9 values). */
   monthly: number[];
 }
@@ -85,6 +90,8 @@ export interface DashboardData {
   /** Last day of door data, YYYY-MM-DD. */
   dataThrough: string;
   members: Member[];
+  /** Where the member list comes from, and the day it was taken. */
+  roster: { source: string; asOf: string | null };
   /** iCrew bookings per day, all accounts (from `club_totals`). */
   totals: ClubTotal[];
   door: DoorPattern;

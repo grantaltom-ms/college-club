@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { isHouseholdName, toCell, toDoorMonth, toMember, toPeriod, toTotal } from "./supabase";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { isHouseholdName, loadLiveData, toCell, toDoorMonth, toMember, toPeriod, toTotal } from "./supabase";
 
 describe("database rows to dashboard data", () => {
   it("maps a members row, turning blanks into zeros and keeping dates", () => {
@@ -108,5 +108,59 @@ describe("multi-booking fields", () => {
     const { icrew_bookings_jul_sep, ...rest } = base;
     void icrew_bookings_jul_sep;
     expect(toMember(rest).bookings).toBe(10);
+  });
+});
+
+describe("loading the live roster", () => {
+  const cfg = { url: "https://example.supabase.co", key: "k" };
+  const usageRow = (name: string) => ({
+    member_name: name,
+    usage_band: "4+/month",
+    visits_per_month: 5,
+    visit_days: 44,
+    door_entries: 50,
+    icrew_booking_days_jul_sep: 3,
+    last_visit: "2026-09-01",
+    own_brivo_fob: true,
+    joined: null,
+    icrew_member_type: "Int - 1",
+    data_through: "2026-09-27",
+    ...Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`visit_days_2026_0${i + 1}`, 4])),
+  });
+  const qbRow = (name: string, extra = {}) => ({
+    qb_name: name,
+    qb_member_type: "Non-Resident",
+    qb_member_number: "12000",
+    qb_created_on: "2021-06-14",
+    link: "matched",
+    usage_member_name: name,
+    door_entries_if_door_only: null,
+    roster_as_of: "2026-10-21",
+    ...extra,
+  });
+
+  function serve(tables: Record<string, unknown[]>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const table = new URL(url).pathname.split("/").pop() as string;
+        return new Response(JSON.stringify(tables[table] ?? []), { status: 200 });
+      }),
+    );
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("builds the member list from QuickBooks, taking type and visits from the right places", async () => {
+    serve({ members: [usageRow("Ann Lee"), usageRow("Only OnICrew")], qb_members: [qbRow("Ann Lee")] });
+    const data = await loadLiveData(cfg);
+    expect(data.members).toHaveLength(1);
+    expect(data.members[0]).toMatchObject({ name: "Ann Lee", memberType: "Non-Resident", visitDays: 44, qbCreatedOn: "2021-06-14" });
+    expect(data.roster).toEqual({ source: "QuickBooks member list", asOf: "2026-10-21" });
+  });
+
+  it("fails rather than quietly showing the iCrew list when the QuickBooks list is empty", async () => {
+    serve({ members: [usageRow("Ann Lee")], qb_members: [] });
+    await expect(loadLiveData(cfg)).rejects.toThrow(/qb_members is empty/);
   });
 });

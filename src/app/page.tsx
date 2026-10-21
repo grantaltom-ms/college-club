@@ -27,19 +27,26 @@ interface CardProps {
   value: string;
   lead: string;
   detail?: ReactNode;
+  /** A second small line under the detail. */
+  note?: string;
   href: string;
   linkText: string;
   testId: string;
 }
 
 /** One headline number: what it is, how it compares with last year, and where to read more. */
-function StatCard({ area, value, lead, detail, href, linkText, testId }: CardProps) {
+function StatCard({ area, value, lead, detail, note, href, linkText, testId }: CardProps) {
   return (
     <section className="stat-card" aria-label={area} data-testid={testId}>
       <h2 className="stat-area">{area}</h2>
       <p className="stat-value num">{value}</p>
       <p className="stat-lead">{lead}</p>
       {detail && <p className="stat-detail">{detail}</p>}
+      {note && (
+        <p className="stat-detail" data-testid={`${testId}-note`}>
+          {note}
+        </p>
+      )}
       <p className="stat-target">Board target: not set yet</p>
       <Link className="stat-link" href={href}>
         {linkText} <span aria-hidden="true">&rarr;</span>
@@ -112,8 +119,9 @@ function Summary({ data, shells, email }: { data: DashboardData; shells: JsonSta
             testId="card-quiet"
             area="Members who rarely visit"
             value={fmtInt(h.quiet)}
-            lead={`of ${fmtInt(h.total)} members came in less than once a month this year (${h.quietShare}%).`}
+            lead={`of ${fmtInt(h.started)} members came in less than once a month this year (${h.quietShare}%).`}
             detail={`${fmtInt(h.noVisits)} have not come in at all.`}
+            note={h.notStarted > 0 ? `${fmtInt(h.notStarted)} new members haven't started yet (off the waitlist).` : undefined}
             href="/visits"
             linkText="Visits"
           />
@@ -178,6 +186,9 @@ function Summary({ data, shells, email }: { data: DashboardData; shells: JsonSta
 
         <p className="data-dates" data-testid="data-dates">
           Data through: {dates.join(" · ")}.
+        </p>
+        <p className="data-dates" data-testid="roster-note">
+          {data.roster.asOf ? `Roster: ${data.roster.source}, ${formatDay(data.roster.asOf, true)}.` : `Roster: ${data.roster.source}.`}
         </p>
       </div>
     </>
