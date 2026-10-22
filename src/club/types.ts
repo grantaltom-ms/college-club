@@ -87,10 +87,128 @@ export interface HistoryEntry {
   details: Record<string, string | number | null>;
 }
 
+/* ---------- Bookable equipment and spaces (step 2) ---------- */
+
+/** Everything the club lets members book. One booking engine handles all of them. */
+export const BOOKING_TYPES = ["Shell", "Kayak", "Paddle Board", "Dock Space", "Gym Space", "Room Space", "Work Space"] as const;
+export type BookingType = (typeof BOOKING_TYPES)[number];
+
+/** On-the-water types put a person in one place at a time: nobody can be in two boats at once. */
+export const BOOKING_TYPE_INFO: Record<BookingType, { onWater: boolean }> = {
+  Shell: { onWater: true },
+  Kayak: { onWater: true },
+  "Paddle Board": { onWater: true },
+  "Dock Space": { onWater: false },
+  "Gym Space": { onWater: false },
+  "Room Space": { onWater: false },
+  "Work Space": { onWater: false },
+};
+
+/** The house rules for something bookable. Every value lives in settings/booking-rules.json, never in code. */
+export interface RuleValues {
+  /** How many days ahead a member can book. */
+  windowDays: number;
+  /** When a new day opens for booking, Pacific "HH:MM". Day D opens windowDays before D, at this time. */
+  opensAt: string;
+  /** Bookable hours, Pacific "HH:MM" ("24:00" allowed for dayEnd). */
+  dayStart: string;
+  dayEnd: string;
+  slotMinutes: number;
+  minMinutes: number;
+  maxMinutes: number;
+  /** Bookings one member can hold at once, per booking type. */
+  maxFuturePerType: number;
+  /** Bookings one member can have on one day, per booking type. */
+  maxPerDayPerType: number;
+  /** Cancelling later than this many minutes before the start counts as a late cancellation. */
+  cancelCutoffMinutes: number;
+  /** Minutes that must stay free between two bookings of the same item. 0 means the setting is off. */
+  gapMinutes: number;
+}
+
+/** A kind of item the rules attach to: "all singles". */
+export interface ItemClass {
+  code: string;
+  type: BookingType;
+  name: string;
+  /** 1 single, 2 double, 4 quad or four. */
+  seats: number;
+  /** Qualification code needed to use items of this class, or null for none. */
+  requiredQualification: string | null;
+  rules: Partial<RuleValues>;
+}
+
+export interface RuleBook {
+  /** True while the numbers are placeholders. Shown on screen. */
+  placeholder: boolean;
+  defaults: RuleValues;
+  classes: ItemClass[];
+}
+
+/** One boat, board, dock space and so on. */
+export interface Item {
+  id: string;
+  name: string;
+  classCode: string;
+  /** Overrides on top of the class rules, for this one item. */
+  ruleOverrides: Partial<RuleValues>;
+  /** undefined: use the class's. null: none needed. A code: that qualification. */
+  requiredQualification?: string | null;
+}
+
+/** A stretch of time when an item cannot be booked. */
+export interface OutOfServicePeriod {
+  id: string;
+  itemId: string;
+  /** ISO moments. `until` null means until staff return it to service. */
+  from: string;
+  until: string | null;
+  reason: string;
+  /** YYYY-MM-DD, what staff expect, shown to members. */
+  expectedReturn: string | null;
+  createdBy: Actor;
+  createdAt: string;
+}
+
+/**
+ * Every booking ends in one of these. "upcoming" is the only one that can still change by the member's own hand.
+ * cancelled and late_cancelled free the slot; completed and no_show are the record of what happened.
+ */
+export const BOOKING_STATUSES = ["upcoming", "completed", "cancelled", "late_cancelled", "no_show"] as const;
+export type BookingStatus = (typeof BOOKING_STATUSES)[number];
+
+/** Statuses that hold the slot (nobody else can book it). */
+export const HOLDING_STATUSES: readonly BookingStatus[] = ["upcoming", "completed", "no_show"];
+
+export interface Booking {
+  id: string;
+  itemId: string;
+  /** The booker owns the booking and is in the boat. */
+  bookerId: string;
+  /** Other members in a multi-seat boat. Never includes the booker. */
+  crew: string[];
+  /** ISO moments. */
+  startsAt: string;
+  endsAt: string;
+  status: BookingStatus;
+  createdAt: string;
+  createdBy: Actor;
+  statusChangedAt: string;
+  cancelledBy: Actor | null;
+  cancelReason: string | null;
+  /** Set when staff booked past the rules: why, who, and exactly which rules were set aside. */
+  override: { reason: string; actor: Actor; waived: string[] } | null;
+  /** Crew taken off this booking because they left the club. */
+  removedCrew: { memberId: string; at: string; reason: string }[];
+}
+
 export interface ClubState {
   households: Household[];
   members: Member[];
   qualifications: Qualification[];
   memberQualifications: MemberQualification[];
   history: HistoryEntry[];
+  items: Item[];
+  outOfService: OutOfServicePeriod[];
+  bookings: Booking[];
 }

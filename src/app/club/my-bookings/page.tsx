@@ -1,0 +1,126 @@
+import { clubNow } from "@/club/clock";
+import { fullName, memberById } from "@/club/engine/queries";
+import { requireClub } from "@/club/guard";
+import { getCurrentActor } from "@/club/identity";
+import { RULE_BOOK, rulesFor } from "@/club/settings/rulebook";
+import { getClubStore } from "@/club/store/instance";
+import { formatDayLong, formatRange, pacificDate } from "@/club/time";
+import type { Booking, ClubState } from "@/club/types";
+import { idParam, NOTICES } from "@/club/web";
+import { PlaceholderNote } from "../PlaceholderNote";
+import { SignedOut } from "../SignedOut";
+
+const STATUS: Record<Booking["status"], string> = {
+  upcoming: "Upcoming",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  late_cancelled: "Cancelled late",
+  no_show: "No-show",
+};
+
+const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
+
+function Row({ state, booking, viewerId, now, staff }: { state: ClubState; booking: Booking; viewerId: string | null; now: Date; staff: boolean }) {
+  const item = state.items.find((i) => i.id === booking.itemId)!;
+  const booker = memberById(state, booking.bookerId)!;
+  const crew = booking.crew.map((id) => fullName(memberById(state, id)!));
+  const mine = booking.bookerId === viewerId;
+  const finished = Date.parse(booking.endsAt) <= now.getTime();
+  const status = booking.status === "upcoming" && finished ? "Awaiting attendance record" : STATUS[booking.status];
+  const cancellable = booking.status === "upcoming" && Date.parse(booking.startsAt) > now.getTime() && (mine || staff);
+  const cutoff = rulesFor(RULE_BOOK, item).rules.cancelCutoffMinutes;
+  const late = mine && Date.parse(booking.startsAt) - now.getTime() < cutoff * 60000;
+  return (
+    <li className="club-card" data-testid="booking-row" data-status={booking.status} data-item={item.name}>
+      <h3>{item.name}</h3>
+      <p>
+        {formatDayLong(pacificDate(new Date(booking.startsAt)))}, {formatRange(booking.startsAt, booking.endsAt)}
+      </p>
+      <p className="club-meta">
+        <span data-testid="booking-status">{status}</span>
+        {staff || !mine ? ` · booked by ${fullName(booker)}` : ""}
+        {crew.length > 0 ? ` · crew: ${crew.join(", ")}` : ""}
+        {!mine && !staff ? " · you are crew" : ""}
+        {booking.override ? ` · staff override: ${booking.override.reason}` : ""}
+        {booking.cancelReason ? ` · ${booking.cancelReason}` : ""}
+      </p>
+      {cancellable && (
+        <form method="post" action="/api/club/bookings/cancel">
+          <input type="hidden" name="id" value={booking.id} />
+          {late && <p className="club-meta">Cancelling now counts as a late cancellation.</p>}
+          <button type="submit" className="club-button club-button-quiet" aria-label={`Cancel ${item.name}, ${formatRange(booking.startsAt, booking.endsAt)}`}>
+            Cancel booking
+          </button>
+        </form>
+      )}
+    </li>
+  );
+}
+
+export default async function MyBookings({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requireClub();
+  const actor = await getCurrentActor();
+  if (!actor) return <SignedOut />;
+
+  const now = clubNow();
+  const state = await (await getClubStore()).read();
+  const params = await searchParams;
+  const staff = actor.kind === "staff";
+  const viewerId = actor.kind === "member" ? actor.member.id : null;
+  const all = state.bookings.filter((b) => staff || b.bookerId === viewerId || b.crew.includes(viewerId!));
+  const upcoming = all.filter((b) => b.status === "upcoming" && Date.parse(b.endsAt) > now.getTime()).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const past = all.filter((b) => !upcoming.includes(b)).sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+
+  const bookedId = idParam(params.booked);
+  const cancelledId = idParam(params.cancelled);
+  const booked = bookedId ? state.bookings.find((b) => b.id === bookedId) : undefined;
+  const cancelled = cancelledId ? state.bookings.find((b) => b.id === cancelledId) : undefined;
+  const nameOf = (b: Booking) => state.items.find((i) => i.id === b.itemId)!.name;
+  const notice = NOTICES[one(params.notice) ?? ""];
+
+  return (
+    <section>
+      <h1>{staff ? "All bookings" : "My bookings"}</h1>
+      <PlaceholderNote />
+      {booked && (
+        <p className="club-success" role="status" data-testid="booked-note">
+          Booked: {nameOf(booked)}, {formatDayLong(pacificDate(new Date(booked.startsAt)))}, {formatRange(booked.startsAt, booked.endsAt)}.
+        </p>
+      )}
+      {cancelled && (
+        <p className="club-success" role="status" data-testid="cancelled-note">
+          {cancelled.status === "late_cancelled"
+            ? `Cancelled ${nameOf(cancelled)}. It was after the cutoff, so it is recorded as a late cancellation.`
+            : `Cancelled ${nameOf(cancelled)}. The time is free for others again.`}
+        </p>
+      )}
+      {notice && (
+        <p className="club-alert" role="alert">
+          {notice}
+        </p>
+      )}
+
+      <h2>Upcoming</h2>
+      {upcoming.length === 0 ? (
+        <p data-testid="no-upcoming">Nothing booked.</p>
+      ) : (
+        <ul className="club-cards" aria-label="Upcoming bookings">
+          {upcoming.map((b) => (
+            <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} />
+          ))}
+        </ul>
+      )}
+
+      <h2>Past</h2>
+      {past.length === 0 ? (
+        <p>Nothing yet.</p>
+      ) : (
+        <ul className="club-cards" aria-label="Past bookings">
+          {past.map((b) => (
+            <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}

@@ -26,6 +26,8 @@ export default defineConfig({
       env: {
         // The browser tests replace /api/dashboard with sample data, so no database is touched.
         CCS_ALLOW_SAMPLE_DATA: "1",
+        // The member area's clock stands still at 1 pm Pacific on Wed Oct 28, 2026, so the tests never depend on the time of day.
+        CCS_CLUB_NOW: "2026-10-28T20:00:00Z",
       },
     },
     {

@@ -1,7 +1,10 @@
-import { NO_BOOKINGS_YET, createHousehold, endHousehold, grantQualification, type Ctx, type NewMember } from "../engine/households";
+import { bookingLedger } from "../engine/bookings";
+import { createHousehold, endHousehold, grantQualification, type Ctx, type NewMember } from "../engine/households";
 import { MemoryClubStore, sequentialIds } from "../store/memory";
+import { clubNow } from "../clock";
 import { addDays, middayPacific, pacificDate } from "../time";
 import type { Actor, MembershipType } from "../types";
+import { seedSampleEquipment } from "./equipment";
 
 /**
  * Invented households for development and tests. Every name, address and phone number is made up
@@ -88,14 +91,18 @@ export async function seedSampleClub(store: MemoryClubStore, today: string): Pro
     }
     if (h.endedDaysAgo !== undefined) {
       const ctx: Ctx = { actor: SAMPLE_STAFF, now: middayPacific(addDays(today, -h.endedDaysAgo)) };
-      await endHousehold(store, NO_BOOKINGS_YET, ctx, members[0].householdId);
+      await endHousehold(store, bookingLedger, ctx, members[0].householdId);
     }
   }
 }
 
-/** A fresh store holding the sample club. IDs are fixed, so addresses and test links stay the same between runs. */
-export async function buildSampleStore(today: string = pacificDate(new Date())): Promise<MemoryClubStore> {
+/**
+ * A fresh store holding the sample club. IDs are fixed, so addresses and test links stay the same between runs.
+ * Households come first, then the boats and a few bookings, all as of `now` (midday on `today` unless given).
+ */
+export async function buildSampleStore(today: string = pacificDate(clubNow()), now: Date = today === pacificDate(clubNow()) ? clubNow() : middayPacific(today)): Promise<MemoryClubStore> {
   const store = new MemoryClubStore(sequentialIds());
   await seedSampleClub(store, today);
+  await seedSampleEquipment(store, now);
   return store;
 }

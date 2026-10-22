@@ -109,7 +109,7 @@ Do better:
 - **Fake data:** about 14 invented households covering a single adult, couples, a three-adult household, each membership type, one ended household, one that joined this month, members with and without rowing qualifications, and one member whose email is shared with a partner. Invented names only; boat names come from `src/lib/shells.ts` when step 2 needs them.
 - **Test member picker** and **one "current member" function**, as described above.
 
-## Step 2: bookable equipment and spaces, with rules (not started)
+## Step 2: bookable equipment and spaces, with rules (built Oct 22; in review)
 
 One engine for everything bookable: Shell, Kayak, Paddle Board, Dock Space, Gym Space, Room Space, Work Space. Fully set up in the fake data: shells, kayaks, paddle boards, plus Dock Space to prove the engine is general.
 
@@ -141,6 +141,19 @@ Behavior:
 - **Time zone:** store exact moments, show Pacific time. Clocks fall back on Nov 1, 2026; no lost or doubled slots that day.
 - **Screens:** a day view by item (filter by type; members see "Booked" or "Yours"), a booking form that shows the rules and why anything is refused, and "My bookings" with cancel. Plain and functional, CCS fonts and colors, works on a phone.
 
+### Step 2 as built
+
+- **Rules are data.** `src/club/settings/booking-rules.json` holds every number (all marked placeholder) and the item classes (single, double, quad, kayak, paddle board, dock space). Rules layer: defaults, then the class ("all singles"), then the single item. `parseRuleBook` refuses typos and contradictions in words ("maxMinutes (100) must be a whole number of 30-minute slots"), so staff edits are caught by the tests. The database has matching tables (`booking_rule_defaults`, `item_classes`, `items`) so the staff screen in step 5 can edit the same data.
+- **The engine** is `src/club/engine/bookings.ts`. `checkBooking` returns every reason a booking is refused, in a fixed order, in plain language, and marks which ones staff may set aside. `createBooking`, `cancelBooking`, `markAttendance`, `takeOutOfService`, `returnToService` do the work, each as one all-or-nothing change.
+- **Facts versus rules.** Staff can book past the *rules* (window, hours, step, length, limits, qualification, gap) with a recorded reason, and the record lists exactly which rules were set aside. Staff can never set aside a *fact*: the slot is taken, the item is out of service, the time has passed, the member has left, nobody in two boats at once.
+- **Time.** Every time is a real moment; days, hours and "midnight" are Pacific. Slots are stepped in real elapsed time, so Nov 1, 2026 (25 hours) has no lost or doubled slot and Mar 14, 2027 (23 hours) is handled. Late-cancel cutoffs count real hours.
+- **No double booking, two layers.** The engine checks first and explains. The database (`club.bookings`, migration `20261023000000`) also refuses an overlap by itself with an exclusion constraint, and lines up competing requests for one item with a lock (without it, colliding requests stalled for about a second on a deadlock instead of getting a clean "taken").
+- **Household link.** Ending a membership or removing an adult cancels their future bookings (not late; staff-cancelled), takes them off other people's boats as crew (the booking stays), leaves bookings under way and past ones alone, and writes it to the household's file. All in the same all-or-nothing change.
+- **Screens.** `/club/book` (day view, filter by type, days in the window), `/club/book/new` (form that runs the real rule check and shows the rules), `/club/my-bookings` (staff see "All bookings"), `/club/equipment` (staff only: take out of service, return, see affected members).
+- **The test clock.** `CCS_CLUB_NOW` (for example `2026-10-28T20:00:00Z`) freezes "now" for the member area, in development and tests only. It does nothing where the member area is switched off.
+
+Not built yet, on purpose: the Postgres store for the screens (they run on the in-memory store; the tables and the overlap rule are in the migration and tested against a real Postgres, but the app does not read or write them yet), the attendance-marking screen, the staff admin screen, emails or texts.
+
 ## Testing (required; nothing is done until all of this passes)
 
 CI runs on every push and pull request: install, lint, type check, unit tests, build, browser tests.
@@ -166,6 +179,10 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
 - C. A shared email (partners on one address) will clash with "one login per adult" in step 6. Decide how those two logins are told apart.
 - D. When the production switch-on happens: the date the `/club` area becomes visible on the production site, and who approves it.
 - E. Who gets which Vercel/Supabase/GitHub accounts under the CCS-owned email.
+- G. Before any pilot, the app needs a Postgres-backed store behind the same interface as the in-memory one. The overlap rule is already enforced by the database, but the other checks (a member's limits, nobody in two boats at once) are in the engine and must then run under a lock on the member's row so two simultaneous requests cannot slip past them. Plan it when step 6 or 7 connects real data.
+- H. Past outings nobody has marked show as "Awaiting attendance record" until the marking screen exists (it comes later). Should unmarked outings count as completed after some days?
+- I. What does a late cancellation lead to (a warning after N, a fee, nothing)? Phase 1 only records it.
+- J. When a member leaves, other people's boats lose that crew member but keep the booking. Confirm that is what staff want, or whether the owner should be told.
 - ~~F. Next.js security advisory~~ Answered Oct 22: Grant merged the upgrade to 16.4.2 (PR 11) before this system was merged. The random "version is affected" build failure is gone.
 
 ## Session log
@@ -186,3 +203,11 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
   - The in-memory store runs the screens; the Postgres store is built in step 2, where the double-booking rule needs it.
 - **Next:** Grant reviews step 1, then step 2 (bookable items, rules, booking engine, day view, booking form, My bookings).
 - **Blocked / needs Grant:** turn on GitHub branch protection; set `CCS_ALLOW_SAMPLE_DATA=1` in Vercel **Preview** only if previews should show `/club`; real qualification names (B). `supabase/config.toml` has not been tried with the Supabase CLI (no Docker in the cloud session).
+
+### Oct 22, 2026 (later): step 1 merged, step 2 built
+- **Done:** Grant merged his two pull requests (Next.js 16.4.2 security upgrade, roster note) and approved merging step 1 once CI passed; step 1 merged as PR 12. Step 2 then built on a fresh branch from `main`.
+- **Built (step 2):** rules as data with a checker; the booking engine (all of the behaviors above); invented boats using the shell names from the dashboard sample plus kayaks, paddle boards and dock slips; day view, booking form, My bookings, staff equipment page; second migration with the overlap constraint, tested against a real Postgres including 20 simultaneous requests and a 100-request storm.
+- **Found and fixed on the way:** (1) twenty colliding database inserts sometimes took seconds (deadlock detection) instead of failing cleanly; fixed with a per-item lock in the database. (2) A test run after merging showed the browser tests assumed a fresh server; they now look in the right list and pass three runs in a row.
+- **Decided / assumed (Grant to confirm in review):** staff overrides cover the club rules but never facts; crew leaving the club lose their seat but the booking stays; a staff cancellation is never recorded as the member's late cancellation; unmarked past outings show "Awaiting attendance record"; a person can hold a dock space while on the water (only boats, kayaks and paddle boards put someone in one place).
+- **Next:** Grant reviews step 2. Then the 10-step order continues with step 3 (fitness classes) only if Grant says so; the Postgres store (open question G) is the main gap before any pilot.
+- **Blocked / needs Grant:** real values for the placeholder rules (open question 5); real qualification names (B); branch protection on `main`.

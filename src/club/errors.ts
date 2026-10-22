@@ -1,4 +1,4 @@
-export type ClubErrorCode = "forbidden" | "not_found" | "invalid" | "conflict";
+export type ClubErrorCode = "forbidden" | "not_found" | "invalid" | "conflict" | "refused";
 
 /** A refusal the person can understand. The message is plain language, safe to show as is. */
 export class ClubError extends Error {

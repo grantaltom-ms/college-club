@@ -49,6 +49,8 @@ The prepare step runs on your own computer: shell rower names are swapped for sc
 
 - It shows invented households only, and exists while developing or when `CCS_ALLOW_SAMPLE_DATA=1`. It is **never** available when `VERCEL_ENV=production`: set the switch in Vercel Preview only.
 - There are no real logins yet. `/club/act-as` lets you act as an invented member (or test staff) to try it.
+- **Booking** (step 2): `/club/book` shows what is free by boat or space, `/club/book/new` checks the rules and explains any refusal, `/club/my-bookings` lists and cancels, and test staff get `/club/equipment` to take things out of service. Every rule number lives in `src/club/settings/booking-rules.json` and is a **placeholder** until staff confirm it.
+- `CCS_CLUB_NOW` freezes the member area's clock (development and tests only).
 - Database tests need a local or throwaway Postgres: see `supabase/README.md`.
 
 ## Checks

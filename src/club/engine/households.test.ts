@@ -3,8 +3,8 @@ import { ClubError } from "../errors";
 import { MemoryClubStore, sequentialIds } from "../store/memory";
 import { middayPacific } from "../time";
 import type { Actor } from "../types";
+import { bookingLedger as NO_BOOKINGS_YET } from "./bookings";
 import {
-  NO_BOOKINGS_YET,
   addMember,
   changeMembershipType,
   createHousehold,
