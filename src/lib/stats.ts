@@ -1,3 +1,4 @@
+import { MEMBER_TYPES } from "./roster";
 import { countWeekdays, formatDay, formatMonth, weekdayIndex, WEEKDAYS, WEEKDAY_NAMES } from "./dates";
 import {
   BAND_ORDER,
@@ -43,10 +44,17 @@ export interface BandRow {
   withoutFob: number;
 }
 
+/** Members who have had the chance to visit: everyone except the new members still waiting to start. */
+export function started(members: Member[]): Member[] {
+  return members.filter((m) => !m.notStarted);
+}
+
+/** The usage groups, counting only members who have started. Shares are of the whole roster, so with the not-started group they add up to 100. */
 export function bandSummary(members: Member[]): BandRow[] {
-  const totalEntries = members.reduce((sum, m) => sum + m.doorEntries, 0);
+  const active = started(members);
+  const totalEntries = active.reduce((sum, m) => sum + m.doorEntries, 0);
   return BAND_ORDER.map((band) => {
-    const inBand = members.filter((m) => m.band === band);
+    const inBand = active.filter((m) => m.band === band);
     const doorEntries = inBand.reduce((sum, m) => sum + m.doorEntries, 0);
     return {
       band,
@@ -61,7 +69,12 @@ export function bandSummary(members: Member[]): BandRow[] {
 }
 
 export interface Headline {
+  /** Everyone on the roster, started or not. The rarely-visit share is of this. */
   total: number;
+  /** Members who have started. */
+  started: number;
+  /** New members who joined this year and have not visited yet. */
+  notStarted: number;
   quiet: number;
   quietShare: number;
   noVisits: number;
@@ -74,8 +87,11 @@ export function headline(members: Member[]): Headline {
   const rows = bandSummary(members);
   const byBand = (b: Band) => rows.find((r) => r.band === b)!;
   const quiet = byBand("0 visits").members + byBand("Under 1/month").members;
+  const active = started(members).length;
   return {
     total: members.length,
+    started: active,
+    notStarted: members.length - active,
     quiet,
     quietShare: percent(quiet, members.length),
     noVisits: byBand("0 visits").members,
@@ -83,6 +99,84 @@ export function headline(members: Member[]): Headline {
     regularEntryShare: byBand("4+/month").entryShare,
     withoutFob: members.filter((m) => !m.ownFob).length,
   };
+}
+
+/* ---------- Who the quiet members are ---------- */
+
+export interface TypeRow {
+  type: string;
+  /** Members of this type who have started. */
+  members: number;
+  /** One count per usage group, in BAND_ORDER. */
+  counts: number[];
+  quiet: number;
+  quietShare: number;
+  notStarted: number;
+}
+
+/** Usage groups for each QuickBooks membership type, among members who have started. */
+export function visitsByType(members: Member[]): TypeRow[] {
+  return MEMBER_TYPES.map((type) => {
+    const ofType = members.filter((m) => m.memberType === type);
+    const active = started(ofType);
+    const counts = BAND_ORDER.map((b) => active.filter((m) => m.band === b).length);
+    const quiet = counts[0] + counts[1];
+    return {
+      type,
+      members: active.length,
+      counts,
+      quiet,
+      quietShare: percent(quiet, active.length),
+      notStarted: ofType.length - active.length,
+    };
+  });
+}
+
+export interface CohortRow {
+  key: string;
+  label: string;
+  /** Fits under a column on a phone. */
+  shortLabel: string;
+  /** Reads after "joined": "before Oct 2019", "in 2025". */
+  phrase: string;
+  /** Members of this group who have started. */
+  members: number;
+  quiet: number;
+  quietShare: number;
+  notStarted: number;
+  /** True for the year still in progress. */
+  partial: boolean;
+}
+
+/** QuickBooks stamped every existing member with its load day, so that day or earlier means "joined on or before". */
+export const QB_LOAD_DAY = "2019-10-18";
+
+/** Share who visit under once a month, by when the member's QuickBooks record was created. */
+export function quietByJoined(members: Member[], through: string): CohortRow[] {
+  const year = Number(through.slice(0, 4));
+  const groups: { key: string; label: string; shortLabel: string; phrase: string; test: (d: string) => boolean; partial?: boolean }[] = [
+    { key: "before", label: "Before Oct 2019", shortLabel: "≤2019", phrase: "before Oct 2019", test: (d) => d <= QB_LOAD_DAY },
+    { key: "2019-2022", label: "Oct 2019–2022", shortLabel: "’19–22", phrase: "in Oct 2019–2022", test: (d) => d > QB_LOAD_DAY && d < "2023" },
+    { key: "2023-2024", label: "2023–2024", shortLabel: "’23–24", phrase: "in 2023–2024", test: (d) => d >= "2023" && d < "2025" },
+    { key: "2025", label: "2025", shortLabel: "2025", phrase: "in 2025", test: (d) => d >= "2025" && d < String(year) },
+    { key: String(year), label: `${year} so far`, shortLabel: `${year}*`, phrase: `in ${year}`, test: (d) => d >= String(year), partial: true },
+  ];
+  return groups.map((g) => {
+    const inGroup = members.filter((m) => m.qbCreatedOn && g.test(m.qbCreatedOn));
+    const active = started(inGroup);
+    const quiet = active.filter((m) => m.band === "0 visits" || m.band === "Under 1/month").length;
+    return {
+      key: g.key,
+      label: g.label,
+      shortLabel: g.shortLabel,
+      phrase: g.phrase,
+      members: active.length,
+      quiet,
+      quietShare: percent(quiet, active.length),
+      notStarted: inGroup.length - active.length,
+      partial: !!g.partial,
+    };
+  });
 }
 
 /* ---------- Several reservations in one day ---------- */

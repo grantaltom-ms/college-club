@@ -1,3 +1,4 @@
+import { buildRoster, ROSTER_SOURCE, type QbRow } from "./roster";
 import { sameDateCutoff, type Outing, type RowerCount, type ShellData } from "./shells";
 import {
   BAND_ORDER,
@@ -116,6 +117,8 @@ export function toMember(r: MemberRow): Member {
     ownFob: r.own_brivo_fob,
     joined: r.joined,
     memberType: r.icrew_member_type,
+    qbCreatedOn: null,
+    notStarted: false,
     monthly: [
       r.visit_days_2026_01,
       r.visit_days_2026_02,
@@ -164,17 +167,27 @@ export function toDoorMonth(r: MonthRow): DoorMonth {
 }
 
 export async function loadLiveData(cfg: { url: string; key: string }): Promise<DashboardData> {
-  const [memberRows, totalRows, periodRows, cellRows, monthRows] = await Promise.all([
+  const [memberRows, qbRows, totalRows, periodRows, cellRows, monthRows] = await Promise.all([
     fetchAll<MemberRow>(cfg, "members", "member_name.asc"),
+    fetchAll<QbRow>(cfg, "qb_members", "qb_name.asc"),
     fetchAll<TotalRow>(cfg, "club_totals", "id.asc"),
     fetchAll<PeriodRow>(cfg, "door_periods", "year.asc"),
     fetchAll<CellRow>(cfg, "door_pattern", "year.asc,weekday.asc,hour.asc"),
     fetchAll<MonthRow>(cfg, "door_monthly", "year.asc,month.asc"),
   ]);
+  // The QuickBooks list is the roster. With none loaded there is nothing honest to show, so fail loudly
+  // rather than quietly falling back to the iCrew list.
+  if (qbRows.length === 0) throw new Error("qb_members is empty: load the QuickBooks member list first");
+  const dataThrough = memberRows[0]?.data_through ?? "2026-09-27";
+  const roster = buildRoster(qbRows, memberRows.map(toMember), dataThrough);
+  if (roster.missing.length > 0) {
+    console.warn(`${roster.missing.length} QuickBooks members link to a usage record that is not in the database`);
+  }
   return {
     source: "live",
-    dataThrough: memberRows[0]?.data_through ?? "2026-09-27",
-    members: memberRows.map(toMember),
+    dataThrough,
+    members: roster.members,
+    roster: { source: ROSTER_SOURCE, asOf: roster.asOf },
     totals: totalRows.map(toTotal),
     door: {
       periods: periodRows.map(toPeriod),

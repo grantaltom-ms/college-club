@@ -12,7 +12,10 @@ test("the summary leads with one sentence and six headline cards, each linking t
   await expect(page.getByRole("heading", { level: 1, name: "How the club is doing." })).toBeVisible();
   await expect(page.getByTestId("story")).toContainText(`club shell outings are down ${Math.abs(shellChange)}%`);
   await expect(page.locator(".stat-card")).toHaveCount(6);
-  await expect(page.getByTestId("card-quiet").locator(".stat-value")).toHaveText("185");
+  await expect(page.getByTestId("card-quiet").locator(".stat-value")).toHaveText("133");
+  await expect(page.getByTestId("card-quiet")).toContainText("of 497 members came in less than once a month this year (27%).");
+  await expect(page.getByTestId("card-quiet-note")).toHaveText("11 new members haven't started yet (off the waitlist).");
+  await expect(page.getByTestId("roster-note")).toHaveText("Roster: QuickBooks member list, Oct 21, 2026.");
   await expect(page.getByTestId("card-shells").locator(".stat-value")).toHaveText(`−${Math.abs(shellChange)}%`);
   await expect(page.getByTestId("card-door").locator(".stat-value")).toHaveText(/^[+−]\d+%$/);
   await expect(page.getByTestId("card-email")).toContainText("The list jumped from");
@@ -58,4 +61,16 @@ test("the cards stack on a phone without sideways scrolling", async ({ page }) =
   await expect(page.locator(".stat-card")).toHaveCount(6);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(390);
+});
+
+test("the rarely-visit note and roster source stay put through repeated visits", async ({ page }) => {
+  await mockAll(page);
+  await page.goto("/");
+  for (let i = 0; i < 3; i++) {
+    await page.getByTestId("card-quiet").getByRole("link").click();
+    await expect(page.getByTestId("roster-note")).toHaveText("Roster: QuickBooks member list, Oct 21, 2026.");
+    await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Summary" }).click();
+    await expect(page.getByTestId("card-quiet-note")).toHaveText("11 new members haven't started yet (off the waitlist).");
+    await expect(page.getByTestId("roster-note")).toHaveText("Roster: QuickBooks member list, Oct 21, 2026.");
+  }
 });

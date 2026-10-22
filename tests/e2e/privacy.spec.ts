@@ -6,8 +6,12 @@ test.describe("what the public site shows", () => {
     const res = await fetch(`${baseURL}/api/dashboard`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.members).toHaveLength(550);
+    expect(body.members).toHaveLength(497);
     expect(body.members.every((m: { name: string; joined: string | null }) => m.name === "" && m.joined === null)).toBe(true);
+    // Type, creation date and the not-started flag travel with each member, but never a name.
+    expect(body.members.every((m: { memberType: string; qbCreatedOn: string; notStarted: boolean }) => ["Resident", "Intermediate", "Non-Resident"].includes(m.memberType) && /^\d{4}-\d{2}-\d{2}$/.test(m.qbCreatedOn) && typeof m.notStarted === "boolean")).toBe(true);
+    expect(body.members.filter((m: { notStarted: boolean }) => m.notStarted)).toHaveLength(11);
+    expect(JSON.stringify(body)).not.toMatch(/qb_name|usage_member_name|qb_member_number/);
   });
 
   test("the Members page and its addresses are gone", async ({ baseURL, page }) => {

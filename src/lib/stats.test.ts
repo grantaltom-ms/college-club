@@ -13,6 +13,8 @@ import {
   heatmap,
   headline,
   hourSeries,
+  quietByJoined,
+  visitsByType,
   monthComparison,
   multiBooking,
   monthSeries,
@@ -40,22 +42,40 @@ function member(overrides: Partial<Member>): Member {
     ownFob: true,
     joined: null,
     memberType: null,
+    qbCreatedOn: null,
+    notStarted: false,
     monthly: [0, 0, 0, 0, 0, 0, 0, 0, 0],
     ...overrides,
   };
 }
 
 describe("band summary and headline", () => {
-  it("matches the real club's group sizes", () => {
-    expect(bandSummary(data.members).map((r) => r.members)).toEqual([63, 122, 96, 81, 188]);
+  it("counts the groups among members who have started", () => {
+    expect(bandSummary(data.members).map((r) => r.members)).toEqual([31, 102, 80, 75, 198]);
   });
 
-  it("has 550 members, 185 of them under one visit a month", () => {
+  it("has 497 members, 11 not started, and 133 of the 497 under one visit a month", () => {
     const h = headline(data.members);
-    expect(h.total).toBe(550);
-    expect(h.quiet).toBe(185);
-    expect(h.noVisits).toBe(63);
-    expect(h.regulars).toBe(188);
+    expect(h.total).toBe(497);
+    expect(h.notStarted).toBe(11);
+    expect(h.started).toBe(486);
+    expect(h.quiet).toBe(133);
+    expect(h.quietShare).toBe(27);
+    expect(h.noVisits).toBe(31);
+    expect(h.regulars).toBe(198);
+  });
+
+  it("leaves not-started members out of the rarely-visit count but keeps them in the total", () => {
+    const members = [
+      member({ band: "0 visits", visitDays: 0, doorEntries: 0 }),
+      member({ band: "0 visits", visitDays: 0, doorEntries: 0, notStarted: true, qbCreatedOn: "2026-06-01" }),
+      member({ band: "4+/month", doorEntries: 100 }),
+    ];
+    const h = headline(members);
+    // The share is of the whole roster, so the not-started member is in the total but not the count.
+    expect(h).toMatchObject({ total: 3, started: 2, notStarted: 1, quiet: 1, noVisits: 1, quietShare: 33 });
+    expect(bandSummary(members).reduce((s, r) => s + r.members, 0)).toBe(2);
+    expect(bandSummary(members).map((r) => r.memberShare)).toEqual([33, 0, 0, 0, 33]);
   });
 
   it("shares of door entries add up to about 100", () => {
@@ -239,5 +259,57 @@ describe("multiBooking", () => {
     for (let i = 0; i < 5; i++) expect(multiBooking(data.members)).toEqual(a);
     expect(a.workFromClub).toBeLessThanOrEqual(a.often);
     expect(a.multiDay).toBeLessThanOrEqual(a.booked);
+  });
+});
+
+describe("visits by membership type and by when members joined", () => {
+  it("splits the groups by QuickBooks type and shares the under-once-a-month rate", () => {
+    const members = [
+      member({ memberType: "Resident", band: "0 visits", visitDays: 0 }),
+      member({ memberType: "Resident", band: "Under 1/month" }),
+      member({ memberType: "Resident", band: "4+/month" }),
+      member({ memberType: "Resident", band: "4+/month" }),
+      member({ memberType: "Intermediate", band: "1-2/month" }),
+      member({ memberType: "Non-Resident", band: "0 visits", visitDays: 0, notStarted: true, qbCreatedOn: "2026-05-01" }),
+      member({ memberType: "Non-Resident", band: "Under 1/month" }),
+    ];
+    const rows = visitsByType(members);
+    expect(rows.map((r) => r.type)).toEqual(["Resident", "Intermediate", "Non-Resident"]);
+    expect(rows[0]).toMatchObject({ members: 4, counts: [1, 1, 0, 0, 2], quiet: 2, quietShare: 50 });
+    expect(rows[1]).toMatchObject({ members: 1, quiet: 0, quietShare: 0 });
+    // The not-started Non-Resident is left out of both the count and the share.
+    expect(rows[2]).toMatchObject({ members: 1, quiet: 1, quietShare: 100, notStarted: 1 });
+  });
+
+  it("covers every started member exactly once across the types", () => {
+    const rows = visitsByType(data.members);
+    expect(rows.reduce((s, r) => s + r.members, 0)).toBe(486);
+  });
+
+  it("groups by when the QuickBooks record was created, with the load day meaning on or before", () => {
+    const at = (qbCreatedOn: string, band: Member["band"] = "4+/month", extra: Partial<Member> = {}) =>
+      member({ qbCreatedOn, band, ...extra });
+    const members = [
+      at("2019-10-18", "Under 1/month"),
+      at("2019-10-18"),
+      at("2019-10-19"),
+      at("2022-12-31", "0 visits", { visitDays: 0 }),
+      at("2023-01-01"),
+      at("2024-12-31", "Under 1/month"),
+      at("2025-06-01"),
+      at("2026-02-01", "Under 1/month"),
+      at("2026-08-01", "0 visits", { visitDays: 0, notStarted: true }),
+    ];
+    const rows = quietByJoined(members, "2026-09-27");
+    expect(rows.map((r) => r.label)).toEqual(["Before Oct 2019", "Oct 2019–2022", "2023–2024", "2025", "2026 so far"]);
+    expect(rows.map((r) => r.members)).toEqual([2, 2, 2, 1, 1]);
+    expect(rows.map((r) => r.quietShare)).toEqual([50, 50, 50, 0, 100]);
+    expect(rows[4]).toMatchObject({ partial: true, notStarted: 1 });
+    expect(rows.slice(0, 4).every((r) => !r.partial)).toBe(true);
+  });
+
+  it("leaves members with no creation date out of every group, and handles an empty list", () => {
+    expect(quietByJoined([member({ qbCreatedOn: null })], "2026-09-27").every((r) => r.members === 0)).toBe(true);
+    expect(visitsByType([]).every((r) => r.members === 0 && r.quietShare === 0)).toBe(true);
   });
 });

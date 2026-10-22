@@ -2,7 +2,9 @@
 
 A web page for College Club Seattle that shows how members use the club: how often they visit, which days and hours are busy, boat and shell use, reservations by type, email results, and a shared goals list. It shows counts only, never member names.
 
-It reads three tables in the CCS Supabase project: `members`, `club_totals` and (later) `door_visits` / `reservations`.
+It reads these tables in the CCS Supabase project: `members`, `qb_members`, `club_totals` and (later) `door_visits` / `reservations`.
+
+**The roster is the QuickBooks member list** (`qb_members`, one row per QuickBooks record, which is one household). Each row says which `members` usage record its visits come from; members with a door fob but no reservation record use door entries as visit days, and members with no record count as no visits. New members who joined this year with no visit yet are shown as "Not started yet" and left out of the "rarely visit" counts. First time: run `db/qb_members.sql` in the Supabase SQL editor, then load the rows (the file has the steps). The member list holds names, so it is never committed. Until `qb_members` has rows, the dashboard shows an error rather than quietly falling back to the iCrew list.
 
 ## Set up
 

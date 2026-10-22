@@ -27,13 +27,20 @@ function rng(seed: number) {
 const FIRST = ["Avery", "Blake", "Casey", "Devon", "Ellis", "Finley", "Greer", "Harper", "Indigo", "Jules", "Kendall", "Lennox", "Morgan", "Noel", "Oakley", "Parker", "Quincy", "Reese", "Sasha", "Tatum", "Umber", "Vesper", "Wren", "Yael"];
 const LAST = ["Alder", "Birch", "Cedar", "Dunmore", "Elmhurst", "Fairweather", "Grayling", "Hollis", "Ivers", "Juniper", "Kestrel", "Lindqvist", "Marlow", "Northcott", "Oakhurst", "Pennywhistle", "Quill", "Rowan", "Sterling", "Thorne", "Underhill", "Vance", "Wexford", "Yarrow"];
 
+/** 497 invented members: 31 who have not visited, plus 11 new ones who have not started yet. */
+const NOT_STARTED = 11;
 const BAND_COUNTS: Record<Band, number> = {
-  "0 visits": 63,
-  "Under 1/month": 122,
-  "1-2/month": 96,
-  "2-4/month": 81,
-  "4+/month": 188,
+  "0 visits": 31 + NOT_STARTED,
+  "Under 1/month": 102,
+  "1-2/month": 80,
+  "2-4/month": 75,
+  "4+/month": 198,
 };
+const TYPE_COUNTS: [string, number][] = [
+  ["Resident", 432],
+  ["Intermediate", 25],
+  ["Non-Resident", 40],
+];
 const BAND_DAYS: Record<Band, [number, number]> = {
   "0 visits": [0, 0],
   "Under 1/month": [1, 8],
@@ -54,10 +61,33 @@ function dayOffset(base: string, back: number): string {
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
+/** A day in `year` (month 1 to `lastMonth`), spread by `r` between 0 and 1. */
+function dayIn(year: number, lastMonth: number, r: number): string {
+  const month = 1 + Math.floor(r * lastMonth);
+  const day = 1 + Math.floor(((r * lastMonth) % 1) * 27);
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+/** The QuickBooks list stamps everyone who joined before it was loaded with the same day. */
+function createdOn(r: number, r2: number, notAfter2025: boolean): string {
+  if (r < 0.34) return "2019-10-18";
+  if (r < 0.5) return dayIn(2020 + Math.floor(r2 * 3), 12, r2);
+  if (r < 0.72) return dayIn(2023 + Math.floor(r2 * 2), 12, r2);
+  if (r < 0.88 || notAfter2025) return dayIn(2025, 12, r2);
+  return dayIn(2026, 8, r2);
+}
+
 function buildMembers(): Member[] {
   const rand = rng(1910);
   // Separate stream so the booking fields never shift the rest of the sample data.
   const rand2 = rng(2026);
+  // A third stream for the QuickBooks fields, so they never shift the rest of the sample data.
+  const rand3 = rng(497);
+  const types = TYPE_COUNTS.flatMap(([type, count]) => Array<string>(count).fill(type));
+  for (let i = types.length - 1; i > 0; i--) {
+    const j = Math.floor(rand3() * (i + 1));
+    [types[i], types[j]] = [types[j], types[i]];
+  }
   const members: Member[] = [];
   let n = 0;
   for (const band of BAND_ORDER) {
@@ -74,23 +104,29 @@ function buildMembers(): Member[] {
       const bookingDays = Math.floor(rand() * Math.min(visitDays, 40));
       // About a third of people who book now and then book twice in a day.
       const bookings = bookingDays + (bookingDays > 0 && rand2() < 0.3 ? 1 + Math.floor(rand2() * 12) : 0);
+      const notStarted = band === "0 visits" && i < NOT_STARTED;
+      // A few members have a door fob but no reservation record: door entries stand in for visits.
+      const doorOnly = !notStarted && visitDays > 0 && rand3() < 0.012;
+      const created = notStarted ? dayIn(2026, 8, rand3()) : createdOn(rand3(), rand3(), visitDays === 0);
       members.push({
         // Names are unique and sort predictably; a numeral keeps any repeats apart.
         name: suffix ? `${first} ${last} ${suffix + 1}` : `${first} ${last}`,
         band,
         visitsPerMonth: Math.round((visitDays / 8.8) * 100) / 100,
         visitDays,
-        doorEntries,
-        bookingDays,
-        bookings,
-        earlyShare: ownFob && visitDays > 0 ? Math.round(rand2() * 100) / 100 : null,
-        weekendShare: ownFob && visitDays > 0 ? Math.round(rand2() * 60) / 100 : null,
+        doorEntries: doorOnly ? visitDays : doorEntries,
+        bookingDays: doorOnly ? 0 : bookingDays,
+        bookings: doorOnly ? 0 : bookings,
+        earlyShare: !doorOnly && ownFob && visitDays > 0 ? Math.round(rand2() * 100) / 100 : null,
+        weekendShare: !doorOnly && ownFob && visitDays > 0 ? Math.round(rand2() * 60) / 100 : null,
         household: rand2() < 0.03,
         lastVisit: visitDays === 0 ? null : dayOffset(DATA_THROUGH, Math.floor(rand() * (band === "4+/month" ? 70 : 200))),
-        ownFob,
-        joined: rand() < 0.45 ? dayOffset(DATA_THROUGH, Math.floor(rand() * 900)) : null,
-        memberType: ["Resident", "Non-Resident", "Int - 1", null][Math.floor(rand() * 4)],
-        monthly,
+        ownFob: doorOnly || ownFob,
+        joined: created,
+        memberType: types[n],
+        qbCreatedOn: created,
+        notStarted,
+        monthly: doorOnly ? Array<number>(9).fill(0) : monthly,
       });
       n += 1;
     }
@@ -158,5 +194,12 @@ function buildTotals(): ClubTotal[] {
 }
 
 export function sampleData(): DashboardData {
-  return { source: "sample", dataThrough: DATA_THROUGH, members: buildMembers(), totals: buildTotals(), door: buildDoor() };
+  return {
+    source: "sample",
+    dataThrough: DATA_THROUGH,
+    members: buildMembers(),
+    roster: { source: "QuickBooks member list", asOf: "2026-10-21" },
+    totals: buildTotals(),
+    door: buildDoor(),
+  };
 }
