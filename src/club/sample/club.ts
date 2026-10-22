@@ -1,6 +1,6 @@
 import { bookingLedger } from "../engine/bookings";
 import { createHousehold, endHousehold, grantQualification, type Ctx, type NewMember } from "../engine/households";
-import { MemoryClubStore, sequentialIds } from "../store/memory";
+import { MemoryClubStore, sequentialIds, type ClubStore } from "../store/memory";
 import { clubNow } from "../clock";
 import { addDays, middayPacific, pacificDate } from "../time";
 import type { Actor, MembershipType } from "../types";
@@ -71,7 +71,7 @@ const HOUSEHOLDS: SampleHousehold[] = [
  * Fills a store with the sample households, through the same engine real changes will use, so each
  * household's file reads the way a real one would. "Today" is a parameter so tests are exact.
  */
-export async function seedSampleClub(store: MemoryClubStore, today: string): Promise<void> {
+export async function seedSampleClub(store: ClubStore, today: string): Promise<void> {
   for (const h of HOUSEHOLDS) {
     const joinedOn = h.joined === "THIS_MONTH" ? `${today.slice(0, 7)}-01` : h.joined;
     const joinedAt = middayPacific(joinedOn);
@@ -97,12 +97,17 @@ export async function seedSampleClub(store: MemoryClubStore, today: string): Pro
 }
 
 /**
- * A fresh store holding the sample club. IDs are fixed, so addresses and test links stay the same between runs.
- * Households come first, then the boats and a few bookings, all as of `now` (midday on `today` unless given).
+ * Fills any store with the sample club: households first, then the boats and a few bookings, all as of `now`
+ * (midday on `today` unless given). Works on the in-memory store and on Postgres alike.
  */
-export async function buildSampleStore(today: string = pacificDate(clubNow()), now: Date = today === pacificDate(clubNow()) ? clubNow() : middayPacific(today)): Promise<MemoryClubStore> {
-  const store = new MemoryClubStore(sequentialIds());
+export async function seedSample(store: ClubStore, today: string = pacificDate(clubNow()), now: Date = today === pacificDate(clubNow()) ? clubNow() : middayPacific(today)): Promise<void> {
   await seedSampleClub(store, today);
   await seedSampleEquipment(store, now);
+}
+
+/** A fresh in-memory store holding the sample club. IDs are fixed, so addresses and test links stay the same between runs. */
+export async function buildSampleStore(today?: string, now?: Date): Promise<MemoryClubStore> {
+  const store = new MemoryClubStore(sequentialIds());
+  await seedSample(store, today, now);
   return store;
 }

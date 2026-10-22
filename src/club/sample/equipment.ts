@@ -1,7 +1,7 @@
 import { createBooking, takeOutOfService } from "../engine/bookings";
 import { fullName } from "../engine/queries";
 import { RULE_BOOK } from "../settings/rulebook";
-import type { MemoryClubStore } from "../store/memory";
+import type { ClubStore } from "../store/memory";
 import { addDays, pacificDate, pacificWall } from "../time";
 import type { Item, RuleValues } from "../types";
 import { SAMPLE_STAFF } from "./club";
@@ -42,7 +42,7 @@ export const SAMPLE_ITEMS: SampleItem[] = [
  * Adds the sample boats, a few bookings in the days ahead, and one boat out of service, through the same
  * engine real changes use. `now` is a parameter so tests are exact. The household sample must be seeded first.
  */
-export async function seedSampleEquipment(store: MemoryClubStore, now: Date): Promise<void> {
+export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<void> {
   await store.transaction(async (s, newId) => {
     for (const i of SAMPLE_ITEMS) {
       const item: Item = { id: newId(), name: i.name, classCode: i.classCode, ruleOverrides: i.ruleOverrides ?? {} };
