@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { addDays } from "../time";
 import { dayView, pickableDays, type Viewer } from "./availability";
 import { cancelBooking, takeOutOfService } from "./bookings";
+import { cancelSession, createClass, scheduleSessions } from "./classes";
+import { CLASS_RULES } from "../settings/class-rules";
 import { describeRules } from "./describe";
 import { NOW, TODAY, at, bookAs, fixture, memberCtx, ruleBookWith, staffCtx } from "./testkit";
 
@@ -170,5 +172,32 @@ describe("the rules in words", () => {
     const state = await f.store.read();
     expect(describeRules(state, f.book, state.items.find((i) => i.name === "Heron")!).lines[2]).toBe("The shortest booking is 30 minutes and the longest is 1 hour.");
     expect(describeRules(state, { ...f.book, placeholder: false }, state.items[0]).placeholder).toBe(false);
+  });
+});
+
+describe("the day view with classes", () => {
+  it("shows a room as held for the class for everyone, only for the class's own hour", async () => {
+    const f = await fixture();
+    await f.store.transaction(async (s, newId) => {
+      s.items.push({ id: newId(), name: "Boathouse gym", classCode: "gym-space", ruleOverrides: {} });
+    });
+    const gym = (await f.store.read()).items.find((i) => i.name === "Boathouse gym")!;
+    const yoga = await createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "Yoga", defaultCapacity: 3, defaultMinutes: 60, roomItemId: gym.id });
+    await scheduleSessions(f.store, f.book, staffCtx(), { classId: yoga.id, startsAt: at(1, 9) });
+    const state = await f.store.read();
+    for (const viewer of [{ kind: "member", memberId: f.m.Ada }, { kind: "staff" }] as Viewer[]) {
+      const slots = dayView(state, f.book, { day: tomorrow, now: NOW, viewer }).items.find((i) => i.item.name === "Boathouse gym")!.slots;
+      const hour = slots.filter((s) => s.startsAt >= at(1, 9).toISOString() && s.endsAt <= at(1, 10).toISOString());
+      expect(states(hour)).toEqual(["class", "class"]);
+      expect(hour.map((s) => s.heldFor)).toEqual(["Yoga", "Yoga"]);
+      expect(hour.every((s) => s.bookedBy === null && s.bookingId === null)).toBe(true);
+      expect(slots.filter((s) => s.state === "class")).toHaveLength(2);
+      expect(slots.filter((s) => s.heldFor === null && s.state === "free")).toHaveLength(28);
+    }
+    // A cancelled class lets the room go.
+    const [session] = state.sessions;
+    await cancelSession(f.store, staffCtx(), session.id, { reason: "Instructor is ill" });
+    const after = dayView(await f.store.read(), f.book, { day: tomorrow, now: NOW, viewer: { kind: "staff" } }).items.find((i) => i.item.name === "Boathouse gym")!.slots;
+    expect(states(after).includes("class")).toBe(false);
   });
 });

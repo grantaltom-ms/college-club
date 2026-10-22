@@ -5,9 +5,9 @@ import type { ClubStore } from "../store/memory";
 import { addDays, clockToMinutes, formatDayLong, formatMinutes, formatRange, pacificDate, pacificMinutes, pacificWall } from "../time";
 import {
   BOOKING_TYPE_INFO,
+  CLASS_ROOM_TYPES,
   HOLDING_STATUSES,
   type Actor,
-  type BookingType,
   type ClassRules,
   type ClassRuleValues,
   type ClassSession,
@@ -43,6 +43,13 @@ export interface SignUpReason {
   message: string;
 }
 
+/** Thrown when staff ask for fewer chairs than there are people in them. */
+export class ChairsTooFew extends ClubError {
+  constructor(message: string) {
+    super("conflict", message);
+  }
+}
+
 /** Thrown when a sign-up cannot be made. `message` is the first reason; `reasons` is all of them. */
 export class SignUpRefused extends ClubError {
   constructor(public reasons: SignUpReason[]) {
@@ -53,9 +60,6 @@ export class SignUpRefused extends ClubError {
 const ms = (minutes: number) => minutes * 60000;
 const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && bStart < aEnd;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
-/** The two kinds of space a class can hold. */
-const CLASS_ROOM_TYPES: readonly BookingType[] = ["Gym Space", "Room Space"];
 
 function sessionOrThrow(state: ClubState, id: string): ClassSession {
   const session = state.sessions.find((x) => x.id === id);
@@ -401,68 +405,80 @@ export interface NewSessions {
 }
 
 /**
+ * What scheduling would do, without doing it: the sessions it would make and, in words, everything that stands in the
+ * way (a room already used, booked by a member, or out of service; a time already gone). Used by the scheduling form to
+ * explain, and by scheduleSessions to decide. Reads only.
+ */
+export function planSessions(state: ClubState, book: RuleBook, ctx: Ctx, input: NewSessions, newId: () => string): { sessions: ClassSession[]; problems: string[] } {
+  const weeks = whole(input.weeks ?? 1, "Weeks", 1, 52);
+  if (Number.isNaN(input.startsAt.getTime())) throw new ClubError("invalid", "Choose a start time.");
+  const template = templateOf(state, { classId: input.classId });
+  const capacity = whole(input.capacity ?? template.defaultCapacity, "Chairs", 1, 200);
+  const minutes = whole(input.minutes ?? template.defaultMinutes, "Length in minutes", 15, 480);
+  const roomItemId = input.roomItemId === undefined ? template.roomItemId : input.roomItemId;
+  const room = roomItemId ? roomOrThrow(state, book, roomItemId) : null;
+  const firstDay = pacificDate(input.startsAt);
+  const wall = pacificMinutes(input.startsAt);
+  const now = ctx.now.getTime();
+
+  const sessions: ClassSession[] = [];
+  const problems: string[] = [];
+  for (let n = 0; n < weeks; n++) {
+    const startsAt = n === 0 ? input.startsAt : pacificWall(addDays(firstDay, 7 * n), wall);
+    const endsAt = new Date(startsAt.getTime() + ms(minutes));
+    const start = startsAt.getTime();
+    const end = endsAt.getTime();
+    const when = `${formatDayLong(pacificDate(startsAt))}, ${formatRange(startsAt, endsAt)}`;
+    if (start <= now) {
+      problems.push(`${when} has already started.`);
+      continue;
+    }
+    if (room) {
+      const other = state.sessions.find((x) => x.status === "scheduled" && x.roomItemId === room.id && overlaps(start, end, Date.parse(x.startsAt), Date.parse(x.endsAt)));
+      if (other) problems.push(`${room.name} is already used for ${templateOf(state, other).name} on ${formatDayLong(pacificDate(new Date(other.startsAt)))}, ${formatRange(other.startsAt, other.endsAt)}.`);
+      const booked = state.bookings.filter((b) => b.itemId === room.id && HOLDING_STATUSES.includes(b.status) && overlaps(start, end, Date.parse(b.startsAt), Date.parse(b.endsAt)));
+      for (const b of booked) {
+        const who = memberById(state, b.bookerId);
+        problems.push(`${room.name} is booked by ${who ? fullName(who) : "a member"} on ${formatDayLong(pacificDate(new Date(b.startsAt)))}, ${formatRange(b.startsAt, b.endsAt)}. Cancel that booking first.`);
+      }
+      if (state.outOfService.some((p) => p.itemId === room.id && overlaps(start, end, Date.parse(p.from), p.until === null ? Infinity : Date.parse(p.until)))) {
+        problems.push(`${room.name} is out of service on ${when}.`);
+      }
+    }
+    sessions.push({
+      id: newId(),
+      classId: template.id,
+      roomItemId: room?.id ?? null,
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      capacity,
+      status: "scheduled",
+      createdAt: ctx.now.toISOString(),
+      createdBy: ctx.actor,
+      statusChangedAt: ctx.now.toISOString(),
+      cancelledBy: null,
+      cancelReason: null,
+    });
+  }
+  return { sessions, problems };
+}
+
+/** The words for a list of scheduling problems: the first three, then a count. */
+export function schedulingMessage(problems: string[]): string {
+  return `Nothing was scheduled. ${problems.slice(0, 3).join(" ")}${problems.length > 3 ? ` (${problems.length - 3} more problems.)` : ""}`;
+}
+
+/**
  * Staff schedule a single class or a weekly series. The room is held for the whole length: if a member has booked it,
  * another class has it, or it is out of service, nothing is scheduled and the message names every clash.
  */
 export async function scheduleSessions(store: ClubStore, book: RuleBook, ctx: Ctx, input: NewSessions): Promise<ClassSession[]> {
   requireStaff(ctx.actor);
-  const weeks = whole(input.weeks ?? 1, "Weeks", 1, 52);
-  if (Number.isNaN(input.startsAt.getTime())) throw new ClubError("invalid", "Choose a start time.");
   return store.transaction(async (s, newId) => {
-    const template = templateOf(s, { classId: input.classId });
-    const capacity = whole(input.capacity ?? template.defaultCapacity, "Chairs", 1, 200);
-    const minutes = whole(input.minutes ?? template.defaultMinutes, "Length in minutes", 15, 480);
-    const roomItemId = input.roomItemId === undefined ? template.roomItemId : input.roomItemId;
-    const room = roomItemId ? roomOrThrow(s, book, roomItemId) : null;
-    const firstDay = pacificDate(input.startsAt);
-    const wall = pacificMinutes(input.startsAt);
-    const now = ctx.now.getTime();
-
-    const made: ClassSession[] = [];
-    const problems: string[] = [];
-    for (let n = 0; n < weeks; n++) {
-      const startsAt = n === 0 ? input.startsAt : pacificWall(addDays(firstDay, 7 * n), wall);
-      const endsAt = new Date(startsAt.getTime() + ms(minutes));
-      const start = startsAt.getTime();
-      const end = endsAt.getTime();
-      const when = `${formatDayLong(pacificDate(startsAt))}, ${formatRange(startsAt, endsAt)}`;
-      if (start <= now) {
-        problems.push(`${when} has already started.`);
-        continue;
-      }
-      if (room) {
-        const other = s.sessions.find((x) => x.status === "scheduled" && x.roomItemId === room.id && overlaps(start, end, Date.parse(x.startsAt), Date.parse(x.endsAt)));
-        if (other) problems.push(`${room.name} is already used for ${templateOf(s, other).name} on ${formatDayLong(pacificDate(new Date(other.startsAt)))}, ${formatRange(other.startsAt, other.endsAt)}.`);
-        const booked = s.bookings.filter((b) => b.itemId === room.id && HOLDING_STATUSES.includes(b.status) && overlaps(start, end, Date.parse(b.startsAt), Date.parse(b.endsAt)));
-        for (const b of booked) {
-          const who = memberById(s, b.bookerId);
-          problems.push(`${room.name} is booked by ${who ? fullName(who) : "a member"} on ${formatDayLong(pacificDate(new Date(b.startsAt)))}, ${formatRange(b.startsAt, b.endsAt)}. Cancel that booking first.`);
-        }
-        if (s.outOfService.some((p) => p.itemId === room.id && overlaps(start, end, Date.parse(p.from), p.until === null ? Infinity : Date.parse(p.until)))) {
-          problems.push(`${room.name} is out of service on ${when}.`);
-        }
-      }
-      made.push({
-        id: newId(),
-        classId: template.id,
-        roomItemId: room?.id ?? null,
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
-        capacity,
-        status: "scheduled",
-        createdAt: ctx.now.toISOString(),
-        createdBy: ctx.actor,
-        statusChangedAt: ctx.now.toISOString(),
-        cancelledBy: null,
-        cancelReason: null,
-      });
-    }
-    if (problems.length > 0) {
-      const shown = problems.slice(0, 3).join(" ");
-      throw new ClubError("conflict", `Nothing was scheduled. ${shown}${problems.length > 3 ? ` (${problems.length - 3} more problems.)` : ""}`);
-    }
-    s.sessions.push(...made);
-    return structuredClone(made);
+    const { sessions, problems } = planSessions(s, book, ctx, input, newId);
+    if (problems.length > 0) throw new ClubError("conflict", schedulingMessage(problems));
+    s.sessions.push(...sessions);
+    return structuredClone(sessions);
   });
 }
 
@@ -517,7 +533,7 @@ export async function setCapacity(store: ClubStore, classRules: ClassRules, ctx:
     if (session.status !== "scheduled") throw new ClubError("conflict", "That class was cancelled, so its chairs cannot change.");
     if (Date.parse(session.endsAt) <= ctx.now.getTime()) throw new ClubError("conflict", "That class is over, so its chairs cannot change.");
     const taken = enrolledCount(s, session.id);
-    if (chairs < taken) throw new ClubError("conflict", `${plural(taken, "person").replace("persons", "people")} already have chairs, so chairs cannot go below ${taken}. Cancel some sign-ups first.`);
+    if (chairs < taken) throw new ChairsTooFew(`${plural(taken, "person").replace("persons", "people")} already have chairs, so chairs cannot go below ${taken}. Cancel some sign-ups first.`);
     session.capacity = chairs;
     const promoted = promoteWaitlist(s, classRules, session.id, ctx.now);
     return { session: structuredClone(session), promoted: structuredClone(promoted) };

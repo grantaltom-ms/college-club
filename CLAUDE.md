@@ -51,7 +51,7 @@ Answers Grant gave to the Phase 1 plan (Oct 22, 2026):
 9. QuickBooks CSV export
 10. iCrew history import and cutover tools
 
-**Phase 1 is steps 1 and 2 only.** Do not build steps 3 to 10. Where a Phase 1 choice affects them, leave room for it and say so. Finish step 1, open a pull request, and wait for Grant's review before starting step 2.
+**Phase 1 was steps 1 and 2.** Grant then asked for the Postgres store and step 3 (Oct 22, "Postgres Store then Step 3"). Do not build steps 4 to 10 until Grant says so. Where a Phase 1 choice affects them, leave room for it and say so. Finish step 1, open a pull request, and wait for Grant's review before starting step 2.
 
 ## The dashboard next door (do not touch)
 
@@ -161,7 +161,24 @@ Behavior:
 - **Never deletes.** The store refuses to delete anything and refuses to rewrite a history line. Bookings are cancelled by status, as in real life.
 - **Proof.** The household, booking, household-plus-booking and daylight-saving tests run on both stores (the Postgres run needs `CLUB_TEST_DATABASE_URL`; CI always sets it). Extra tests check that Postgres holds exactly the same sample club as memory, that two app servers sharing one database cannot beat a limit, a slot or a "two boats" rule by racing, that the database overlap rule is translated into a plain refusal, and that the booking browser tests pass on a Postgres-backed server.
 
-Not built yet, on purpose: the attendance-marking screen, the staff admin screen, emails or texts.
+Not built yet, on purpose: the attendance-marking screen for boat outings, the staff admin screen, emails or texts.
+
+## Step 3: fitness classes with chairs and a waiting list (built Oct 22; in review)
+
+Grant's answers (Oct 22): the waiting list moves up **automatically and instantly**, first in line first; nobody can be **in two places at once** (two classes, or a class and their own boat, as booker or crew); a class **holds a gym or room space** (members cannot book that space while it runs); **no money** in step 3 (classes are included in membership; fees wait for the QuickBooks step). Assumed unless Grant objects: only staff create and change classes; members see just "full" and their own waiting-list place, never other names; classes have their own section next to Book rather than being folded into My bookings.
+
+The building comparison: a class session is a scheduled use of the clubhouse room. The chairs are its unit count; the waiting list is the applicant queue; a sign-up is a lease on one chair for one evening.
+
+- **Pieces.** A *class* ("Morning Yoga": usual chairs, length, room, instructor, optional own rules). A *session* is one dated occurrence with its own number of chairs, and it holds its room. A *sign-up* is one name on one session's sheet: `enrolled` (has a chair), `waitlisted`, or how it ended: `cancelled`, `late_cancelled`, `attended`, `no_show`.
+- **Rules are data.** `src/club/settings/class-rules.json` (placeholders, like the boat rules): sign-up window (14 days, opens at midnight Pacific), closes 30 minutes before, leave without penalty until 2 hours before, the automatic move-up runs until 2 hours before, waiting list up to 10, 5 upcoming places at once (a waiting spot counts), 1 class a day. A class can override any of them under its own `rules`. A typo is refused in words by `parseClassRules`.
+- **The engine** is `src/club/engine/classes.ts`: `checkSignUp` (every reason in plain words, read only), `signUp`, `leaveClass`, `markClassAttendance`, `createClass`, `planSessions` / `scheduleSessions` (single or weekly; weekly keeps the same Pacific clock time across the Nov 1 and Mar 14 clock changes), `cancelSession`, `setCapacity`, `sessionView`, and `classLedger`. `engine/ledger.ts` combines it with the boat ledger as `clubLedger`: ending a household or removing an adult now also takes them off future classes (not as a late cancellation), moves the waiting lists up behind them, and writes `signups_cancelled` to the household's file.
+- **The waiting list.** A chair freed by someone leaving, by more chairs, or by a member leaving the club goes to the first person waiting, in the same all-or-nothing change. After the move-up cutoff (2 hours before) a free chair goes to whoever asks first, and someone already waiting can take it. Order is the order names were written (database `seq`), so someone who leaves and comes back goes to the end.
+- **Facts, not rules.** Unlike boats, staff **cannot** set aside class rules for one member: they raise the chairs instead. Reason: a sign-up has no room in its record for an override reason, and "add a chair" is the honest tool. Open question L.
+- **One place at a time.** A chair *or* a waiting spot holds the person's time. Booking a boat is refused if you (or your crew) are in a class then (`in_class`); signing up is refused if a boat is booked then (`boat_busy`) or another class overlaps (`person_busy`). A class holding a room makes `checkBooking` refuse that room (`room_in_use`), for staff too.
+- **The database enforces** (migration `20261025000000_club_classes.sql`, tested against a real Postgres): chairs never over-filled, a room never used by two classes or by a class and a booking at once (one lock per room shared by both checks), one live line per person per session, sign-ups only move forward, a session cannot be moved or revived, chairs cannot drop below the people in them. Each rule was broken on purpose to prove a test notices.
+- **Screens.** `/club/classes` (pick a day, see chairs left, your place), `/club/classes/[sessionId]` (the rules in words, why a sign-up is refused, sign up / join the waiting list / take a free chair / leave; staff also see the sheet and names, mark attendance, change chairs, cancel the class and see who to contact), `/club/my-classes`, and for staff `/club/classes/manage` (add a class, schedule one date or a weekly run, with every clash explained before anything is saved). The `/club/book` day view shows a room held by a class as "Class".
+- **Sample data.** Invented Boathouse gym and Clubhouse room; Morning Yoga, Erg Conditioning, Stretch & Mobility for a fortnight; tomorrow's Erg Conditioning is full (4 chairs) with two people waiting.
+- **Not built, on purpose:** emails or texts (a member whose waiting spot became a chair only sees it in My classes; open question N), an attendance screen beyond the buttons on the class page, fees, class series editing (cancel one session and schedule another).
 
 ## Testing (required; nothing is done until all of this passes)
 
@@ -193,6 +210,11 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
 - H. Past outings nobody has marked show as "Awaiting attendance record" until the marking screen exists (it comes later). Should unmarked outings count as completed after some days?
 - I. What does a late cancellation lead to (a warning after N, a fee, nothing)? Phase 1 only records it.
 - J. When a member leaves, other people's boats lose that crew member but keep the booking. Confirm that is what staff want, or whether the owner should be told.
+- K. Real class rule values. Every number in `class-rules.json` is a placeholder (open question 5 covers boats).
+- L. Should staff be able to sign a member into a class past the rules (a full class, the daily limit) with a recorded reason, as they can for boats? Step 3 says no; staff raise the chairs instead. Confirm.
+- M. Past classes nobody has marked show "Awaiting attendance record" (same as question H for boat outings).
+- N. Nobody is told when the waiting list moves them up. Step 3 shows it in My classes only. Email or text comes later; decide who sends it and when.
+- O. A late cancellation of a class is only recorded (same as question I for boats).
 - ~~F. Next.js security advisory~~ Answered Oct 22: Grant merged the upgrade to 16.4.2 (PR 11) before this system was merged. The random "version is affected" build failure is gone.
 
 ## Session log
@@ -230,3 +252,13 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
 - **Decided / assumed (Grant to confirm):** one database-wide writers lock (simple and correct; narrowable later); the screens show the last 90 days of bookings; the rules file stays the source of the rules until step 5.
 - **Next:** a short plan and questions for step 3 (fitness classes), then build.
 - **Blocked / needs Grant:** same as before (rule numbers, qualification names, branch protection).
+
+### Oct 22, 2026 (night): step 3, fitness classes
+- **Asked by Grant:** "Postgres Store then Step 3", then answers 1a, 2a, 3a, 4a (waiting list moves up automatically; nobody in two places; a class holds its room; no money in step 3).
+- **Built:** class rules as data; the class engine; the combined leave-the-club ledger; migration `20261025000000_club_classes.sql`; the Postgres mapping for classes, sessions and sign-ups; sample gym, room and three classes; four screens plus staff set-up; the day view shows a class holding a room; browser tests on the in-memory and Postgres servers (core flow, a full class and its waiting list, boat versus class both ways, staff scheduling clashes, names hidden from members, phone width), and the hidden-on-the-live-site checks cover every new page and handler.
+- **Proof it can fail:** the engine tests were run with the move-up removed, reversed or never stopping, the boat and class checks removed, late-cancel rules broken, and the room check removed: each broke tests. The migration was broken seven ways (chair limit, one live line, class room overlap, class-versus-booking room check, ending a household, chairs below taken, reviving a finished line): each broke a database test.
+- **Mistake caught on the way:** while breaking things on purpose I ran a `git checkout` on one file and wiped a few uncommitted helper functions from `queries.ts`. I rewrote them from the earlier read and re-ran the whole suite before going on. Lesson: keep a copy before breaking a file, never reset it.
+- **Decided / assumed (Grant to confirm in review):** staff cannot override class rules (open question L); no emails (N); one class a day and five places at once as placeholders; a waiting spot counts as a place for limits and for "one place at a time"; a sign-up closes 30 minutes before the start.
+- **Checks at the end:** lint and type check clean; 600 unit tests (including the database tests on a real Postgres) all pass; the production build works; 124 browser tests pass (in-memory server, Postgres-backed server, and the two production-style servers that prove every new page and handler is "not found" on the live site); the dashboard tests pass untouched.
+- **Next:** Grant reviews the Postgres store and step 3 (they are in one pull request, step 3 is the last commit). Step 4 (events and RSVPs) only if Grant says so.
+- **Blocked / needs Grant:** same as before (rule numbers for boats and classes, qualification names, branch protection).

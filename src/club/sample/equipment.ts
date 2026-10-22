@@ -36,6 +36,9 @@ export const SAMPLE_ITEMS: SampleItem[] = [
   { name: "Dock slip A", classCode: "dock-space" },
   { name: "Dock slip B", classCode: "dock-space" },
   { name: "Dock slip C", classCode: "dock-space" },
+  // The two spaces fitness classes use. Members can book them too, when no class is in them.
+  { name: "Boathouse gym", classCode: "gym-space" },
+  { name: "Clubhouse room", classCode: "room-space" },
 ];
 
 /**

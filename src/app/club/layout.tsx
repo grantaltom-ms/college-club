@@ -31,6 +31,8 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
             <Link href="/club">{actor?.kind === "staff" ? "Households" : "My household"}</Link>
             {actor && <Link href="/club/book">Book</Link>}
             {actor && <Link href="/club/my-bookings">{actor.kind === "staff" ? "All bookings" : "My bookings"}</Link>}
+            {actor && <Link href="/club/classes">Classes</Link>}
+            {actor?.kind === "member" && <Link href="/club/my-classes">My classes</Link>}
             {actor?.kind === "staff" && <Link href="/club/equipment">Equipment</Link>}
             <Link href="/club/act-as">Switch test member</Link>
           </nav>

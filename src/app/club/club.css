@@ -299,6 +299,12 @@ a.slot-free:focus-visible {
   color: var(--ink);
 }
 
+.slot-class {
+  background: #e3e0ef;
+  border-color: #a9a3c7;
+  color: var(--ink);
+}
+
 .slot-out_of_service {
   background: #ecd9d3;
   border-color: #c4a89f;

@@ -4,6 +4,7 @@ import { MemoryClubStore, sequentialIds, type ClubStore } from "../store/memory"
 import { clubNow } from "../clock";
 import { addDays, middayPacific, pacificDate } from "../time";
 import type { Actor, MembershipType } from "../types";
+import { seedSampleClasses } from "./classes";
 import { seedSampleEquipment } from "./equipment";
 
 /**
@@ -97,12 +98,13 @@ export async function seedSampleClub(store: ClubStore, today: string): Promise<v
 }
 
 /**
- * Fills any store with the sample club: households first, then the boats and a few bookings, all as of `now`
+ * Fills any store with the sample club: households first, then the boats and a few bookings, then the fitness classes, all as of `now`
  * (midday on `today` unless given). Works on the in-memory store and on Postgres alike.
  */
 export async function seedSample(store: ClubStore, today: string = pacificDate(clubNow()), now: Date = today === pacificDate(clubNow()) ? clubNow() : middayPacific(today)): Promise<void> {
   await seedSampleClub(store, today);
   await seedSampleEquipment(store, now);
+  await seedSampleClasses(store, now);
 }
 
 /** A fresh in-memory store holding the sample club. IDs are fixed, so addresses and test links stay the same between runs. */

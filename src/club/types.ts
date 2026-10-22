@@ -95,6 +95,9 @@ export const BOOKING_TYPES = ["Shell", "Kayak", "Paddle Board", "Dock Space", "G
 export type BookingType = (typeof BOOKING_TYPES)[number];
 
 /** On-the-water types put a person in one place at a time: nobody can be in two boats at once. */
+/** The kinds of space a fitness class can hold. */
+export const CLASS_ROOM_TYPES: readonly BookingType[] = ["Gym Space", "Room Space"];
+
 export const BOOKING_TYPE_INFO: Record<BookingType, { onWater: boolean }> = {
   Shell: { onWater: true },
   Kayak: { onWater: true },

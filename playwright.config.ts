@@ -27,7 +27,7 @@ export default defineConfig({
       ? [
           {
             name: "postgres",
-            testMatch: /club(-booking)?\.spec\.ts/,
+            testMatch: /club(-booking|-classes)?\.spec\.ts/,
             use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${PORT_POSTGRES}` },
           },
         ]
