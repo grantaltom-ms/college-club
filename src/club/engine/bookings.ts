@@ -23,7 +23,7 @@ import {
 } from "../types";
 import { bookingBlockReason, meetsQualification } from "./eligibility";
 import type { BookingLedger, Ctx } from "./households";
-import { fullName, householdOf, memberById } from "./queries";
+import { classClash, fullName, householdOf, memberById } from "./queries";
 
 /* ---------- Why a booking is refused ---------- */
 
@@ -44,7 +44,9 @@ export type ReasonCode =
   | "over_daily_limit"
   | "slot_taken"
   | "gap_needed"
-  | "person_busy";
+  | "person_busy"
+  | "in_class"
+  | "room_in_use";
 
 /** One plain-language reason a booking cannot be made. */
 export interface Reason {
@@ -113,7 +115,7 @@ export function dayWindow(day: string, dayStart: string, dayEnd: string): { open
 }
 
 /** "midnight" for 00:00, otherwise "7:30 am". */
-function clockWords(day: string, minutes: number): string {
+export function clockWords(day: string, minutes: number): string {
   return minutes === 0 ? "midnight" : formatClock(pacificWall(day, minutes));
 }
 
@@ -241,6 +243,27 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
           overlaps(start, end, Date.parse(b.startsAt), Date.parse(b.endsAt)),
       );
       if (clash) add("person_busy", `${who(person.id)} ${isYou(person.id) ? "are" : "is"} already on another boat from ${formatRange(clash.startsAt, clash.endsAt)}.`);
+    }
+  }
+
+  // Nobody is in a class and on the water at once. A place on a waiting list holds the time too.
+  if (BOOKING_TYPE_INFO[cls.type].onWater) {
+    for (const person of [booker, ...crew]) {
+      const clash = classClash(state, person.id, start, end);
+      if (clash) {
+        add("in_class", `${who(person.id)} ${isYou(person.id) ? "are" : "is"} ${clash.waiting ? "on the waiting list for" : "signed up for"} ${clash.className} from ${formatRange(clash.startsAt, clash.endsAt)}.`);
+      }
+    }
+  }
+
+  // A class holds its room while it runs.
+  if (state.sessions.length > 0) {
+    const held = state.sessions.find(
+      (x) => x.status === "scheduled" && x.roomItemId === item.id && overlaps(start, end, Date.parse(x.startsAt), Date.parse(x.endsAt)),
+    );
+    if (held) {
+      const name = state.classes.find((k) => k.id === held.classId)?.name ?? "a class";
+      add("room_in_use", `${item.name} is being used for ${name} from ${formatRange(held.startsAt, held.endsAt)}.`);
     }
   }
   return reasons;

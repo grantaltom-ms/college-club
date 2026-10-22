@@ -38,9 +38,9 @@ describe("the shipped booking rules", () => {
     expect(classOf(RULE_BOOK, { classCode: "kayak" }).requiredQualification).toBeNull();
   });
 
-  it("cover shells, kayaks, paddle boards and a space, using only booking types the engine knows", () => {
+  it("cover shells, kayaks, paddle boards and the spaces, using only booking types the engine knows", () => {
     const types = new Set(RULE_BOOK.classes.map((c) => c.type));
-    expect(types).toEqual(new Set(["Shell", "Kayak", "Paddle Board", "Dock Space"]));
+    expect(types).toEqual(new Set(["Shell", "Kayak", "Paddle Board", "Dock Space", "Gym Space", "Room Space"]));
     for (const t of types) expect(BOOKING_TYPES).toContain(t);
   });
 });

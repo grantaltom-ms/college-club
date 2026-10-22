@@ -23,12 +23,17 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         `/club/book/new?item=${FIRST_HOUSEHOLD}&start=2026-10-29T14:00:00.000Z`,
         "/club/my-bookings",
         "/club/equipment",
+        "/club/classes",
+        "/club/classes?day=2026-10-30",
+        `/club/classes/${FIRST_HOUSEHOLD}`,
+        "/club/classes/manage",
+        "/club/my-classes",
       ];
       for (const path of paths) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Yoga|Erg Conditioning|Stretch|Boathouse gym/i);
       }
     });
 
@@ -45,12 +50,19 @@ for (const [name, base] of Object.entries(HIDDEN)) {
       }
     });
 
-    test("no booking, cancelling or equipment request does anything, even with a test-member cookie", async () => {
+    test("no booking, cancelling, equipment or class request does anything, even with a test-member cookie", async () => {
       const posts: [string, Record<string, string>][] = [
         ["/api/club/bookings", { item: FIRST_HOUSEHOLD, start: "2026-10-29T14:00:00.000Z", minutes: "60", for: FIRST_HOUSEHOLD }],
         ["/api/club/bookings/cancel", { id: FIRST_HOUSEHOLD }],
         ["/api/club/equipment/out-of-service", { item: FIRST_HOUSEHOLD, reason: "Test" }],
         ["/api/club/equipment/return", { period: FIRST_HOUSEHOLD }],
+        ["/api/club/classes/sign-up", { session: FIRST_HOUSEHOLD, for: FIRST_HOUSEHOLD }],
+        ["/api/club/classes/leave", { id: FIRST_HOUSEHOLD }],
+        ["/api/club/classes/create", { name: "Test", chairs: "5", minutes: "60" }],
+        ["/api/club/classes/schedule", { class: FIRST_HOUSEHOLD, date: "2026-10-30", time: "07:00", weeks: "1" }],
+        ["/api/club/classes/cancel-session", { session: FIRST_HOUSEHOLD, reason: "Test" }],
+        ["/api/club/classes/capacity", { session: FIRST_HOUSEHOLD, capacity: "5" }],
+        ["/api/club/classes/attendance", { id: FIRST_HOUSEHOLD, outcome: "attended" }],
       ];
       for (const [path, body] of posts) {
         const res = await fetch(`${base}${path}`, {

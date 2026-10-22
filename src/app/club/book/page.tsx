@@ -16,6 +16,7 @@ const SLOT_WORDS: Record<SlotView["state"], string> = {
   free: "Free",
   booked: "Booked",
   yours: "Yours",
+  class: "Class",
   out_of_service: "Out of service",
   past: "Past",
   not_open: "Not open yet",
@@ -71,7 +72,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
       <h2 data-testid="day-heading">{formatDayLong(day)}</h2>
       <ul className="club-legend" aria-label="Legend">
-        {(["free", "booked", "yours", "out_of_service", "past"] as const).map((s) => (
+        {(["free", "booked", "yours", "class", "out_of_service", "past"] as const).map((s) => (
           <li key={s}>
             <span className={`slot slot-${s}`} aria-hidden="true" /> {SLOT_WORDS[s]}
           </li>
@@ -94,7 +95,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             {item.note && <p className="club-meta">{item.note}</p>}
             <ol className="slots">
               {item.slots.map((slot) => {
-                const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${SLOT_WORDS[slot.state].toLowerCase()}`;
+                const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${slot.heldFor ? `${slot.heldFor} class` : SLOT_WORDS[slot.state].toLowerCase()}`;
                 return (
                   <li key={slot.startsAt}>
                     {slot.state === "free" ? (
@@ -104,7 +105,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                     ) : (
                       <span className={`slot slot-${slot.state}`} aria-label={label} data-state={slot.state}>
                         {formatClock(slot.startsAt)}
-                        <small>{slot.bookedBy ?? (slot.state === "past" ? "" : SLOT_WORDS[slot.state])}</small>
+                        <small>{slot.bookedBy ?? slot.heldFor ?? (slot.state === "past" ? "" : SLOT_WORDS[slot.state])}</small>
                       </span>
                     )}
                   </li>

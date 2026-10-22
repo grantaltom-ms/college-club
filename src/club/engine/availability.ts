@@ -8,7 +8,7 @@ import { fullName, memberById } from "./queries";
 /** Who is looking. Members see "Booked" and "Yours"; staff also see names. */
 export type Viewer = { kind: "member"; memberId: string } | { kind: "staff" };
 
-export type SlotState = "free" | "booked" | "yours" | "out_of_service" | "past" | "not_open";
+export type SlotState = "free" | "booked" | "yours" | "class" | "out_of_service" | "past" | "not_open";
 
 export interface SlotView {
   startsAt: string;
@@ -18,6 +18,8 @@ export interface SlotView {
   bookingId: string | null;
   /** Names, for staff only. Always null for members. */
   bookedBy: string | null;
+  /** The class holding this room in this slot, for everyone (classes are public). */
+  heldFor: string | null;
 }
 
 export interface ItemDayView {
@@ -49,14 +51,18 @@ export function dayView(state: ClubState, book: RuleBook, input: { day: string; 
       const step = rules.slotMinutes * 60000;
       const opens = opensAt(day, rules.windowDays, rules.opensAt);
       const holding = state.bookings.filter((b) => b.itemId === item.id && HOLDING_STATUSES.includes(b.status));
+      const classes = state.sessions.filter((x) => x.roomItemId === item.id && x.status === "scheduled");
       const slots: SlotView[] = [];
       for (let t = open.getTime(); t + step <= close.getTime(); t += step) {
         const end = t + step;
         const booking = holding.find((b) => Date.parse(b.startsAt) < end && t < Date.parse(b.endsAt));
+        const heldBy = booking ? undefined : classes.find((x) => Date.parse(x.startsAt) < end && t < Date.parse(x.endsAt));
         let slotState: SlotState;
         if (booking) {
           const mine = viewer.kind === "member" && (booking.bookerId === viewer.memberId || booking.crew.includes(viewer.memberId));
           slotState = mine ? "yours" : "booked";
+        } else if (heldBy) {
+          slotState = "class";
         } else if (outOfServiceAt(state, item.id, new Date(t)) || state.outOfService.some((p) => p.itemId === item.id && Date.parse(p.from) < end && t < (p.until === null ? Infinity : Date.parse(p.until)))) {
           slotState = "out_of_service";
         } else if (t < now.getTime()) {
@@ -74,6 +80,7 @@ export function dayView(state: ClubState, book: RuleBook, input: { day: string; 
           state: slotState,
           bookingId: shown && booking ? booking.id : null,
           bookedBy: viewer.kind === "staff" && booker ? fullName(booker) : null,
+          heldFor: heldBy ? (state.classes.find((c) => c.id === heldBy.classId)?.name ?? "A class") : null,
         });
       }
       const need = requiredQualification ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;

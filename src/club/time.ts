@@ -68,6 +68,14 @@ export function pacificWall(day: string, minutes: number): Date {
   return new Date(winter);
 }
 
+const minuteParts = new Intl.DateTimeFormat("en-US", { timeZone: PACIFIC, hourCycle: "h23", hour: "2-digit", minute: "2-digit" });
+
+/** What the Pacific wall clock reads at a moment, in minutes after midnight (7:30 am is 450). Not the time elapsed since midnight: on the two clock-change days those differ. */
+export function pacificMinutes(at: Date): number {
+  const p = Object.fromEntries(minuteParts.formatToParts(at).map((x) => [x.type, Number(x.value)]));
+  return p.hour * 60 + p.minute;
+}
+
 /** Midnight at the start of a Pacific day. A day is 23, 24 or 25 hours long. */
 export function pacificDayStart(day: string): Date {
   return pacificWall(day, 0);

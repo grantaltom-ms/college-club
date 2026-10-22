@@ -15,11 +15,69 @@
     "gapMinutes": 0
   },
   "classes": [
-    { "code": "shell-single", "type": "Shell", "name": "Single", "seats": 1, "requiredQualification": "scull-1", "rules": {} },
-    { "code": "shell-double", "type": "Shell", "name": "Double", "seats": 2, "requiredQualification": "scull-2", "rules": {} },
-    { "code": "shell-quad", "type": "Shell", "name": "Quad or four", "seats": 4, "requiredQualification": "scull-3", "rules": {} },
-    { "code": "kayak", "type": "Kayak", "name": "Kayak", "seats": 1, "requiredQualification": null, "rules": {} },
-    { "code": "paddle-board", "type": "Paddle Board", "name": "Paddle board", "seats": 1, "requiredQualification": null, "rules": {} },
-    { "code": "dock-space", "type": "Dock Space", "name": "Dock space", "seats": 1, "requiredQualification": null, "rules": {} }
+    {
+      "code": "shell-single",
+      "type": "Shell",
+      "name": "Single",
+      "seats": 1,
+      "requiredQualification": "scull-1",
+      "rules": {}
+    },
+    {
+      "code": "shell-double",
+      "type": "Shell",
+      "name": "Double",
+      "seats": 2,
+      "requiredQualification": "scull-2",
+      "rules": {}
+    },
+    {
+      "code": "shell-quad",
+      "type": "Shell",
+      "name": "Quad or four",
+      "seats": 4,
+      "requiredQualification": "scull-3",
+      "rules": {}
+    },
+    {
+      "code": "kayak",
+      "type": "Kayak",
+      "name": "Kayak",
+      "seats": 1,
+      "requiredQualification": null,
+      "rules": {}
+    },
+    {
+      "code": "paddle-board",
+      "type": "Paddle Board",
+      "name": "Paddle board",
+      "seats": 1,
+      "requiredQualification": null,
+      "rules": {}
+    },
+    {
+      "code": "dock-space",
+      "type": "Dock Space",
+      "name": "Dock space",
+      "seats": 1,
+      "requiredQualification": null,
+      "rules": {}
+    },
+    {
+      "code": "gym-space",
+      "type": "Gym Space",
+      "name": "Gym space",
+      "seats": 1,
+      "requiredQualification": null,
+      "rules": {}
+    },
+    {
+      "code": "room-space",
+      "type": "Room Space",
+      "name": "Room space",
+      "seats": 1,
+      "requiredQualification": null,
+      "rules": {}
+    }
   ]
 }

@@ -3,6 +3,12 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3100;
 const PORT_SWITCH_OFF = 3101;
 const PORT_LIVE_SITE = 3102;
+const PORT_POSTGRES = 3103;
+
+// The booking specs also run against a server whose records live in Postgres. That needs a local or throwaway
+// Postgres (CLUB_TEST_DATABASE_URL, which CI always sets); without one, only the in-memory run happens.
+const ADMIN_DB = process.env.CLUB_TEST_DATABASE_URL;
+const E2E_DB = ADMIN_DB ? Object.assign(new URL(ADMIN_DB), { pathname: "/club_e2e" }).toString() : null;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -15,7 +21,18 @@ export default defineConfig({
     // Locally the sandbox browser path can be supplied; in CI the installed Chromium is used.
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    ...(E2E_DB
+      ? [
+          {
+            name: "postgres",
+            testMatch: /club(-booking|-classes)?\.spec\.ts/,
+            use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${PORT_POSTGRES}` },
+          },
+        ]
+      : []),
+  ],
   // Tests run against the production build, so run `npm run build` first.
   webServer: [
     {
@@ -47,5 +64,18 @@ export default defineConfig({
       timeout: 60_000,
       env: { CCS_ALLOW_SAMPLE_DATA: "1", VERCEL_ENV: "production" },
     },
+    ...(E2E_DB
+      ? [
+          {
+            // The member area on the Postgres store: a fresh migrated database, the invented club loaded on first use.
+            command: `node scripts/prepare-club-db.mjs && npx next start -p ${PORT_POSTGRES}`,
+            // The page needs the store, so the server is only "ready" once the database is open and the sample club is in.
+            url: `http://localhost:${PORT_POSTGRES}/club/act-as`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+            env: { CCS_ALLOW_SAMPLE_DATA: "1", CCS_CLUB_NOW: "2026-10-28T20:00:00Z", CLUB_DATABASE_URL: E2E_DB, CLUB_TEST_DATABASE_URL: ADMIN_DB! },
+          },
+        ]
+      : []),
   ],
 });

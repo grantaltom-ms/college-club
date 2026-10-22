@@ -24,6 +24,24 @@ export function momentParam(value: Param): Date | null {
   return Number.isNaN(at.getTime()) ? null : at;
 }
 
+/** A date like 2026-10-29, or null. */
+export function dateParam(value: Param): string | null {
+  const v = first(value);
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const [y, m, d] = v.split("-").map(Number);
+  const real = new Date(Date.UTC(y, m - 1, d));
+  return real.getUTCFullYear() === y && real.getUTCMonth() === m - 1 && real.getUTCDate() === d ? v : null;
+}
+
+/** A clock time like 07:30, as minutes after midnight, or null. */
+export function timeParam(value: Param): number | null {
+  const v = first(value);
+  const m = v ? /^(\d{2}):(\d{2})$/.exec(v) : null;
+  if (!m) return null;
+  const minutes = Number(m[1]) * 60 + Number(m[2]);
+  return Number(m[1]) < 24 && Number(m[2]) < 60 ? minutes : null;
+}
+
 /** A whole number from the address within a range, or the fallback. */
 export function intParam(value: Param, min: number, max: number, fallback: number): number {
   const v = first(value);
@@ -68,4 +86,5 @@ export const NOTICES: Record<string, string> = {
   invalid: "Something was missing or not valid. Check your choices and try again.",
   conflict: "That has already changed. Reload and try again.",
   signed_out: "Choose a test member first.",
+  duplicate_class: "There is already a class with that name. Pick another name.",
 };

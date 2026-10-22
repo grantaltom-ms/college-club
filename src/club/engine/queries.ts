@@ -35,3 +35,43 @@ export function historyOf(state: ClubState, householdId: string): HistoryEntry[]
     .sort((a, b) => b.entry.at.localeCompare(a.entry.at) || b.written - a.written)
     .map(({ entry }) => entry);
 }
+
+/* ---------- Classes ---------- */
+
+/** A name's place on a session's waiting list, counting from 1 (null if not waiting). The list moves up in the order names were written. */
+export function waitlistPlace(state: ClubState, signUpId: string): number | null {
+  const mine = state.signups.find((g) => g.id === signUpId);
+  if (!mine || mine.status !== "waitlisted") return null;
+  return state.signups.filter((g) => g.sessionId === mine.sessionId && g.status === "waitlisted").findIndex((g) => g.id === signUpId) + 1;
+}
+
+export const enrolledCount = (state: ClubState, sessionId: string) => state.signups.filter((g) => g.sessionId === sessionId && g.status === "enrolled").length;
+export const waitingCount = (state: ClubState, sessionId: string) => state.signups.filter((g) => g.sessionId === sessionId && g.status === "waitlisted").length;
+
+/** "1st", "2nd", "3rd", "11th". */
+export function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  return `${n}${({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th"}`;
+}
+
+export interface ClassClash {
+  className: string;
+  startsAt: string;
+  endsAt: string;
+  /** True if the person is only on the waiting list. */
+  waiting: boolean;
+}
+
+/** The class (in a chair or waiting) that fills this person's time between two moments, if any. A cancelled class fills nothing. */
+export function classClash(state: ClubState, memberId: string, startMs: number, endMs: number, exceptSessionId?: string): ClassClash | undefined {
+  for (const g of state.signups) {
+    if (g.memberId !== memberId || (g.status !== "enrolled" && g.status !== "waitlisted") || g.sessionId === exceptSessionId) continue;
+    const session = state.sessions.find((x) => x.id === g.sessionId);
+    if (!session || session.status !== "scheduled") continue;
+    if (Date.parse(session.startsAt) < endMs && startMs < Date.parse(session.endsAt)) {
+      return { className: state.classes.find((k) => k.id === session.classId)?.name ?? "a class", startsAt: session.startsAt, endsAt: session.endsAt, waiting: g.status === "waitlisted" };
+    }
+  }
+  return undefined;
+}

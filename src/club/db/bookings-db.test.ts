@@ -236,10 +236,11 @@ describe.skipIf(!ADMIN_URL)("the booking tables", () => {
       expect((await q(`select status from club.bookings where id = $1`, [id])).rows[0].status).toBe("upcoming");
     });
 
-    it("needs a real reason and a return after the start", async () => {
+    it("needs a real reason and a return that is not before the start", async () => {
       const item = await freshItem();
-      await expect(out(item, T(9), T(9))).rejects.toThrow(/out_of_service_ends_after_start/);
       await expect(out(item, T(9), T(8))).rejects.toThrow(/out_of_service_ends_after_start/);
+      // Ending it the same moment it began is an empty period: allowed, so an immediate "never mind" can be recorded.
+      await out(item, T(9), T(9));
       await expect(out(item, T(9), null, "   ")).rejects.toThrow(/reason/);
       await expect(out(item, T(9), null, "Repair", "member")).rejects.toThrow(/created_by_kind/);
     });
@@ -276,14 +277,16 @@ describe.skipIf(!ADMIN_URL)("the booking tables", () => {
     });
 
     it("agrees with the app on the list of booking types, booking states and history kinds", async () => {
-      const check = async (table: string, column: string) => {
-        const { rows } = await q(`select pg_get_constraintdef(c.oid) as def from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace s on s.oid = t.relnamespace where s.nspname = 'club' and t.relname = $1 and c.contype = 'c' and pg_get_constraintdef(c.oid) like $2`, [table, `%${column} = ANY%`]);
+      // Read each list by the constraint's own name: a table can have several constraints that mention the same column.
+      const check = async (constraint: string) => {
+        const { rows } = await q(`select pg_get_constraintdef(c.oid) as def from pg_constraint c join pg_namespace s on s.oid = c.connamespace where s.nspname = 'club' and c.conname = $1`, [constraint]);
+        expect(rows, constraint).toHaveLength(1);
         return rows[0].def as string;
       };
       const values = (def: string) => [...def.matchAll(/'([^']+)'::text/g)].map((m) => m[1]).sort();
-      expect(values(await check("item_classes", "booking_type"))).toEqual([...BOOKING_TYPES].sort());
-      expect(values(await check("bookings", "status"))).toEqual([...BOOKING_STATUSES].sort());
-      expect(values(await check("household_history", "kind"))).toEqual([...HISTORY_KINDS].sort());
+      expect(values(await check("item_classes_booking_type_check"))).toEqual([...BOOKING_TYPES].sort());
+      expect(values(await check("bookings_status_check"))).toEqual([...BOOKING_STATUSES].sort());
+      expect(values(await check("household_history_kind_check"))).toEqual([...HISTORY_KINDS].sort());
     });
   });
 
