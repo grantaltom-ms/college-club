@@ -166,7 +166,7 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
 - C. A shared email (partners on one address) will clash with "one login per adult" in step 6. Decide how those two logins are told apart.
 - D. When the production switch-on happens: the date the `/club` area becomes visible on the production site, and who approves it.
 - E. Who gets which Vercel/Supabase/GitHub accounts under the CCS-owned email.
-- F. Next.js 16.4.0 has a critical security advisory (npm audit: remote code execution in image optimization and `use cache`, denial of service in server actions). The fix, 16.4.2, is on the unmerged branch `nextjs-security-upgrade`. Until it is merged, `next build` randomly stops with a "version is affected" notice about every other run. Grant to decide when to merge it; Phase 1 did not touch it.
+- ~~F. Next.js security advisory~~ Answered Oct 22: Grant merged the upgrade to 16.4.2 (PR 11) before this system was merged. The random "version is affected" build failure is gone.
 
 ## Session log
 
@@ -185,4 +185,4 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
   - Step 1 has no bookings yet, so "cancel future bookings" goes through a `BookingLedger` hook that does nothing until step 2 plugs the real calendar in. Tests prove the hook is called and that a failure rolls everything back.
   - The in-memory store runs the screens; the Postgres store is built in step 2, where the double-booking rule needs it.
 - **Next:** Grant reviews step 1, then step 2 (bookable items, rules, booking engine, day view, booking form, My bookings).
-- **Blocked / needs Grant:** turn on GitHub branch protection; set `CCS_ALLOW_SAMPLE_DATA=1` in Vercel **Preview** only if previews should show `/club`; the Next.js security upgrade (open question F); real qualification names (B). `supabase/config.toml` has not been tried with the Supabase CLI (no Docker in the cloud session).
+- **Blocked / needs Grant:** turn on GitHub branch protection; set `CCS_ALLOW_SAMPLE_DATA=1` in Vercel **Preview** only if previews should show `/club`; real qualification names (B). `supabase/config.toml` has not been tried with the Supabase CLI (no Docker in the cloud session).

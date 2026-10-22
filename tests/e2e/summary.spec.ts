@@ -15,6 +15,9 @@ test("the summary leads with one sentence and six headline cards, each linking t
   await expect(page.getByTestId("card-quiet").locator(".stat-value")).toHaveText("133");
   await expect(page.getByTestId("card-quiet")).toContainText("of 497 members came in less than once a month this year (27%).");
   await expect(page.getByTestId("card-quiet-note")).toHaveText("11 new members haven't started yet (off the waitlist).");
+  await expect(page.getByTestId("card-quiet-roster-change")).toHaveText(
+    "Down from 185 because the count now uses the QuickBooks list of paying members (497) instead of the iCrew list. Club usage didn’t improve; the list of who counts as a member changed.",
+  );
   await expect(page.getByTestId("roster-note")).toHaveText("Roster: QuickBooks member list, Oct 21, 2026.");
   await expect(page.getByTestId("card-shells").locator(".stat-value")).toHaveText(`−${Math.abs(shellChange)}%`);
   await expect(page.getByTestId("card-door").locator(".stat-value")).toHaveText(/^[+−]\d+%$/);
@@ -71,6 +74,7 @@ test("the rarely-visit note and roster source stay put through repeated visits",
     await expect(page.getByTestId("roster-note")).toHaveText("Roster: QuickBooks member list, Oct 21, 2026.");
     await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Summary" }).click();
     await expect(page.getByTestId("card-quiet-note")).toHaveText("11 new members haven't started yet (off the waitlist).");
+    await expect(page.getByTestId("card-quiet-roster-change")).toContainText("Down from 185");
     await expect(page.getByTestId("roster-note")).toHaveText("Roster: QuickBooks member list, Oct 21, 2026.");
   }
 });
