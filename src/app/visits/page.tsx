@@ -6,7 +6,7 @@ import { WithData } from "@/components/DataProvider";
 import { StackedBarChart } from "@/components/StackedBarChart";
 import { useElementWidth } from "@/components/useElementWidth";
 import { formatDay } from "@/lib/dates";
-import { BAND_COLORS, BAND_LABELS, bandSummary, dataRange, fmtInt, headline, multiBooking, quietByJoined, visitsByType } from "@/lib/stats";
+import { BAND_COLORS, BAND_LABELS, bandSummary, dataRange, fmtInt, headline, multiBooking, percent, quietByJoined, visitsByType } from "@/lib/stats";
 import { BAND_ORDER, type DashboardData } from "@/lib/types";
 
 const SERIES_COLORS = BAND_ORDER.map((b) => BAND_COLORS[b]);
@@ -55,11 +55,11 @@ function Visits({ data }: { data: DashboardData }) {
           <p className="hero-number num">{fmtInt(h.quiet)}</p>
           <div className="hero-copy">
             <p className="hero-lead">
-              of {fmtInt(h.started)} members visited less than once a month.
+              of {fmtInt(h.total)} members visited less than once a month.
             </p>
             <p className="hero-support">
               {fmtInt(h.noVisits)} had no visit at all. The other {fmtInt(h.quiet - h.noVisits)} came in, but rarely.
-              {h.notStarted > 0 && <> {fmtInt(h.notStarted)} new members haven&rsquo;t started yet and are not counted.</>}
+              {h.notStarted > 0 && <> {fmtInt(h.notStarted)} new members haven&rsquo;t started yet, so they are not in the {fmtInt(h.quiet)}.</>}
             </p>
           </div>
         </section>
@@ -111,10 +111,12 @@ function Visits({ data }: { data: DashboardData }) {
                     style={{ width: `${(h.notStarted / widest) * 70}%`, background: "#d4dbde" }}
                     aria-hidden="true"
                   />
-                  <span className="band-count">{fmtInt(h.notStarted)}</span>
+                  <span className="band-count">
+                    {fmtInt(h.notStarted)} <small>{percent(h.notStarted, h.total)}%</small>
+                  </span>
                 </span>
                 <span className="band-entries" role="cell">
-                  <small>Joined this year, no visit yet. Not counted above.</small>
+                  <small>Joined this year, no visit yet. Not counted as rarely visiting.</small>
                 </span>
               </div>
             )}

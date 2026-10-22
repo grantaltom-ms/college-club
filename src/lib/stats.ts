@@ -49,7 +49,7 @@ export function started(members: Member[]): Member[] {
   return members.filter((m) => !m.notStarted);
 }
 
-/** The usage groups, counting only members who have started. Shares are of those members. */
+/** The usage groups, counting only members who have started. Shares are of the whole roster, so with the not-started group they add up to 100. */
 export function bandSummary(members: Member[]): BandRow[] {
   const active = started(members);
   const totalEntries = active.reduce((sum, m) => sum + m.doorEntries, 0);
@@ -60,7 +60,7 @@ export function bandSummary(members: Member[]): BandRow[] {
       band,
       label: BAND_LABELS[band],
       members: inBand.length,
-      memberShare: percent(inBand.length, active.length),
+      memberShare: percent(inBand.length, members.length),
       doorEntries,
       entryShare: percent(doorEntries, totalEntries),
       withoutFob: inBand.filter((m) => !m.ownFob).length,
@@ -69,9 +69,9 @@ export function bandSummary(members: Member[]): BandRow[] {
 }
 
 export interface Headline {
-  /** Everyone on the roster, started or not. */
+  /** Everyone on the roster, started or not. The rarely-visit share is of this. */
   total: number;
-  /** Members who have started: the group the shares below are of. */
+  /** Members who have started. */
   started: number;
   /** New members who joined this year and have not visited yet. */
   notStarted: number;
@@ -93,7 +93,7 @@ export function headline(members: Member[]): Headline {
     started: active,
     notStarted: members.length - active,
     quiet,
-    quietShare: percent(quiet, active),
+    quietShare: percent(quiet, members.length),
     noVisits: byBand("0 visits").members,
     regulars: byBand("4+/month").members,
     regularEntryShare: byBand("4+/month").entryShare,

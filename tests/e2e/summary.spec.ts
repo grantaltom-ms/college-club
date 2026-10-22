@@ -13,7 +13,7 @@ test("the summary leads with one sentence and six headline cards, each linking t
   await expect(page.getByTestId("story")).toContainText(`club shell outings are down ${Math.abs(shellChange)}%`);
   await expect(page.locator(".stat-card")).toHaveCount(6);
   await expect(page.getByTestId("card-quiet").locator(".stat-value")).toHaveText("133");
-  await expect(page.getByTestId("card-quiet")).toContainText("of 486 members came in less than once a month this year (27%).");
+  await expect(page.getByTestId("card-quiet")).toContainText("of 497 members came in less than once a month this year (27%).");
   await expect(page.getByTestId("card-quiet-note")).toHaveText("11 new members haven't started yet (off the waitlist).");
   await expect(page.getByTestId("roster-note")).toHaveText("Roster: QuickBooks member list, Oct 21, 2026.");
   await expect(page.getByTestId("card-shells").locator(".stat-value")).toHaveText(`−${Math.abs(shellChange)}%`);

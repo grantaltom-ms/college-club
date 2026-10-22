@@ -54,7 +54,7 @@ describe("band summary and headline", () => {
     expect(bandSummary(data.members).map((r) => r.members)).toEqual([31, 102, 80, 75, 198]);
   });
 
-  it("has 497 members, 11 not started, and 133 of the 486 who started under one visit a month", () => {
+  it("has 497 members, 11 not started, and 133 of the 497 under one visit a month", () => {
     const h = headline(data.members);
     expect(h.total).toBe(497);
     expect(h.notStarted).toBe(11);
@@ -65,15 +65,17 @@ describe("band summary and headline", () => {
     expect(h.regulars).toBe(198);
   });
 
-  it("leaves not-started members out of the rarely-visit count and every share", () => {
+  it("leaves not-started members out of the rarely-visit count but keeps them in the total", () => {
     const members = [
       member({ band: "0 visits", visitDays: 0, doorEntries: 0 }),
       member({ band: "0 visits", visitDays: 0, doorEntries: 0, notStarted: true, qbCreatedOn: "2026-06-01" }),
       member({ band: "4+/month", doorEntries: 100 }),
     ];
     const h = headline(members);
-    expect(h).toMatchObject({ total: 3, started: 2, notStarted: 1, quiet: 1, noVisits: 1, quietShare: 50 });
+    // The share is of the whole roster, so the not-started member is in the total but not the count.
+    expect(h).toMatchObject({ total: 3, started: 2, notStarted: 1, quiet: 1, noVisits: 1, quietShare: 33 });
     expect(bandSummary(members).reduce((s, r) => s + r.members, 0)).toBe(2);
+    expect(bandSummary(members).map((r) => r.memberShare)).toEqual([33, 0, 0, 0, 33]);
   });
 
   it("shares of door entries add up to about 100", () => {

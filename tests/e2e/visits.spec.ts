@@ -13,13 +13,13 @@ test("the visits page shows the headline and all five usage groups", async ({ pa
   await page.goto("/visits");
   await expect(page.getByRole("heading", { level: 1, name: "Member visits." })).toBeVisible();
   await expect(page.locator(".hero-number")).toHaveText("133");
-  await expect(page.getByText("of 486 members visited less than once a month.")).toBeVisible();
-  await expect(page.getByText(/11 new members haven.t started yet and are not counted\./)).toBeVisible();
+  await expect(page.getByText("of 497 members visited less than once a month.")).toBeVisible();
+  await expect(page.getByText(/11 new members haven.t started yet, so they are not in the 133\./)).toBeVisible();
   await expect(page.getByTestId("roster-note")).toHaveText("Roster: QuickBooks member list, Oct 21, 2026.");
   // Five usage groups, then the members who have not started yet on their own row.
   await expect(page.locator(".band-row")).toHaveCount(6);
   await expect(page.locator('.band-row[data-band="0 visits"]')).toContainText("31");
-  await expect(page.locator('.band-row[data-band="Not started yet"]')).toContainText("11");
+  await expect(page.locator('.band-row[data-band="Not started yet"]')).toContainText("11 2%");
   await expect(page.getByRole("heading", { name: /^198 regulars make \d+% of all member door entries$/ })).toBeVisible();
   await expect(page.getByRole("note")).toContainText("Sample data");
 });

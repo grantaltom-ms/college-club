@@ -119,7 +119,7 @@ function Summary({ data, shells, email }: { data: DashboardData; shells: JsonSta
             testId="card-quiet"
             area="Members who rarely visit"
             value={fmtInt(h.quiet)}
-            lead={`of ${fmtInt(h.started)} members came in less than once a month this year (${h.quietShare}%).`}
+            lead={`of ${fmtInt(h.total)} members came in less than once a month this year (${h.quietShare}%).`}
             detail={`${fmtInt(h.noVisits)} have not come in at all.`}
             note={h.notStarted > 0 ? `${fmtInt(h.notStarted)} new members haven't started yet (off the waitlist).` : undefined}
             href="/visits"
