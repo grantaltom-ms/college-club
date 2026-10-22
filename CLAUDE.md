@@ -73,7 +73,7 @@ The repo also holds the CCS member usage dashboard. The board uses it. Its pages
 | Database tables | their own database schema, `club` |
 | Database changes | `supabase/migrations/`, versioned, never applied to the live project in Phase 1 |
 
-Inside `src/club/`: `engine/` holds the rules (the lease terms; every change needs tests), `store/` holds where data is kept (in memory for Phase 1), `sample/` holds the invented households, `identity.ts` is the one "who is the current member" function, `enabled.ts` decides whether `/club` exists at all.
+Inside `src/club/`: `engine/` holds the rules (the lease terms; every change needs tests), `store/` holds where data is kept (`memory.ts` for the in-memory sample, `postgres.ts` for Postgres; both fit one `ClubStore` interface, so the rules never know which), `sample/` holds the invented households, `identity.ts` is the one "who is the current member" function, `enabled.ts` decides whether `/club` exists at all.
 
 The new tables are an apartment building: household = the lease, member = a person on the lease, household history = the tenant file, qualification = "certified to use the rooftop grill", bookable item = a unit, rule set = the house rules.
 
@@ -82,7 +82,7 @@ The new tables are an apartment building: household = the lease, member = a pers
 - **`/club` only exists when sample data is allowed** (`src/club/enabled.ts`): in development, or with `CCS_ALLOW_SAMPLE_DATA=1`, and never when `VERCEL_ENV=production`. Otherwise it answers "page not found".
 - **The "act as this test member" picker** is the stand-in for login until step 6. It follows the same on/off switch. It is tested absent in a production setting.
 - **Every permission check goes through `getCurrentActor()`** in `src/club/identity.ts`. Step 6 replaces what is inside that function and nothing else.
-- **Never use `SUPABASE_URL` or the service key for club work.** Club code uses its own `CLUB_DATABASE_URL` (local or test databases only). Tests refuse any database address that looks like Supabase.
+- **Never use `SUPABASE_URL` or the service key for club work.** Club code uses its own `CLUB_DATABASE_URL` (local or test databases only). The Postgres store (`createClubPool`) and the tests both refuse any database address that looks like Supabase. With `CLUB_DATABASE_URL` unset the member area runs on the in-memory sample.
 - Fake data only. Invented names only. Never real member data.
 - Stop and ask before: spending money (including Supabase branches and paid Vercel features); deleting any file, table or data; connecting to the live Supabase project or applying a migration to it; touching Wix, iCrew, Mailchimp, QuickBooks, Brivo or real member data; changing any dashboard page, table or URL; merging a pull request or changing Vercel production; changing any decision in this file.
 - Vercel runs Node 24. CI runs Node 24 as of this change, so tests match what goes live.
@@ -152,7 +152,16 @@ Behavior:
 - **Screens.** `/club/book` (day view, filter by type, days in the window), `/club/book/new` (form that runs the real rule check and shows the rules), `/club/my-bookings` (staff see "All bookings"), `/club/equipment` (staff only: take out of service, return, see affected members).
 - **The test clock.** `CCS_CLUB_NOW` (for example `2026-10-28T20:00:00Z`) freezes "now" for the member area, in development and tests only. It does nothing where the member area is switched off.
 
-Not built yet, on purpose: the Postgres store for the screens (they run on the in-memory store; the tables and the overlap rule are in the migration and tested against a real Postgres, but the app does not read or write them yet), the attendance-marking screen, the staff admin screen, emails or texts.
+### The Postgres store (built Oct 22, after step 2)
+
+- **What it is.** `PgClubStore` (`src/club/store/postgres.ts`) keeps the same `ClubStore` interface as the in-memory copy, so the rules engine did not change. With `CLUB_DATABASE_URL` set, `/club` reads and writes Postgres (a local or throwaway one only; hosted Supabase addresses are refused). With `CCS_ALLOW_SAMPLE_DATA=1` too, the invented club is loaded the first time, only if the database has no households.
+- **How a change works.** Take one database-wide "writers" lock (shared by every app server), load the current records, let the engine change a working copy, write back exactly what changed, all in one transaction. Writers therefore take turns and always start from the truth. That is what makes a member's limits and "nobody in two boats" race-free (open question G, now answered), with the database's overlap rule still underneath as a second line of defence. Readers take a consistent snapshot and never wait for writers.
+- **Rules and the database.** `booking-rules.json` is still the source of the rules; `syncRules` mirrors it into the rule tables on start-up so items can point at their classes. In step 5 the staff screen edits those tables instead.
+- **What it loads.** All households, members, history, items and out-of-service entries, and bookings that ended in the last 90 days (`historyDays`). Older bookings stay in the database; the screens' "Past" list shows the last 90 days until a full-history view exists.
+- **Never deletes.** The store refuses to delete anything and refuses to rewrite a history line. Bookings are cancelled by status, as in real life.
+- **Proof.** The household, booking, household-plus-booking and daylight-saving tests run on both stores (the Postgres run needs `CLUB_TEST_DATABASE_URL`; CI always sets it). Extra tests check that Postgres holds exactly the same sample club as memory, that two app servers sharing one database cannot beat a limit, a slot or a "two boats" rule by racing, that the database overlap rule is translated into a plain refusal, and that the booking browser tests pass on a Postgres-backed server.
+
+Not built yet, on purpose: the attendance-marking screen, the staff admin screen, emails or texts.
 
 ## Testing (required; nothing is done until all of this passes)
 
@@ -165,6 +174,7 @@ CI runs on every push and pull request: install, lint, type check, unit tests, b
 - **Daylight saving:** bookings on Nov 1, 2026 and the days around it.
 - **Safety:** the picker and `/club` are absent in a production setting. No dashboard page shows member names. Dashboard tests pass unchanged.
 - All external services are mocked. Tests never touch the live Supabase project or any real service.
+- The engine tests run on **both stores** (memory, and Postgres when `CLUB_TEST_DATABASE_URL` is set). Anything the engine does must give the same answer on each. The booking browser tests also run against a Postgres-backed server (Playwright project `postgres`).
 - Database rules are tested against a real Postgres (`CLUB_TEST_DATABASE_URL`; CI provides a throwaway one). Without that variable those tests are skipped and say so.
 
 ## Open questions
@@ -179,7 +189,7 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
 - C. A shared email (partners on one address) will clash with "one login per adult" in step 6. Decide how those two logins are told apart.
 - D. When the production switch-on happens: the date the `/club` area becomes visible on the production site, and who approves it.
 - E. Who gets which Vercel/Supabase/GitHub accounts under the CCS-owned email.
-- G. Before any pilot, the app needs a Postgres-backed store behind the same interface as the in-memory one. The overlap rule is already enforced by the database, but the other checks (a member's limits, nobody in two boats at once) are in the engine and must then run under a lock on the member's row so two simultaneous requests cannot slip past them. Plan it when step 6 or 7 connects real data.
+- ~~G. Postgres-backed store and racing requests~~ Answered Oct 22: built. Changes take turns under one database-wide lock, so limits and "two boats" are checked against fresh data. If the club ever gets busy enough for that to be a bottleneck (hundreds of simultaneous bookings), the lock can be narrowed to per-member and per-item locks; not needed now.
 - H. Past outings nobody has marked show as "Awaiting attendance record" until the marking screen exists (it comes later). Should unmarked outings count as completed after some days?
 - I. What does a late cancellation lead to (a warning after N, a fee, nothing)? Phase 1 only records it.
 - J. When a member leaves, other people's boats lose that crew member but keep the booking. Confirm that is what staff want, or whether the owner should be told.
@@ -211,3 +221,12 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
 - **Decided / assumed (Grant to confirm in review):** staff overrides cover the club rules but never facts; crew leaving the club lose their seat but the booking stays; a staff cancellation is never recorded as the member's late cancellation; unmarked past outings show "Awaiting attendance record"; a person can hold a dock space while on the water (only boats, kayaks and paddle boards put someone in one place).
 - **Next:** Grant reviews step 2. Then the 10-step order continues with step 3 (fitness classes) only if Grant says so; the Postgres store (open question G) is the main gap before any pilot.
 - **Blocked / needs Grant:** real values for the placeholder rules (open question 5); real qualification names (B); branch protection on `main`.
+
+### Oct 22, 2026 (evening): the Postgres store
+- **Asked by Grant:** "Postgres Store then Step 3".
+- **Built:** `PgClubStore` and its wiring (`getClubStore` picks it when `CLUB_DATABASE_URL` is set); a third migration (who-did-it IDs, creation order, crew seat order, empty out-of-service periods allowed); sample loading into an empty database; a second Playwright project that runs the member-area specs on a Postgres-backed server.
+- **Found by running both stores:** the in-memory store allowed returning a boat to service in the same instant it was taken out; the database insisted the period end strictly later. Settled in the database's favour with a note (an empty period means it never mattered).
+- **Proof it can fail:** with the writers lock removed, the two-server races, the limit bypass and the household-ending race all fail; with crew saving or member IDs removed, the equivalence and round-trip tests fail.
+- **Decided / assumed (Grant to confirm):** one database-wide writers lock (simple and correct; narrowable later); the screens show the last 90 days of bookings; the rules file stays the source of the rules until step 5.
+- **Next:** a short plan and questions for step 3 (fitness classes), then build.
+- **Blocked / needs Grant:** same as before (rule numbers, qualification names, branch protection).

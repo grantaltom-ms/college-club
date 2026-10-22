@@ -51,6 +51,7 @@ The prepare step runs on your own computer: shell rower names are swapped for sc
 - There are no real logins yet. `/club/act-as` lets you act as an invented member (or test staff) to try it.
 - **Booking** (step 2): `/club/book` shows what is free by boat or space, `/club/book/new` checks the rules and explains any refusal, `/club/my-bookings` lists and cancels, and test staff get `/club/equipment` to take things out of service. Every rule number lives in `src/club/settings/booking-rules.json` and is a **placeholder** until staff confirm it.
 - `CCS_CLUB_NOW` freezes the member area's clock (development and tests only).
+- **Where the records live.** By default the member area runs on an in-memory sample. Set `CLUB_DATABASE_URL` (a local or throwaway Postgres only; hosted Supabase addresses are refused) and it reads and writes Postgres instead: see `supabase/README.md`. Changes take turns, one at a time, so limits and double bookings are checked against the truth even when many requests arrive together.
 - Database tests need a local or throwaway Postgres: see `supabase/README.md`.
 
 ## Checks
