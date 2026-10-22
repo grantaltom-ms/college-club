@@ -1,6 +1,6 @@
 # Database for the member system
 
-Versioned changes live in `migrations/`, one file per change, applied in file-name order. Everything is in the
+Versioned changes live in `migrations/`, one file per change, applied in file-name order: `20261022000000_club_households.sql` (households, members, qualifications, history) and `20261023000000_club_bookings.sql` (items, rules as data, out of service, bookings, and the rule that stops a double booking). The second needs the `btree_gist` extension, which the local Supabase database and Postgres 16 both allow. Everything is in the
 `club` schema, apart from the dashboard's tables in `public`.
 
 **Phase 1 rule: nothing here is ever applied to the live Supabase project.** The local database and the automated
