@@ -43,9 +43,17 @@ The prepare step runs on your own computer: shell rower names are swapped for sc
 - **In development** (or with `CCS_ALLOW_SAMPLE_DATA=1`) it uses an in-memory copy of the starting content instead of Supabase, so tests never touch the real database.
 - "Overdue" and "due soon" (today to 7 days ahead) use the visitor's own clock; "Due soon" also lists anything already overdue. Finishing every subitem shows "3 of 3 done" on the parent but never changes the parent's status.
 
+## The member area (reservation system, test build)
+
+`/club` is the start of the CCS member and reservation system. It is **separate from the dashboard**: its own pages (`src/app/club`), logic (`src/club`) and database schema (`club`, see `supabase/`). Read `CLAUDE.md` for the plan, the decisions and the rules.
+
+- It shows invented households only, and exists while developing or when `CCS_ALLOW_SAMPLE_DATA=1`. It is **never** available when `VERCEL_ENV=production`: set the switch in Vercel Preview only.
+- There are no real logins yet. `/club/act-as` lets you act as an invented member (or test staff) to try it.
+- Database tests need a local or throwaway Postgres: see `supabase/README.md`.
+
 ## Checks
 
-`npm run check` runs everything CI runs: lint, type check, unit tests, build, and browser tests (Playwright, against a production build with mocked data). Browser tests need Chromium: `npx playwright install chromium`.
+`npm run check` runs everything CI runs: lint, type check, unit tests, build, and browser tests (Playwright, against a production build with mocked data). Browser tests need Chromium: `npx playwright install chromium`. The member system's database tests also need `CLUB_TEST_DATABASE_URL` (see `supabase/README.md`); without it they are skipped.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the same on every push and pull request.
 

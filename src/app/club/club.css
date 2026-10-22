@@ -1,0 +1,204 @@
+/* Member area: plain and functional. Brand colors and fonts come from globals.css. */
+.club {
+  min-height: 100vh;
+}
+
+.club-frame {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.club-header {
+  border-bottom: 1px solid var(--hairline);
+  background: var(--card);
+}
+
+.club-header .club-frame {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.club-wordmark {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.club-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+
+.club-header nav a {
+  display: inline-block;
+  padding: 10px 0;
+  color: var(--waterloo);
+}
+
+.club-banner {
+  margin: 16px 0 8px;
+  padding: 10px 14px;
+  background: var(--oyster-50);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.club-acting {
+  margin: 0 0 16px;
+  color: var(--slate);
+  font-size: 0.95rem;
+}
+
+.club main {
+  padding-bottom: 48px;
+}
+
+.club h1 {
+  font-size: 1.6rem;
+  margin: 8px 0 8px;
+}
+
+.club h2 {
+  font-size: 1.15rem;
+  margin: 28px 0 10px;
+}
+
+.club h3 {
+  font-family: var(--body);
+  font-size: 1.1rem;
+  margin: 0 0 2px;
+}
+
+.club-meta {
+  color: var(--slate);
+  font-size: 0.95rem;
+}
+
+.club-cards,
+.club-list,
+.club-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.club-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.club-card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.club-cards > .club-card {
+  margin-bottom: 0;
+}
+
+.club-card p {
+  margin: 4px 0;
+}
+
+.club-list li {
+  padding: 2px 0;
+}
+
+.club-history li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--grid);
+}
+
+.club-chip {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--oyster);
+  font-size: 0.85rem;
+}
+
+.club-chip-active {
+  background: #dfe9e3;
+}
+
+.club-chip-removed,
+.club-chip-household_ended {
+  background: #ecd9d3;
+}
+
+.club-slots {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 14px;
+  margin: 8px 0 0;
+  color: var(--slate);
+  font-size: 0.9rem;
+}
+
+.club-slots dt {
+  font-weight: 500;
+}
+
+.club-slots dd {
+  margin: 0;
+}
+
+.club-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.club-button {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--waterloo);
+  border-radius: 4px;
+  background: var(--waterloo);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  margin: 0 8px 8px 0;
+}
+
+.club-button:hover {
+  background: var(--cyberspace);
+}
+
+.club-button:focus-visible,
+.club-header a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.club-button-quiet {
+  background: transparent;
+  color: var(--waterloo);
+}
+
+.club-button-quiet:hover {
+  background: var(--oyster-50);
+}
+
+@media (min-width: 720px) {
+  .club-history li {
+    grid-template-columns: 11rem 1fr 9rem;
+    gap: 12px;
+  }
+}

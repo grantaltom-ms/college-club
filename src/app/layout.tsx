@@ -1,36 +1,21 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import "@fontsource/cinzel/latin-500.css";
 import "@fontsource/cinzel/latin-600.css";
 import "@fontsource/eb-garamond/latin-400.css";
 import "@fontsource/eb-garamond/latin-500.css";
 import "@fontsource/eb-garamond/latin-600.css";
 import "./globals.css";
-import { DataProvider } from "@/components/DataProvider";
-import { Nav } from "@/components/Nav";
 
+// Shared by everything in the app: the brand fonts and colors. The dashboard (app/(dashboard)) and the
+// member area (app/club) each add their own header and layout on top.
 export const metadata: Metadata = {
-  title: "CCS member usage",
-  description: "How College Club Seattle members use the club: door entries, boat reservations, and who has gone quiet.",
   robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <header className="site-header">
-          <div className="frame">
-            <Link href="/" className="wordmark">
-              College Club Seattle
-            </Link>
-            <Nav />
-          </div>
-        </header>
-        <main className="frame">
-          <DataProvider>{children}</DataProvider>
-        </main>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
