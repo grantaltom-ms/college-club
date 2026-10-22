@@ -13,11 +13,22 @@ const FIRST_HOUSEHOLD = "00000000-0000-4000-8000-000000000001";
 for (const [name, base] of Object.entries(HIDDEN)) {
   test.describe(name, () => {
     test("the member area answers 'page not found', not a login or a picker", async () => {
-      for (const path of ["/club", "/club/act-as", `/club/household/${FIRST_HOUSEHOLD}`, "/club/anything-else"]) {
+      const paths = [
+        "/club",
+        "/club/act-as",
+        `/club/household/${FIRST_HOUSEHOLD}`,
+        "/club/anything-else",
+        "/club/book",
+        "/club/book?day=2026-10-29&type=Shell",
+        `/club/book/new?item=${FIRST_HOUSEHOLD}&start=2026-10-29T14:00:00.000Z`,
+        "/club/my-bookings",
+        "/club/equipment",
+      ];
+      for (const path of paths) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger/i);
       }
     });
 
@@ -31,6 +42,25 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         });
         expect(res.status, actor).toBe(404);
         expect(res.headers.get("set-cookie"), actor).toBeNull();
+      }
+    });
+
+    test("no booking, cancelling or equipment request does anything, even with a test-member cookie", async () => {
+      const posts: [string, Record<string, string>][] = [
+        ["/api/club/bookings", { item: FIRST_HOUSEHOLD, start: "2026-10-29T14:00:00.000Z", minutes: "60", for: FIRST_HOUSEHOLD }],
+        ["/api/club/bookings/cancel", { id: FIRST_HOUSEHOLD }],
+        ["/api/club/equipment/out-of-service", { item: FIRST_HOUSEHOLD, reason: "Test" }],
+        ["/api/club/equipment/return", { period: FIRST_HOUSEHOLD }],
+      ];
+      for (const [path, body] of posts) {
+        const res = await fetch(`${base}${path}`, {
+          method: "POST",
+          redirect: "manual",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: "ccs_test_actor=staff" },
+          body: new URLSearchParams(body),
+        });
+        expect(res.status, path).toBe(404);
+        expect(res.headers.get("location"), path).toBeNull();
       }
     });
 

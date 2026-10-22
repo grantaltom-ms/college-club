@@ -19,19 +19,13 @@ export interface Ctx {
 }
 
 /**
- * Where future bookings live. Ending a household or removing a member cancels theirs through this.
- * Bookings arrive in step 2; until then nothing is booked, so there is nothing to cancel.
- * Returns the IDs of the bookings it cancelled.
+ * Where future bookings live. Ending a household or removing a member cancels theirs through this, inside the
+ * same all-or-nothing change (`state` is that change's working copy), so a household is never half ended.
+ * Returns the IDs of the bookings it cancelled. The real one is `bookingLedger` in bookings.ts.
  */
 export interface BookingLedger {
-  cancelFutureBookings(input: { memberIds: string[]; now: Date; reason: string }): Promise<string[]>;
+  cancelFutureBookings(input: { state: ClubState; memberIds: string[]; now: Date; reason: string; actor: Actor }): Promise<string[]>;
 }
-
-export const NO_BOOKINGS_YET: BookingLedger = {
-  async cancelFutureBookings() {
-    return [];
-  },
-};
 
 export interface NewMember {
   firstName: string;
@@ -167,7 +161,7 @@ export async function removeMember(
     }
     member.status = "removed";
     log(s, newId, ctx, household.id, "member_removed", `${fullName(member)} was removed from the household.`, { memberId: member.id });
-    const cancelled = await ledger.cancelFutureBookings({ memberIds: [member.id], now: ctx.now, reason: `${fullName(member)} was removed from the household` });
+    const cancelled = await ledger.cancelFutureBookings({ state: s, memberIds: [member.id], now: ctx.now, reason: `${fullName(member)} was removed from the household`, actor: ctx.actor });
     if (cancelled.length > 0) {
       log(s, newId, ctx, household.id, "bookings_cancelled", `${cancelled.length} future booking${cancelled.length === 1 ? "" : "s"} cancelled for ${fullName(member)}.`, { count: cancelled.length });
     }
@@ -229,7 +223,7 @@ export async function endHousehold(
       adults: adults.length,
     });
     const memberIds = adults.map((m) => m.id);
-    const cancelled = await ledger.cancelFutureBookings({ memberIds, now: ctx.now, reason: "The household's membership ended" });
+    const cancelled = await ledger.cancelFutureBookings({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor });
     if (cancelled.length > 0) {
       log(s, newId, ctx, household.id, "bookings_cancelled", `${cancelled.length} future booking${cancelled.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: cancelled.length });
     }
