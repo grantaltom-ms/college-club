@@ -1,0 +1,8 @@
+# Local Supabase for the CCS member system (Supabase CLI: `supabase start`). This is a throwaway database on
+# your own computer; it is not connected to any hosted project, and nothing here is applied to the live
+# project (hgjcnuwxhemynnvsnmou) in Phase 1.
+#
+# Only the project name is set; everything else uses the CLI's defaults. The "club" schema is deliberately
+# NOT added to the exposed API schemas: the member system reaches its tables through its own database
+# connection, not through the public web API.
+project_id = "ccs-club-local"
