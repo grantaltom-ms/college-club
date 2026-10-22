@@ -25,6 +25,11 @@ export interface Ctx {
  */
 export interface BookingLedger {
   cancelFutureBookings(input: { state: ClubState; memberIds: string[]; now: Date; reason: string; actor: Actor }): Promise<string[]>;
+  /**
+   * Takes these members off the sign-up sheets of classes still to come and moves the waiting lists up behind them.
+   * Returns the IDs of the sign-ups cancelled. Optional, so a ledger that knows nothing of classes still works.
+   */
+  cancelFutureSignUps?(input: { state: ClubState; memberIds: string[]; now: Date; reason: string; actor: Actor }): Promise<string[]>;
 }
 
 export interface NewMember {
@@ -165,6 +170,10 @@ export async function removeMember(
     if (cancelled.length > 0) {
       log(s, newId, ctx, household.id, "bookings_cancelled", `${cancelled.length} future booking${cancelled.length === 1 ? "" : "s"} cancelled for ${fullName(member)}.`, { count: cancelled.length });
     }
+    const dropped = (await ledger.cancelFutureSignUps?.({ state: s, memberIds: [member.id], now: ctx.now, reason: `${fullName(member)} was removed from the household`, actor: ctx.actor })) ?? [];
+    if (dropped.length > 0) {
+      log(s, newId, ctx, household.id, "signups_cancelled", `${dropped.length} future class sign-up${dropped.length === 1 ? "" : "s"} cancelled for ${fullName(member)}.`, { count: dropped.length });
+    }
   });
 }
 
@@ -226,6 +235,10 @@ export async function endHousehold(
     const cancelled = await ledger.cancelFutureBookings({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor });
     if (cancelled.length > 0) {
       log(s, newId, ctx, household.id, "bookings_cancelled", `${cancelled.length} future booking${cancelled.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: cancelled.length });
+    }
+    const dropped = (await ledger.cancelFutureSignUps?.({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor })) ?? [];
+    if (dropped.length > 0) {
+      log(s, newId, ctx, household.id, "signups_cancelled", `${dropped.length} future class sign-up${dropped.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: dropped.length });
     }
     return { endedOn, blocked: memberIds, cancelledBookings: cancelled };
   });

@@ -1,4 +1,4 @@
-import { bookingLedger } from "../engine/bookings";
+import { clubLedger } from "../engine/ledger";
 import { createHousehold, endHousehold, grantQualification, type Ctx, type NewMember } from "../engine/households";
 import { MemoryClubStore, sequentialIds, type ClubStore } from "../store/memory";
 import { clubNow } from "../clock";
@@ -91,7 +91,7 @@ export async function seedSampleClub(store: ClubStore, today: string): Promise<v
     }
     if (h.endedDaysAgo !== undefined) {
       const ctx: Ctx = { actor: SAMPLE_STAFF, now: middayPacific(addDays(today, -h.endedDaysAgo)) };
-      await endHousehold(store, bookingLedger, ctx, members[0].householdId);
+      await endHousehold(store, clubLedger, ctx, members[0].householdId);
     }
   }
 }

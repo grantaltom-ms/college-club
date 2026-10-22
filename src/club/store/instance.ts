@@ -1,6 +1,7 @@
 import { clubNow } from "../clock";
 import { clubEnabled } from "../enabled";
 import { buildSampleStore, seedSample } from "../sample/club";
+import { CLASS_RULES } from "../settings/class-rules";
 import { RULE_BOOK } from "../settings/rulebook";
 import { sequentialIds, type ClubStore } from "./memory";
 import { PgClubStore, createClubPool } from "./postgres";
@@ -13,7 +14,7 @@ const g = globalThis as unknown as { __ccsClubStore?: Promise<ClubStore> };
  */
 async function openPostgres(url: string): Promise<ClubStore> {
   const store = new PgClubStore(createClubPool(url), { now: clubNow });
-  await store.syncRules(RULE_BOOK);
+  await store.syncRules(RULE_BOOK, CLASS_RULES);
   if (process.env.CCS_ALLOW_SAMPLE_DATA === "1") {
     // Fixed IDs while seeding, so the sample's addresses read the same as the in-memory sample's.
     await store.seedIfEmpty((empty) => seedSample(empty.withIds(sequentialIds())));

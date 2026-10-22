@@ -70,6 +70,7 @@ export const HISTORY_KINDS = [
   "type_changed",
   "qualification_granted",
   "bookings_cancelled",
+  "signups_cancelled",
   "membership_ended",
 ] as const;
 export type HistoryKind = (typeof HISTORY_KINDS)[number];
@@ -202,6 +203,97 @@ export interface Booking {
   removedCrew: { memberId: string; at: string; reason: string }[];
 }
 
+/* ---------- Fitness classes (step 3) ---------- */
+
+/** The house rules for class sign-ups. Every value lives in settings/class-rules.json, never in code. */
+export interface ClassRuleValues {
+  /** How many days ahead members can sign up. */
+  signUpDaysAhead: number;
+  /** When a new day opens for sign-up, Pacific "HH:MM". */
+  opensAt: string;
+  /** Sign-up closes this many minutes before the start. */
+  closeMinutesBefore: number;
+  /** Leaving later than this many minutes before the start is recorded as a late cancellation. */
+  cancelCutoffMinutes: number;
+  /** The waiting list moves up automatically until this many minutes before the start; after that, free chairs are first come. */
+  promoteUntilMinutesBefore: number;
+  /** The most people who can wait for one class. 0 means no waiting list. */
+  waitlistMax: number;
+  /** Upcoming sign-ups (chairs and waiting-list places) one member can hold at once. */
+  maxUpcomingPerMember: number;
+  /** Class sign-ups one member can have on one day. */
+  maxPerDayPerMember: number;
+}
+
+export interface ClassRules {
+  /** True while the numbers are placeholders. Shown on screen. */
+  placeholder: boolean;
+  defaults: ClassRuleValues;
+}
+
+/** A kind of class: "Morning Yoga". Staff schedule dated sessions of it. */
+export interface ClassTemplate {
+  id: string;
+  name: string;
+  description: string;
+  instructor: string;
+  /** Chairs a new session starts with. */
+  defaultCapacity: number;
+  /** How long a new session lasts. */
+  defaultMinutes: number;
+  /** The gym or room it usually uses, if any. */
+  roomItemId: string | null;
+  /** Overrides of the class rules for this class only. */
+  rules: Partial<ClassRuleValues>;
+}
+
+export const SESSION_STATUSES = ["scheduled", "cancelled"] as const;
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
+
+/** One dated occurrence of a class, with a number of chairs. */
+export interface ClassSession {
+  id: string;
+  classId: string;
+  /** The gym or room it holds for its whole length, or null. While scheduled, nothing else can use that room then. */
+  roomItemId: string | null;
+  /** ISO moments. */
+  startsAt: string;
+  endsAt: string;
+  /** Chairs. */
+  capacity: number;
+  status: SessionStatus;
+  createdAt: string;
+  createdBy: Actor;
+  statusChangedAt: string;
+  cancelledBy: Actor | null;
+  cancelReason: string | null;
+}
+
+/**
+ * Where a name stands on a session's sign-up sheet. "enrolled" has a chair; "waitlisted" waits in order.
+ * The rest are how it ended: cancelled and late_cancelled free the chair; attended and no_show are the record.
+ */
+export const SIGNUP_STATUSES = ["enrolled", "waitlisted", "cancelled", "late_cancelled", "attended", "no_show"] as const;
+export type SignUpStatus = (typeof SIGNUP_STATUSES)[number];
+
+/** Sign-ups that still take up the member's time. */
+export const LIVE_SIGNUP: readonly SignUpStatus[] = ["enrolled", "waitlisted"];
+
+export interface SignUp {
+  id: string;
+  sessionId: string;
+  memberId: string;
+  status: SignUpStatus;
+  /** When the name went on the sheet. Waiting-list order follows this. */
+  createdAt: string;
+  createdBy: Actor;
+  statusChangedAt: string;
+  /** Set when the waiting list moved this person up to a chair. */
+  promotedAt: string | null;
+  cancelledBy: Actor | null;
+  cancelReason: string | null;
+}
+
 export interface ClubState {
   households: Household[];
   members: Member[];
@@ -211,4 +303,7 @@ export interface ClubState {
   items: Item[];
   outOfService: OutOfServicePeriod[];
   bookings: Booking[];
+  classes: ClassTemplate[];
+  sessions: ClassSession[];
+  signups: SignUp[];
 }

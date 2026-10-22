@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BookingRefused, cancelBooking, createBooking } from "../engine/bookings";
-import { createHousehold } from "../engine/households";
+import { SignUpRefused, createClass, leaveClass, scheduleSessions, signUp } from "../engine/classes";
+import { createHousehold, endHousehold } from "../engine/households";
+import { clubLedger } from "../engine/ledger";
+import { waitlistPlace } from "../engine/queries";
 import { addMembers, at, makeStore, NOW, openAnother, databaseUrls, memberCtx, staffCtx, request, bookAs, refusedFor, STORE_KINDS, fixtureFor } from "../engine/testkit";
 import { ClubError } from "../errors";
 import { seedSample } from "../sample/club";
+import { CLASS_RULES } from "../settings/class-rules";
 import { RULE_BOOK } from "../settings/rulebook";
 import { addDays, pacificDate } from "../time";
 import { MemoryClubStore, sequentialIds } from "./memory";
@@ -28,6 +32,13 @@ describe("the Postgres store's safeguards (no database needed)", () => {
     expect((overlap as ClubError).message).toBe("That time was just taken by someone else. Pick another.");
     expect((overlap as ClubError).code).toBe("conflict");
     for (const code of ["40001", "40P01"]) expect((translateDatabaseError({ code }) as ClubError).message).toBe("A lot of changes arrived at once. Please try again.");
+    for (const message of ["That class is full.", "That class was cancelled.", "Chairs cannot go below the 3 people already in them."]) {
+      expect(translateDatabaseError({ code: "23514", message })).toMatchObject({ code: "conflict", message });
+    }
+    expect(translateDatabaseError({ code: "23505", constraint: "class_signups_one_live" })).toMatchObject({ code: "conflict", message: "That person is already on this class's sign-up sheet." });
+    // Anything else from the database is not shown to members as it is.
+    const unknownCheck = { code: "23514", message: 'new row for relation "members" violates check constraint "x"' };
+    expect(translateDatabaseError(unknownCheck)).toBe(unknownCheck);
     const other = new Error("boom");
     expect(translateDatabaseError(other)).toBe(other);
     const refusal = new ClubError("forbidden", "No.");
@@ -146,7 +157,6 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
 
     it("an ending household and a new booking by one of its adults cannot both win", async () => {
       const { f, b } = await twoServers();
-      const { endHousehold } = await import("../engine/households");
       const { bookingLedger } = await import("../engine/bookings");
       const [ended, booked] = await Promise.allSettled([endHousehold(f.store, bookingLedger, staffCtx(), f.h.Quill), bookAs(b, "Ada", "Heron", at(1, 7), at(1, 8))]);
       expect(ended.status).toBe("fulfilled");
@@ -154,6 +164,61 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       // Whichever came first, no Quill is left holding a booking once the household has ended.
       expect(upcomingByQuills).toHaveLength(0);
       if (booked.status === "rejected") expect((booked.reason as BookingRefused).reasons.map((r) => r.code)).toEqual(["member_blocked"]);
+    });
+  });
+
+  describe("class sign-ups race too", () => {
+    async function twoServersWithAClass() {
+      const f = await fixture();
+      const b = { ...f, store: openAnother(databaseUrls.get(f.store)!) };
+      const yoga = await createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "Yoga", defaultCapacity: 3, defaultMinutes: 60 });
+      const [session] = await scheduleSessions(f.store, f.book, staffCtx(), { classId: yoga.id, startsAt: at(1, 9) });
+      const join = (server: typeof f, who: string) => signUp(server.store, server.book, CLASS_RULES, memberCtx(who, who), { sessionId: session.id, memberId: who });
+      return { f, b, session, join };
+    }
+
+    it("twenty members on two servers sign up for a class of three: exactly three chairs, ten waiting, the rest told the list is full", async () => {
+      const { f, b, session, join } = await twoServersWithAClass();
+      const people = await addMembers(f, 20);
+      const results = await Promise.allSettled(people.map((id, i) => join(i % 2 === 0 ? f : b, id)));
+      const state = await f.store.read();
+      expect(state.signups.filter((g) => g.sessionId === session.id && g.status === "enrolled")).toHaveLength(3);
+      expect(state.signups.filter((g) => g.sessionId === session.id && g.status === "waitlisted")).toHaveLength(10);
+      expect(results.filter((r) => r.status === "rejected")).toHaveLength(7);
+      for (const r of results) if (r.status === "rejected") expect((r.reason as SignUpRefused).reasons.map((x) => x.code)).toEqual(["waitlist_full"]);
+      // Everyone waiting has a different place, 1 to 10: the order is the order the database wrote them in.
+      const places = state.signups.filter((g) => g.status === "waitlisted").map((g) => waitlistPlace(state, g.id));
+      expect(places.sort((x, y) => (x ?? 0) - (y ?? 0))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    }, 60000);
+
+    it("someone leaving on one server while someone joins on the other never loses a chair or double-fills one", async () => {
+      const { f, b, session, join } = await twoServersWithAClass();
+      const people = await addMembers(f, 3);
+      const lines = [];
+      for (const id of [f.m.Ada, f.m.Dee, people[0]]) lines.push(await join(f, id));
+      const waiting = await join(f, people[1]);
+      expect(waiting.outcome).toBe("waitlisted");
+      const [left, joined] = await Promise.allSettled([
+        leaveClass(f.store, CLASS_RULES, memberCtx(f.m.Ada, "Ada"), lines[0].signUp.id),
+        join(b, people[2]),
+      ]);
+      expect(left.status).toBe("fulfilled");
+      const state = await f.store.read();
+      const chairs = state.signups.filter((g) => g.sessionId === session.id && g.status === "enrolled");
+      // Whichever came first, Ada's chair went to the person first in line, the chairs are exactly full, and the newcomer is on the sheet.
+      expect(chairs).toHaveLength(3);
+      expect(chairs.map((g) => g.memberId)).toContain(people[1]);
+      expect(joined.status).toBe("fulfilled");
+      expect(state.signups.some((g) => g.memberId === people[2] && (g.status === "enrolled" || g.status === "waitlisted"))).toBe(true);
+    });
+
+    it("an ending household and a new class sign-up by one of its adults cannot both win", async () => {
+      const { f, b, session, join } = await twoServersWithAClass();
+      const [ended, joined] = await Promise.allSettled([endHousehold(f.store, clubLedger, staffCtx(), f.h.Quill), join(b, f.m.Ada)]);
+      expect(ended.status).toBe("fulfilled");
+      const live = (await f.store.read()).signups.filter((g) => g.sessionId === session.id && [f.m.Ada, f.m.Ben, f.m.Cy].includes(g.memberId) && (g.status === "enrolled" || g.status === "waitlisted"));
+      expect(live).toHaveLength(0);
+      if (joined.status === "rejected") expect((joined.reason as SignUpRefused).reasons.map((r) => r.code)).toEqual(["member_blocked"]);
     });
   });
 

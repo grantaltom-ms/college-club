@@ -5,6 +5,10 @@ import type {
   Actor,
   Booking,
   BookingStatus,
+  ClassRules,
+  ClassRuleValues,
+  ClassSession,
+  ClassTemplate,
   ClubState,
   HistoryEntry,
   HistoryKind,
@@ -20,6 +24,9 @@ import type {
   Qualification,
   RuleBook,
   RuleValues,
+  SessionStatus,
+  SignUp,
+  SignUpStatus,
 } from "../types";
 import type { ClubStore } from "./memory";
 
@@ -73,6 +80,9 @@ interface HistoryRow { id: string; household_id: string; at: Date; kind: History
 interface ItemRow { id: string; name: string; class_code: string; rule_overrides: Partial<RuleValues>; qualification_mode: "class" | "none" | "code"; required_qualification: string | null }
 interface OutOfServiceRow { id: string; item_id: string; from_at: Date; until_at: Date | null; reason: string; expected_return: string | null; created_by_kind: string; created_by_label: string; created_at: Date }
 interface BookingRow { id: string; item_id: string; booker_id: string; starts_at: Date; ends_at: Date; status: BookingStatus; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null; override_reason: string | null; override_by_label: string | null; override_waived: string[] | null }
+interface ClassRow { id: string; name: string; description: string; instructor: string; default_capacity: number; default_minutes: number; room_item_id: string | null; rules: Partial<ClassRuleValues> }
+interface SessionRow { id: string; class_id: string; room_item_id: string | null; starts_at: Date; ends_at: Date; capacity: number; status: SessionStatus; created_at: Date; created_by_kind: string; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
+interface SignUpRow { id: string; session_id: string; member_id: string; status: SignUpStatus; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface CrewRow { booking_id: string; member_id: string; position: number; removed_at: Date | null; removed_reason: string | null }
 
 const iso = (d: Date | string) => new Date(d).toISOString();
@@ -160,6 +170,45 @@ function toBooking(r: BookingRow, crew: CrewRow[]): Booking {
   };
 }
 
+const toClass = (r: ClassRow): ClassTemplate => ({
+  id: r.id,
+  name: r.name,
+  description: r.description,
+  instructor: r.instructor,
+  defaultCapacity: r.default_capacity,
+  defaultMinutes: r.default_minutes,
+  roomItemId: r.room_item_id,
+  rules: r.rules,
+});
+
+const toSession = (r: SessionRow): ClassSession => ({
+  id: r.id,
+  classId: r.class_id,
+  roomItemId: r.room_item_id,
+  startsAt: iso(r.starts_at),
+  endsAt: iso(r.ends_at),
+  capacity: r.capacity,
+  status: r.status,
+  createdAt: iso(r.created_at),
+  createdBy: actorFrom(r.created_by_kind, null, r.created_by_label),
+  statusChangedAt: iso(r.status_changed_at),
+  cancelledBy: r.cancelled_by_kind ? actorFrom(r.cancelled_by_kind, null, r.cancelled_by_label ?? "") : null,
+  cancelReason: r.cancel_reason,
+});
+
+const toSignUp = (r: SignUpRow): SignUp => ({
+  id: r.id,
+  sessionId: r.session_id,
+  memberId: r.member_id,
+  status: r.status,
+  createdAt: iso(r.created_at),
+  createdBy: actorFrom(r.created_by_kind, r.created_by_id, r.created_by_label),
+  statusChangedAt: iso(r.status_changed_at),
+  promotedAt: r.promoted_at ? iso(r.promoted_at) : null,
+  cancelledBy: r.cancelled_by_kind ? actorFrom(r.cancelled_by_kind, r.cancelled_by_id, r.cancelled_by_label ?? "") : null,
+  cancelReason: r.cancel_reason,
+});
+
 /* ---------- Loading ---------- */
 
 type Queryable = Pick<PoolClient, "query">;
@@ -184,6 +233,22 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
        from club.bookings where ends_at > $1 order by seq`,
     [since.toISOString()],
   );
+  const classes = await rows<ClassRow>(c, `select id, name, description, instructor, default_capacity, default_minutes, room_item_id, rules from club.classes order by seq`);
+  const sessionRows = await rows<SessionRow>(
+    c,
+    `select id, class_id, room_item_id, starts_at, ends_at, capacity, status, created_at, created_by_kind, created_by_label, status_changed_at, cancelled_by_kind, cancelled_by_label, cancel_reason
+       from club.class_sessions where ends_at > $1 order by seq`,
+    [since.toISOString()],
+  );
+  const signUpRows =
+    sessionRows.length === 0
+      ? []
+      : await rows<SignUpRow>(
+          c,
+          `select id, session_id, member_id, status, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, promoted_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason
+             from club.class_signups where session_id = any($1) order by seq`,
+          [sessionRows.map((x) => x.id)],
+        );
   const crew = bookingRows.length === 0 ? [] : await rows<CrewRow>(c, `select booking_id, member_id, position, removed_at, removed_reason from club.booking_crew where booking_id = any($1)`, [bookingRows.map((b) => b.id)]);
   return {
     households: households.map(toHousehold),
@@ -194,6 +259,9 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
     items: items.map(toItem),
     outOfService: oos.map(toOutOfService),
     bookings: bookingRows.map((b) => toBooking(b, crew)),
+    classes: classes.map(toClass),
+    sessions: sessionRows.map(toSession),
+    signups: signUpRows.map(toSignUp),
   };
 }
 
@@ -293,6 +361,40 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
       else await run(`insert into club.booking_crew (booking_id, member_id, position, removed_at, removed_reason) values ($1,$2,$3,$4,$5)`, [b.id, r.memberId, b.crew.length, r.at, r.reason]);
     }
   }
+
+  // Classes, their dated sessions, and the sign-up sheets.
+  const cc = compare("classes", before.classes, after.classes);
+  const classSql = (k: ClassTemplate) => [k.name, k.description, k.instructor, k.defaultCapacity, k.defaultMinutes, k.roomItemId, JSON.stringify(k.rules)];
+  for (const k of cc.added) await run(`insert into club.classes (id, name, description, instructor, default_capacity, default_minutes, room_item_id, rules) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [k.id, ...classSql(k)]);
+  for (const k of cc.updated) await run(`update club.classes set name=$2, description=$3, instructor=$4, default_capacity=$5, default_minutes=$6, room_item_id=$7, rules=$8 where id=$1`, [k.id, ...classSql(k)]);
+
+  const ss = compare("class sessions", before.sessions, after.sessions);
+  for (const x of ss.added) {
+    await run(
+      `insert into club.class_sessions (id, class_id, room_item_id, starts_at, ends_at, capacity, status, created_at, created_by_kind, created_by_label, status_changed_at, cancelled_by_kind, cancelled_by_label, cancel_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [x.id, x.classId, x.roomItemId, x.startsAt, x.endsAt, x.capacity, x.status, x.createdAt, x.createdBy.kind, x.createdBy.label, x.statusChangedAt, x.cancelledBy?.kind ?? null, x.cancelledBy?.label ?? null, x.cancelReason],
+    );
+  }
+  for (const x of ss.updated) {
+    await run(`update club.class_sessions set capacity=$2, status=$3, status_changed_at=$4, cancelled_by_kind=$5, cancelled_by_label=$6, cancel_reason=$7 where id=$1`, [x.id, x.capacity, x.status, x.statusChangedAt, x.cancelledBy?.kind ?? null, x.cancelledBy?.label ?? null, x.cancelReason]);
+  }
+
+  // Sign-ups. Anyone leaving a chair is saved before anyone moving into one, so a class is never briefly over-full.
+  const gg = compare("class sign-ups", before.signups, after.signups);
+  const updateSignUp = (g: SignUp) =>
+    run(`update club.class_signups set status=$2, status_changed_at=$3, promoted_at=$4, cancelled_by_kind=$5, cancelled_by_id=$6, cancelled_by_label=$7, cancel_reason=$8 where id=$1`, [
+      g.id, g.status, g.statusChangedAt, g.promotedAt, g.cancelledBy?.kind ?? null, g.cancelledBy ? actorId(g.cancelledBy) : null, g.cancelledBy?.label ?? null, g.cancelReason,
+    ]);
+  for (const g of gg.updated.filter((x) => x.status !== "enrolled")) await updateSignUp(g);
+  for (const g of gg.added) {
+    await run(
+      `insert into club.class_signups (id, session_id, member_id, status, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, promoted_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [g.id, g.sessionId, g.memberId, g.status, g.createdAt, g.createdBy.kind, actorId(g.createdBy), g.createdBy.label, g.statusChangedAt, g.promotedAt, g.cancelledBy?.kind ?? null, g.cancelledBy ? actorId(g.cancelledBy) : null, g.cancelledBy?.label ?? null, g.cancelReason],
+    );
+  }
+  for (const g of gg.updated.filter((x) => x.status === "enrolled")) await updateSignUp(g);
 }
 
 /** A database refusal turned into the plain sentence a member can act on. Anything else passes through. */
@@ -301,6 +403,10 @@ export function translateDatabaseError(e: unknown): unknown {
   const code = (e as { code?: string } | null)?.code;
   if (code === "23P01") return new ClubError("conflict", "That time was just taken by someone else. Pick another.");
   if (code === "40001" || code === "40P01") return new ClubError("conflict", "A lot of changes arrived at once. Please try again.");
+  // The class guards in the database are worded for members already; only those sentences are passed on.
+  const { message, constraint } = (e ?? {}) as { message?: string; constraint?: string };
+  if (code === "23514" && message && /^(That class is full|That class was cancelled|Chairs cannot go below)/.test(message)) return new ClubError("conflict", message);
+  if (code === "23505" && constraint === "class_signups_one_live") return new ClubError("conflict", "That person is already on this class's sign-up sheet.");
   return e;
 }
 
@@ -364,7 +470,7 @@ export class PgClubStore implements ClubStore {
    * Makes the rule tables match the rules file (booking-rules.json), which is the source of truth until the staff
    * screen in step 5 edits them directly. Items point at these classes, so they must exist first.
    */
-  async syncRules(book: RuleBook): Promise<void> {
+  async syncRules(book: RuleBook, classRules?: ClassRules): Promise<void> {
     const c = await this.pool.connect();
     try {
       await c.query("begin");
@@ -376,6 +482,9 @@ export class PgClubStore implements ClubStore {
            on conflict (code) do update set booking_type = excluded.booking_type, name = excluded.name, seats = excluded.seats, required_qualification = excluded.required_qualification, rules = excluded.rules`,
           [k.code, k.type, k.name, k.seats, k.requiredQualification, JSON.stringify(k.rules)],
         );
+      }
+      if (classRules) {
+        await c.query(`insert into club.class_rule_defaults (id, placeholder, rules) values (true, $1, $2) on conflict (id) do update set placeholder = excluded.placeholder, rules = excluded.rules`, [classRules.placeholder, JSON.stringify(classRules.defaults)]);
       }
       await c.query("commit");
     } catch (e) {

@@ -1,0 +1,14 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). Times are Pacific. These are the house rules for signing up for fitness classes. A single class can override any of them under its own 'rules'. Change a number here and the class screens and rule checks follow.",
+  "defaults": {
+    "signUpDaysAhead": 14,
+    "opensAt": "00:00",
+    "closeMinutesBefore": 30,
+    "cancelCutoffMinutes": 120,
+    "promoteUntilMinutesBefore": 120,
+    "waitlistMax": 10,
+    "maxUpcomingPerMember": 5,
+    "maxPerDayPerMember": 1
+  }
+}

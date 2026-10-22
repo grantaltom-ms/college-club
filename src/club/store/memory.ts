@@ -23,7 +23,7 @@ export class MemoryClubStore implements ClubStore {
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(private newId: () => string = () => crypto.randomUUID()) {
-    this.state = { households: [], members: [], qualifications: structuredClone(QUALIFICATIONS), memberQualifications: [], history: [], items: [], outOfService: [], bookings: [] };
+    this.state = { households: [], members: [], qualifications: structuredClone(QUALIFICATIONS), memberQualifications: [], history: [], items: [], outOfService: [], bookings: [], classes: [], sessions: [], signups: [] };
   }
 
   async read(): Promise<ClubState> {

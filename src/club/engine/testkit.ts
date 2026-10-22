@@ -1,6 +1,7 @@
 import { afterAll, afterEach } from "vitest";
 import { cloneScratchDb, dropTemplate } from "../db/testdb";
 import { QUALIFICATIONS } from "../qualifications";
+import { CLASS_RULES } from "../settings/class-rules";
 import { RULE_BOOK, parseRuleBook } from "../settings/rulebook";
 import raw from "../settings/booking-rules.json";
 import { MemoryClubStore, sequentialIds, type ClubStore } from "../store/memory";
@@ -58,7 +59,7 @@ export async function makeStore(kind: StoreKind, book: RuleBook = RULE_BOOK, new
   const db = await cloneScratchDb(POSTGRES_URL!);
   const pool = createClubPool(db.url, 8);
   const store = new PgClubStore(pool, { newId, now: () => NOW });
-  await store.syncRules(book);
+  await store.syncRules(book, CLASS_RULES);
   databaseUrls.set(store, db.url);
   cleanups.push(async () => {
     await pool.end();
