@@ -11,6 +11,9 @@ import { bookingYearOverYear, fmtInt, headline, multiBooking, yearOverYear } fro
 import { fmtChange, storyLines } from "@/lib/summary";
 import type { DashboardData } from "@/lib/types";
 
+/** The iCrew-based "rarely visit" count the board saw before Oct 22, 2026, when the roster switched to QuickBooks. */
+const ICREW_QUIET_BEFORE = 185;
+
 export default function SummaryPage() {
   const shells = useJson<ShellData>("/api/shells", "The shell figures could not be loaded.");
   const email = useJson<EmailData>("/api/email", "The email figures could not be loaded.");
@@ -29,13 +32,15 @@ interface CardProps {
   detail?: ReactNode;
   /** A second small line under the detail. */
   note?: string;
+  /** Why the number moved after the roster switch, under the note. */
+  rosterChange?: string;
   href: string;
   linkText: string;
   testId: string;
 }
 
 /** One headline number: what it is, how it compares with last year, and where to read more. */
-function StatCard({ area, value, lead, detail, note, href, linkText, testId }: CardProps) {
+function StatCard({ area, value, lead, detail, note, rosterChange, href, linkText, testId }: CardProps) {
   return (
     <section className="stat-card" aria-label={area} data-testid={testId}>
       <h2 className="stat-area">{area}</h2>
@@ -45,6 +50,11 @@ function StatCard({ area, value, lead, detail, note, href, linkText, testId }: C
       {note && (
         <p className="stat-detail" data-testid={`${testId}-note`}>
           {note}
+        </p>
+      )}
+      {rosterChange && (
+        <p className="stat-detail" data-testid={`${testId}-roster-change`}>
+          {rosterChange}
         </p>
       )}
       <p className="stat-target">Board target: not set yet</p>
@@ -122,6 +132,7 @@ function Summary({ data, shells, email }: { data: DashboardData; shells: JsonSta
             lead={`of ${fmtInt(h.total)} members came in less than once a month this year (${h.quietShare}%).`}
             detail={`${fmtInt(h.noVisits)} have not come in at all.`}
             note={h.notStarted > 0 ? `${fmtInt(h.notStarted)} new members haven't started yet (off the waitlist).` : undefined}
+            rosterChange={`Down from ${fmtInt(ICREW_QUIET_BEFORE)} because the count now uses the QuickBooks list of paying members (${fmtInt(h.total)}) instead of the iCrew list. Club usage didn’t improve; the list of who counts as a member changed.`}
             href="/visits"
             linkText="Visits"
           />
