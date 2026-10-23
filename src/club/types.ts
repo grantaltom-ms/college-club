@@ -66,6 +66,7 @@ export const HISTORY_KINDS = [
   "joined",
   "member_added",
   "member_removed",
+  "member_updated",
   "primary_changed",
   "type_changed",
   "qualification_granted",

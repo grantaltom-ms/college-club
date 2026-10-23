@@ -109,6 +109,11 @@ export function HouseholdDesk({ state, household, typed, problem }: { state: Clu
                 <p className="club-meta">Holds every qualification.</p>
               )}
               <p>
+                <Link href={`/club/admin/households/${household.id}/members/${m.id}/edit`} data-testid="edit-link" aria-label={`Change details for ${fullName(m)}`}>
+                  Change name, email or phone&hellip;
+                </Link>
+              </p>
+              <p>
                 <Link href={`/club/admin/households/${household.id}/remove/${m.id}`} data-testid="remove-link" aria-label={`Remove ${fullName(m)} from the household`}>
                   Remove from the household&hellip;
                 </Link>
