@@ -71,6 +71,27 @@ export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<
   await book("Osprey", "Tomas Vandermeer", 2, 8, 1);
   await book("Dock slip A", "Walter Pemberton", 1, 7, 2);
 
+  // Today, for the staff check-in screens. They were booked yesterday so that the engine accepts them, whatever "now" is.
+  // Alex Brooks's and Kenji Tanaka's singles ended this morning with nobody checked in, so they show up as automatic no-shows to look at.
+  // Priya Rao's kayak is under way, Dev Rao's opens for check-in before it starts, and Julien Moreau's is not open yet.
+  // They use members and boats the other sample bookings and the browser tests do not.
+  const yesterday = { actor: SAMPLE_STAFF, now: pacificWall(addDays(today, -1), 12 * 60) };
+  const bookToday = (name: string, booker: string, hour: number, minute: number, minutes: number) =>
+    createBooking(store, RULE_BOOK, yesterday, {
+      itemId: item(name),
+      bookerId: member(booker),
+      startsAt: pacificWall(today, hour * 60 + minute),
+      endsAt: pacificWall(today, hour * 60 + minute + minutes),
+      crewIds: [],
+    });
+  await bookToday("Cormorant", "Alex Brooks", 7, 0, 60);
+  await bookToday("Grebe", "Kenji Tanaka", 8, 0, 60);
+  await bookToday("Mink", "Priya Rao", 12, 0, 120);
+  await bookToday("Beaver", "Dev Rao", 13, 30, 60);
+  await bookToday("Drift", "Julien Moreau", 15, 0, 60);
+  // The club room needs no check-in, so this one that is over this morning is simply finished, never a no-show.
+  await bookToday("Clubhouse room", "Yuki Nakamura", 9, 0, 60);
+
   // Merganser is being repaired, from now until staff return it.
   await takeOutOfService(store, ctx, item("Merganser"), { reason: "Rigger being repaired", expectedReturn: addDays(today, 5) });
 }

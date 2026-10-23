@@ -362,20 +362,6 @@ export async function cancelBooking(
   });
 }
 
-/** Staff record what happened after the start: the member came (completed) or did not (no_show). */
-export async function markAttendance(store: ClubStore, ctx: Ctx, bookingId: string, outcome: "completed" | "no_show"): Promise<Booking> {
-  if (ctx.actor.kind !== "staff") throw new ClubError("forbidden", "Only club staff can record attendance.");
-  return store.transaction(async (s) => {
-    const booking = s.bookings.find((b) => b.id === bookingId);
-    if (!booking) throw new ClubError("not_found", "That booking no longer exists.");
-    if (booking.status !== "upcoming") throw new ClubError("conflict", `That booking is already ${STATUS_WORDS[booking.status]}.`);
-    if (ctx.now.getTime() < Date.parse(booking.startsAt)) throw new ClubError("conflict", "That outing has not started yet.");
-    booking.status = outcome;
-    booking.statusChangedAt = ctx.now.toISOString();
-    return structuredClone(booking);
-  });
-}
-
 /* ---------- Out of service ---------- */
 
 /** Someone staff need to tell when a boat they booked goes out of service. */

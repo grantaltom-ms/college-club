@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ClubError } from "../errors";
 import { addDays, pacificWall } from "../time";
-import { BookingRefused, affectedBookings, cancelBooking, checkBooking, createBooking, markAttendance, outOfServiceAt, returnToService, takeOutOfService } from "./bookings";
-import { NOW, STORE_KINDS, cancelEverything, TODAY, at, bookAs, fixtureFor, memberCtx, refusalMessages, refusedFor, request, staffCtx } from "./testkit";
+import { BookingRefused, affectedBookings, cancelBooking, checkBooking, createBooking, outOfServiceAt, returnToService, takeOutOfService } from "./bookings";
+import { NOW, STORE_KINDS, cancelEverything, TODAY, at, bookAs, fixtureFor, memberCtx, refusalMessages, refusedFor, request, staffCtx, mark } from "./testkit";
 
 describe.each(STORE_KINDS)("on the %s store", (kind) => {
   const fixture = fixtureFor(kind);
@@ -460,8 +460,8 @@ describe.each(STORE_KINDS)("on the %s store", (kind) => {
       const late = await bookAs(f, "Ben", "Loon", at(1, 7), at(1, 8));
       const upcoming = await bookAs(f, "Cy", "Otter", at(1, 7), at(1, 8));
       const after = staffCtx(at(1, 9));
-      await markAttendance(f.store, after, done.booking.id, "completed");
-      await markAttendance(f.store, after, missed.booking.id, "no_show");
+      await mark(f.store, after, "booking", done.booking.id, "attended");
+      await mark(f.store, after, "booking", missed.booking.id, "no_show");
       await cancelBooking(f.store, f.book, memberCtx(f.m.Eli), cancelled.booking.id);
       await cancelBooking(f.store, f.book, memberCtx(f.m.Ben, "Ben", at(1, 6)), late.booking.id);
       const status = Object.fromEntries((await f.store.read()).bookings.map((b) => [b.id, b.status]));
@@ -474,20 +474,39 @@ describe.each(STORE_KINDS)("on the %s store", (kind) => {
       });
     });
 
-    it("is staff only, only after the start, and only from upcoming", async () => {
+    it("is staff only, opens 30 minutes before the start, and refuses a no-show before the start", async () => {
       const f = await fixture();
       const { booking } = await bookAs(f, "Ada", "Heron", at(1, 7), at(1, 8));
-      await expect(markAttendance(f.store, memberCtx(f.m.Ada, "Ada", at(1, 9)), booking.id, "completed")).rejects.toMatchObject({ code: "forbidden" });
-      await expect(markAttendance(f.store, staffCtx(), booking.id, "completed")).rejects.toThrow("has not started yet");
-      await markAttendance(f.store, staffCtx(at(1, 9)), booking.id, "no_show");
-      await expect(markAttendance(f.store, staffCtx(at(1, 9)), booking.id, "completed")).rejects.toThrow("already marked as a no-show");
-      await expect(markAttendance(f.store, staffCtx(at(1, 9)), "nope", "completed")).rejects.toMatchObject({ code: "not_found" });
+      await expect(mark(f.store, memberCtx(f.m.Ada, "Ada", at(1, 9)), "booking", booking.id, "attended")).rejects.toMatchObject({ code: "forbidden" });
+      await expect(mark(f.store, staffCtx(), "booking", booking.id, "attended")).rejects.toThrow("Check-in for Heron opens at 6:30 am, 30 minutes before the start.");
+      await expect(mark(f.store, staffCtx(at(1, 6, 45)), "booking", booking.id, "no_show")).rejects.toThrow("has not started yet, so it cannot be a no-show");
+      await expect(mark(f.store, staffCtx(at(1, 9)), "booking", "nope", "attended")).rejects.toMatchObject({ code: "not_found" });
+      await expect(mark(f.store, staffCtx(at(1, 9)), "booking", booking.id, "attended", { memberId: f.m.Dee })).rejects.toThrow("not on this reservation");
+      await mark(f.store, staffCtx(at(1, 6, 45)), "booking", booking.id, "attended");
+      expect((await f.store.read()).bookings.find((b) => b.id === booking.id)!.status).toBe("completed");
+    });
+
+    it("lets staff correct an outcome afterwards, writes every change to the record, and refuses a repeat", async () => {
+      const f = await fixture();
+      const { booking } = await bookAs(f, "Ada", "Heron", at(1, 7), at(1, 8));
+      const first = await mark(f.store, staffCtx(at(1, 9)), "booking", booking.id, "no_show");
+      expect(first).toMatchObject({ outcome: "no_show", previous: null, via: "staff" });
+      await expect(mark(f.store, staffCtx(at(1, 9, 5)), "booking", booking.id, "no_show")).rejects.toThrow("already recorded as a no-show");
+      const fix = await mark(f.store, staffCtx(at(1, 10)), "booking", booking.id, "attended", { note: "iPad was down" });
+      expect(fix).toMatchObject({ outcome: "attended", previous: "no_show", note: "iPad was down" });
+      const state = await f.store.read();
+      expect(state.bookings.find((b) => b.id === booking.id)).toMatchObject({ status: "completed", statusChangedAt: at(1, 10).toISOString() });
+      expect(state.attendance.map((l) => [l.outcome, l.previous])).toEqual([["no_show", null], ["attended", "no_show"]]);
+      // A cancelled booking has nothing to check in.
+      const gone = await bookAs(f, "Dee", "Osprey", at(2, 7), at(2, 8));
+      await cancelBooking(f.store, f.book, memberCtx(f.m.Dee), gone.booking.id);
+      await expect(mark(f.store, staffCtx(at(2, 7)), "booking", gone.booking.id, "attended")).rejects.toThrow("cancelled, so there is nothing to check in");
     });
 
     it("keeps a no-show or completed outing holding the slot and counting toward the day, but not toward holding", async () => {
       const f = await fixture();
       const { booking } = await bookAs(f, "Ada", "Heron", at(1, 7), at(1, 8));
-      await markAttendance(f.store, staffCtx(at(1, 9)), booking.id, "no_show");
+      await mark(f.store, staffCtx(at(1, 9)), "booking", booking.id, "no_show");
       const later = at(1, 9);
       // Same day: still counts toward the one-a-day limit.
       expect(await refusedFor(bookAs(f, "Ada", "Osprey", at(1, 15), at(1, 16), [], undefined, later))).toEqual(["over_daily_limit"]);
@@ -582,7 +601,7 @@ describe.each(STORE_KINDS)("on the %s store", (kind) => {
     const attempts: (() => Promise<unknown>)[] = [
       () => bookAs(f, "Cy", "Heron", at(14, 4, 45), at(14, 7, 45)),
       () => cancelBooking(f.store, f.book, memberCtx(f.m.Dee), "nope"),
-      () => markAttendance(f.store, memberCtx(f.m.Dee), "nope", "completed"),
+      () => mark(f.store, memberCtx(f.m.Dee), "booking", "nope", "attended"),
       () => takeOutOfService(f.store, memberCtx(f.m.Dee), f.i.Heron, { reason: "x" }),
     ];
     for (const a of attempts) {

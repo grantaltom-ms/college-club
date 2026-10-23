@@ -94,6 +94,24 @@ export function bookingFormHref(input: { itemId: string; start: string; minutes?
   return `/club/book/new?${q.toString()}`;
 }
 
+/**
+ * Where a form should send the browser afterwards. Only a path inside the member area is believed, so a crafted form can
+ * never bounce staff to another site. Anything else becomes the fallback.
+ */
+export function backPath(value: string, fallback: string): string {
+  return /^\/club(\/[A-Za-z0-9._~\-\/]*)?(\?[A-Za-z0-9._~\-=&%]*)?$/.test(value) && !value.includes("//") ? value : fallback;
+}
+
+/** What a staff change to a household says when it worked, from `?changed=` on the household page. */
+export const HOUSEHOLD_CHANGES: Record<string, string> = {
+  created: "Household added.",
+  added: "Adult added.",
+  removed: "Adult removed from the household. Their future bookings, class places and event RSVPs were cancelled.",
+  type: "Membership type changed.",
+  granted: "Qualification granted.",
+  ended: "Membership ended. Every adult in the household can no longer book, and their future bookings, class places and event RSVPs were cancelled.",
+};
+
 /** Plain-language messages for the few things a form post can come back with. Never echoes anything from the address. */
 export const NOTICES: Record<string, string> = {
   forbidden: "You are not allowed to do that.",
@@ -103,5 +121,6 @@ export const NOTICES: Record<string, string> = {
   signed_out: "Choose a test member first.",
   duplicate_class: "There is already a class with that name. Pick another name.",
   link: "That link does not work. Ask club staff for a new one.",
+  not_open: "Check-in is not open yet for that. The list below shows when it opens.",
   limit: "The limit cannot go below the number of people already going. Cancel some RSVPs first, or choose a bigger number.",
 };

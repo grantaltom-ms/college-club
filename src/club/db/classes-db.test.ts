@@ -1,7 +1,7 @@
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HISTORY_KINDS, SESSION_STATUSES, SIGNUP_STATUSES } from "../types";
-import { createScratchDb, type ScratchDb } from "./testdb";
+import { createScratchDb, recordOutcome, type ScratchDb } from "./testdb";
 
 /**
  * The class rules the DATABASE enforces by itself, tested against a real Postgres: chairs are never over-filled, a room
@@ -59,7 +59,9 @@ describe.skipIf(!ADMIN_URL)("the class tables", () => {
   const join = (sessionId: string, member: string, status = "enrolled", client: Client = db.client) =>
     client.query(`insert into club.class_signups (session_id, member_id, status, created_by_kind, created_by_label) values ($1, $2, $3, 'member', 'A Member') returning id`, [sessionId, member, status]);
   const setStatus = (id: string, status: string) =>
-    q(
+    status === "attended" || status === "no_show"
+      ? recordOutcome(db.client, "class_signups", id, status)
+      : q(
       `update club.class_signups set status = $2, cancelled_by_kind = case when $2 in ('cancelled','late_cancelled') then 'member' end, cancelled_by_label = case when $2 in ('cancelled','late_cancelled') then 'A Member' end where id = $1`,
       [id, status],
     );
@@ -210,8 +212,10 @@ describe.skipIf(!ADMIN_URL)("the class tables", () => {
       expect(await statusOf(waiting)).toBe("waitlisted");
       expect(await code(setStatus(waiting, "late_cancelled"))).toMatch(/./); // leaving a waiting list is never late
       expect(await code(setStatus(chair, "attended"))).toBeNull();
-      expect(await code(setStatus(chair, "no_show"))).toMatch(/./); // finished is final
-      expect(await code(setStatus(chair, "enrolled"))).toMatch(/./);
+      expect(await code(setStatus(chair, "no_show"))).toBeNull(); // a mistake can be corrected, with a line in the record
+      expect(await code(setStatus(chair, "attended"))).toBeNull();
+      expect(await code(setStatus(chair, "enrolled"))).toMatch(/./); // but never back to a chair
+      expect(await code(setStatus(chair, "cancelled"))).toMatch(/./); // or cancelled
       expect(await statusOf(chair)).toBe("attended");
 
       const left = (await join(s, members[2])).rows[0].id;

@@ -31,6 +31,11 @@ export default async function ClubHome() {
     <section>
       <h1>Households</h1>
       <p className="club-meta">{households.length} test households. Staff see all of them.</p>
+      <p>
+        <Link href="/club/admin/households/new" className="club-button" data-testid="add-household-link">
+          Add a household
+        </Link>
+      </p>
       <ul className="club-cards" aria-label="All households">
         {households.map((h) => {
           const adults = membersOf(state, h.id).filter((m) => m.status === "active").length;

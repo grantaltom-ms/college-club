@@ -78,6 +78,44 @@ function cleanMember(input: NewMember): Pick<Member, "firstName" | "lastName" | 
   };
 }
 
+function problemOf(check: () => void): string | null {
+  try {
+    check();
+    return null;
+  } catch (e) {
+    if (e instanceof ClubError) return e.message;
+    throw e;
+  }
+}
+
+const isRealDay = (day: string) => {
+  const at = new Date(`${day}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === day;
+};
+
+/** What is wrong with a new household's details, in the engine's own words, or null. Changes nothing; the add-household form uses it. */
+export function householdFieldsProblem(input: NewHousehold): string | null {
+  return problemOf(() => {
+    text(input.displayName, "The household name", 120);
+    checkHouseholdFields(input);
+    cleanMember(input.primary);
+    for (const m of input.additional ?? []) cleanMember(m);
+  });
+}
+
+/** What is wrong with a new adult's details, or null. */
+export function memberFieldsProblem(input: NewMember): string | null {
+  return problemOf(() => {
+    cleanMember(input);
+  });
+}
+
+function checkHouseholdFields(input: Pick<NewHousehold, "membershipType" | "joinedOn">) {
+  if (!(MEMBERSHIP_TYPES as readonly string[]).includes(input.membershipType)) throw new ClubError("invalid", "Choose Resident, Intermediate or Non-Resident.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.joinedOn)) throw new ClubError("invalid", "The join date must look like 2026-10-22.");
+  if (!isRealDay(input.joinedOn)) throw new ClubError("invalid", "That join date is not a real date.");
+}
+
 function log(
   s: ClubState,
   newId: () => string,
@@ -119,8 +157,7 @@ function activeHousehold(s: ClubState, id: string): Household {
 /** A household joins: one record for the household and one for each adult, with a "joined" line in its file. */
 export async function createHousehold(store: ClubStore, ctx: Ctx, input: NewHousehold): Promise<{ household: Household; members: Member[] }> {
   requireStaff(ctx.actor);
-  if (!(MEMBERSHIP_TYPES as readonly string[]).includes(input.membershipType)) throw new ClubError("invalid", "Choose Resident, Intermediate or Non-Resident.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.joinedOn)) throw new ClubError("invalid", "The join date must look like 2026-10-22.");
+  checkHouseholdFields(input);
   return store.transaction(async (s, newId) => {
     const household: Household = {
       id: newId(),

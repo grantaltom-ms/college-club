@@ -3,6 +3,10 @@ import { assertNotHosted } from "../db/guard";
 import { ClubError } from "../errors";
 import type {
   Actor,
+  AttendanceEntry,
+  AttendanceKind,
+  AttendanceOutcome,
+  AttendanceVia,
   Booking,
   BookingStatus,
   ClassRules,
@@ -33,7 +37,7 @@ import type {
   RsvpStatus,
   RsvpVia,
 } from "../types";
-import type { ClubStore } from "./memory";
+import type { ClubStore, Settler } from "./memory";
 
 /**
  * The club's records in Postgres, behind the same `ClubStore` the in-memory copy uses, so the rules engine does
@@ -60,6 +64,8 @@ export interface PgStoreOptions {
   historyDays?: number;
   /** The store's idea of "now", used only to decide how far back to load. */
   now?: () => Date;
+  /** Applied to what readers see and, inside every change, to the working copy (see Settler). */
+  settle?: Settler;
 }
 
 /** A connection pool for the club database. Refuses hosted Supabase addresses. Dates come back as plain YYYY-MM-DD text. */
@@ -90,6 +96,7 @@ interface SessionRow { id: string; class_id: string; room_item_id: string | null
 interface SignUpRow { id: string; session_id: string; member_id: string; status: SignUpStatus; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface EventRow { id: string; title: string; description: string; location: string; starts_at: Date; ends_at: Date; capacity: number | null; price_cents: number | null; reply_by: Date | null; status: ClubEvent["status"]; created_at: Date; created_by_kind: string; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface RsvpRow { id: string; event_id: string; member_id: string; guests: number; status: RsvpStatus; price_cents: number | null; via: RsvpVia; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; hold_until: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
+interface AttendanceRow { id: string; kind: AttendanceKind; booking_id: string | null; signup_id: string | null; rsvp_id: string | null; member_id: string; at: Date; outcome: AttendanceOutcome; previous_outcome: AttendanceOutcome | null; by_kind: string; by_id: string | null; by_label: string; via: AttendanceVia; note: string | null }
 interface CrewRow { booking_id: string; member_id: string; position: number; removed_at: Date | null; removed_reason: string | null }
 
 const iso = (d: Date | string) => new Date(d).toISOString();
@@ -251,6 +258,19 @@ const toRsvp = (r: RsvpRow): Rsvp => ({
   cancelReason: r.cancel_reason,
 });
 
+const toAttendance = (r: AttendanceRow): AttendanceEntry => ({
+  id: r.id,
+  kind: r.kind,
+  recordId: (r.booking_id ?? r.signup_id ?? r.rsvp_id)!,
+  memberId: r.member_id,
+  at: iso(r.at),
+  outcome: r.outcome,
+  previous: r.previous_outcome,
+  by: actorFrom(r.by_kind, r.by_id, r.by_label),
+  via: r.via,
+  note: r.note,
+});
+
 /* ---------- Loading ---------- */
 
 type Queryable = Pick<PoolClient, "query">;
@@ -306,6 +326,15 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
              from club.event_rsvps where event_id = any($1) order by seq`,
           [eventRows.map((x) => x.id)],
         );
+  const attendanceRows =
+    bookingRows.length + signUpRows.length + rsvpRows.length === 0
+      ? []
+      : await rows<AttendanceRow>(
+          c,
+          `select id, kind, booking_id, signup_id, rsvp_id, member_id, at, outcome, previous_outcome, by_kind, by_id, by_label, via, note
+             from club.attendance_log where booking_id = any($1) or signup_id = any($2) or rsvp_id = any($3) order by seq`,
+          [bookingRows.map((x) => x.id), signUpRows.map((x) => x.id), rsvpRows.map((x) => x.id)],
+        );
   const crew = bookingRows.length === 0 ? [] : await rows<CrewRow>(c, `select booking_id, member_id, position, removed_at, removed_reason from club.booking_crew where booking_id = any($1)`, [bookingRows.map((b) => b.id)]);
   return {
     households: households.map(toHousehold),
@@ -321,6 +350,7 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
     signups: signUpRows.map(toSignUp),
     events: eventRows.map(toEvent),
     rsvps: rsvpRows.map(toRsvp),
+    attendance: attendanceRows.map(toAttendance),
   };
 }
 
@@ -487,6 +517,16 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
     );
   }
   for (const r of rr.updated.filter((x) => !givesUpPlaces(x))) await updateRsvp(r);
+
+  // The check-in record is only ever added to. It goes last, because each line points at a record saved above.
+  const al = compare("check-in lines", before.attendance, after.attendance);
+  if (al.updated.length > 0) throw new Error("The check-in record can only be added to, never changed.");
+  for (const l of al.added) {
+    await run(
+      `insert into club.attendance_log (id, kind, booking_id, signup_id, rsvp_id, member_id, at, outcome, previous_outcome, by_kind, by_id, by_label, via, note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [l.id, l.kind, l.kind === "booking" ? l.recordId : null, l.kind === "class" ? l.recordId : null, l.kind === "event" ? l.recordId : null, l.memberId, l.at, l.outcome, l.previous, l.by.kind, actorId(l.by), l.by.label, l.via, l.note],
+    );
+  }
 }
 
 /** A database refusal turned into the plain sentence a member can act on. Anything else passes through. */
@@ -510,6 +550,7 @@ export class PgClubStore implements ClubStore {
   private newId: () => string;
   private historyDays: number;
   private clock: () => Date;
+  private settle: Settler | undefined;
 
   constructor(
     private pool: Pool,
@@ -518,6 +559,7 @@ export class PgClubStore implements ClubStore {
     this.newId = options.newId ?? (() => crypto.randomUUID());
     this.historyDays = options.historyDays ?? DEFAULT_HISTORY_DAYS;
     this.clock = options.now ?? (() => new Date());
+    this.settle = options.settle;
   }
 
   private since(): Date {
@@ -531,6 +573,8 @@ export class PgClubStore implements ClubStore {
       await c.query("begin isolation level repeatable read read only");
       const state = await loadState(c, this.since());
       await c.query("commit");
+      // Readers see the settled club, but nothing is saved by looking.
+      this.settle?.(state, () => crypto.randomUUID());
       return state;
     } catch (e) {
       await c.query("rollback").catch(() => undefined);
@@ -548,8 +592,14 @@ export class PgClubStore implements ClubStore {
       await c.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [WRITERS_LOCK]);
       const before = await loadState(c, this.since());
       const draft = structuredClone(before);
+      this.settle?.(draft, this.newId);
+      // What settling did is saved as a step of its own, before the change itself: a booking that ran out of time
+      // (upcoming to no-show) and was then put right by staff (no-show to attended) is two steps with a line each,
+      // and the database checks every step against its line.
+      const settled = structuredClone(draft);
       const result = await fn(draft, this.newId);
-      await save(c, before, draft);
+      await save(c, before, settled);
+      await save(c, settled, draft);
       await c.query("commit");
       return result;
     } catch (e) {
@@ -615,7 +665,7 @@ export class PgClubStore implements ClubStore {
 
   /** A second view of the same database with its own ID source (the sample club wants fixed IDs while it is seeded). */
   withIds(newId: () => string): PgClubStore {
-    return new PgClubStore(this.pool, { newId, historyDays: this.historyDays, now: this.clock });
+    return new PgClubStore(this.pool, { newId, historyDays: this.historyDays, now: this.clock, settle: this.settle });
   }
 
   async close(): Promise<void> {

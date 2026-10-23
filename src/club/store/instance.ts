@@ -1,6 +1,8 @@
 import { clubNow } from "../clock";
+import { attendanceSettler } from "../engine/attendance";
 import { clubEnabled } from "../enabled";
 import { buildSampleStore, seedSample } from "../sample/club";
+import { ATTENDANCE_RULES } from "../settings/attendance-rules";
 import { CLASS_RULES } from "../settings/class-rules";
 import { EVENT_RULES } from "../settings/event-rules";
 import { RULE_BOOK } from "../settings/rulebook";
@@ -9,12 +11,15 @@ import { PgClubStore, createClubPool } from "./postgres";
 
 const g = globalThis as unknown as { __ccsClubStore?: Promise<ClubStore> };
 
+/** Boat and space bookings and class chairs that nobody checked in for become no-shows when their time has run out. */
+const settle = attendanceSettler(ATTENDANCE_RULES, clubNow);
+
 /**
  * Opens the Postgres store: the rule tables are brought in line with the rules file, and the invented sample club
  * is loaded if (and only if) sample data is allowed and the database holds no households yet.
  */
 async function openPostgres(url: string): Promise<ClubStore> {
-  const store = new PgClubStore(createClubPool(url), { now: clubNow });
+  const store = new PgClubStore(createClubPool(url), { now: clubNow, settle });
   await store.syncRules(RULE_BOOK, CLASS_RULES, EVENT_RULES);
   if (process.env.CCS_ALLOW_SAMPLE_DATA === "1") {
     // Fixed IDs while seeding, so the sample's addresses read the same as the in-memory sample's.
@@ -32,7 +37,7 @@ export function getClubStore(): Promise<ClubStore> {
   if (!clubEnabled()) throw new Error("The member area is switched off.");
   const url = process.env.CLUB_DATABASE_URL;
   if (!g.__ccsClubStore) {
-    const opening = url ? openPostgres(url) : buildSampleStore();
+    const opening = url ? openPostgres(url) : buildSampleStore(undefined, undefined, { settle });
     // If opening fails (the database is down, or the address is refused), do not remember the failure: try again next time.
     opening.catch(() => {
       if (g.__ccsClubStore === opening) delete g.__ccsClubStore;

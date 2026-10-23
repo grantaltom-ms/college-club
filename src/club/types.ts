@@ -385,6 +385,55 @@ export interface Rsvp {
   cancelReason: string | null;
 }
 
+/* ---------- Check-ins and attendance (step 5) ---------- */
+
+/** The house rules for checking in. Every value lives in settings/attendance-rules.json, never in code. */
+export interface AttendanceRuleValues {
+  /** Someone can be checked in from this many minutes before the start. */
+  checkInOpensMinutesBefore: number;
+  /** A boat or space booking, or a class chair, that nobody checked in for becomes a no-show this many minutes after it ends. */
+  noShowAfterEndMinutes: number;
+  /** Kinds of booking that need no check-in at all (the club room, work-from-club): never a no-show, never on the check-in lists. */
+  checkInNotNeededFor: BookingType[];
+}
+
+export interface AttendanceRules {
+  /** True while the numbers are placeholders. Shown on screen. */
+  placeholder: boolean;
+  defaults: AttendanceRuleValues;
+}
+
+/** What an attendance line is about: a boat or space booking, a class sign-up, or an event RSVP. */
+export const ATTENDANCE_KINDS = ["booking", "class", "event"] as const;
+export type AttendanceKind = (typeof ATTENDANCE_KINDS)[number];
+
+/** Came, or did not. (On a booking the stored status for "attended" is `completed`.) */
+export const ATTENDANCE_OUTCOMES = ["attended", "no_show"] as const;
+export type AttendanceOutcome = (typeof ATTENDANCE_OUTCOMES)[number];
+
+/** How it was recorded: by staff at the front desk, by the system when the time ran out, or (a later step) by the member on the iPad. */
+export const ATTENDANCE_VIA = ["staff", "automatic", "ipad"] as const;
+export type AttendanceVia = (typeof ATTENDANCE_VIA)[number];
+
+/** One line in the check-in record. Lines are only ever added, never changed or removed; a correction is a new line. */
+export interface AttendanceEntry {
+  id: string;
+  kind: AttendanceKind;
+  /** The booking, class sign-up or RSVP this is about. */
+  recordId: string;
+  /** Who was checked in, or missed. On a boat or space outing: the booker, unless staff named one of the crew. */
+  memberId: string;
+  /** ISO instant the line was written. */
+  at: string;
+  outcome: AttendanceOutcome;
+  /** What it said before this line, or null the first time. */
+  previous: AttendanceOutcome | null;
+  by: Actor;
+  via: AttendanceVia;
+  /** Why, in staff's words. Optional. */
+  note: string | null;
+}
+
 export interface ClubState {
   households: Household[];
   members: Member[];
@@ -399,4 +448,5 @@ export interface ClubState {
   signups: SignUp[];
   events: ClubEvent[];
   rsvps: Rsvp[];
+  attendance: AttendanceEntry[];
 }

@@ -14,6 +14,9 @@ import { formatDayLong, formatRange, pacificDate } from "@/club/time";
 import { idParam, NOTICES } from "@/club/web";
 import { ClassPlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
+import { rowFor } from "@/club/engine/attendance";
+import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
+import { AttendanceButtons } from "../../AttendanceButtons";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
@@ -181,17 +184,10 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
               {view.sheet.map((line) => (
                 <li key={line.signUpId} data-testid="sheet-line" data-status={line.status}>
                   {line.name} · {line.status === "waitlisted" ? `waiting, ${ordinal(line.place ?? 1)} in line` : line.status.replace("_", " ")}
-                  {line.status === "enrolled" && started && session.status === "scheduled" && (
-                    <form method="post" action="/api/club/classes/attendance" style={{ display: "inline" }}>
-                      <input type="hidden" name="id" value={line.signUpId} />
-                      <button type="submit" name="outcome" value="attended" className="club-button club-button-quiet" aria-label={`Mark ${line.name} attended`}>
-                        Attended
-                      </button>{" "}
-                      <button type="submit" name="outcome" value="no_show" className="club-button club-button-quiet" aria-label={`Mark ${line.name} no-show`}>
-                        No-show
-                      </button>
-                    </form>
-                  )}
+                  {(() => {
+                    const row = rowFor(state, "class", line.signUpId, now, ATTENDANCE_RULES);
+                    return row ? <AttendanceButtons row={row} who={line.name ?? "this person"} back={`/club/classes/${session.id}`} /> : null;
+                  })()}
                 </li>
               ))}
             </ul>

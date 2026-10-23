@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { bookingLedger, cancelBooking, markAttendance } from "./bookings";
+import { bookingLedger, cancelBooking } from "./bookings";
 import { endHousehold, removeMember, type BookingLedger } from "./households";
 import { historyOf } from "./queries";
-import { NOW, STORE_KINDS, at, bookAs, fixtureFor, memberCtx, refusalMessages, refusedFor, staffCtx } from "./testkit";
+import { NOW, STORE_KINDS, at, bookAs, fixtureFor, memberCtx, refusalMessages, refusedFor, staffCtx, mark } from "./testkit";
 
 describe.each(STORE_KINDS)("on the %s store", (kind) => {
   const fixture = fixtureFor(kind);
@@ -14,7 +14,7 @@ describe.each(STORE_KINDS)("on the %s store", (kind) => {
     const future2 = await bookAs(f, "Ada", "Osprey", at(2, 7), at(2, 8));
     // A finished outing, booked back when it was still ahead and marked completed afterwards.
     const past = await bookAs(f, "Ben", "Heron", at(-2, 7), at(-2, 8), [], undefined, at(-3, 12));
-    await markAttendance(f.store, staffCtx(at(-2, 9)), past.booking.id, "completed");
+    await mark(f.store, staffCtx(at(-2, 9)), "booking", past.booking.id, "attended");
     // An outing that started an hour ago.
     const inProgress = await bookAs(f, "Ben", "Kingfisher", at(0, 12), at(0, 13, 30), [], undefined, at(0, 9));
     // Ben is crew on Eli's double, and Eli's own single is nothing to do with the Quills.

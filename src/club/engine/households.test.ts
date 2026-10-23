@@ -9,6 +9,8 @@ import {
   createHousehold,
   endHousehold,
   grantQualification,
+  householdFieldsProblem,
+  memberFieldsProblem,
   removeMember,
   type BookingLedger,
   type Ctx,
@@ -76,8 +78,22 @@ describe.each(STORE_KINDS)("on the %s store", (kind) => {
       await expect(createHousehold(store, ctx(), { ...base, primary: { ...ada, email: "nope" } })).rejects.toThrow('"nope" does not look like an email address.');
       await expect(createHousehold(store, ctx(), { ...base, joinedOn: "Jan 1" })).rejects.toThrow("The join date must look like 2026-10-22.");
       await expect(createHousehold(store, ctx(), { ...base, membershipType: "Gold" as never })).rejects.toThrow("Choose Resident, Intermediate or Non-Resident.");
+      await expect(createHousehold(store, ctx(), { ...base, joinedOn: "2026-02-31" })).rejects.toThrow("That join date is not a real date.");
+      await expect(createHousehold(store, ctx(), { ...base, additional: [{ ...ben, firstName: " " }] })).rejects.toThrow("First name is required.");
       // Nothing half-made is left behind after a refusal.
       expect((await store.read()).households).toHaveLength(0);
+    });
+
+    it("explains the same mistakes without changing anything, for a form to show before it saves", () => {
+      const base = { displayName: "The X household", membershipType: "Resident" as const, joinedOn: "2026-01-01", primary: ada };
+      expect(householdFieldsProblem(base)).toBeNull();
+      expect(householdFieldsProblem({ ...base, displayName: "" })).toBe("The household name is required.");
+      expect(householdFieldsProblem({ ...base, joinedOn: "2026-13-01" })).toBe("That join date is not a real date.");
+      expect(householdFieldsProblem({ ...base, joinedOn: "Jan 1" })).toBe("The join date must look like 2026-10-22.");
+      expect(householdFieldsProblem({ ...base, primary: { ...ada, email: "nope" } })).toBe('"nope" does not look like an email address.');
+      expect(householdFieldsProblem({ ...base, additional: [{ ...ben, lastName: "x".repeat(81) }] })).toBe("Last name must be 80 characters or fewer.");
+      expect(memberFieldsProblem(ben)).toBeNull();
+      expect(memberFieldsProblem({ ...ben, email: "" })).toBe("Email is required.");
     });
 
     it("is staff only", async () => {

@@ -9,7 +9,6 @@ import {
   checkSignUp,
   createClass,
   leaveClass,
-  markClassAttendance,
   scheduleSessions,
   sessionView,
   setCapacity,
@@ -19,7 +18,7 @@ import {
 import { endHousehold, removeMember } from "./households";
 import { clubLedger } from "./ledger";
 import { historyOf } from "./queries";
-import { NOW, STORE_KINDS, addMembers, at, bookAs, fixtureFor, memberCtx, refusalMessages, refusedFor, request, staffCtx, type Fixture } from "./testkit";
+import { NOW, STORE_KINDS, addMembers, at, bookAs, fixtureFor, memberCtx, refusalMessages, refusedFor, request, staffCtx, mark, type Fixture } from "./testkit";
 
 /** The invented club from the booking tests, plus a gym, a room and one class ("Yoga", 3 chairs, 60 minutes, in the gym). */
 async function classClub(kind: (typeof STORE_KINDS)[number]) {
@@ -536,11 +535,16 @@ describe.each(STORE_KINDS)("classes on the %s store", (kind) => {
       const [s] = await schedule(f, { classId: yoga.id, startsAt: at(1, 9), capacity: 1 });
       const ada = await join(f, "Ada", s.id);
       const ben = await join(f, "Ben", s.id);
-      await expect(markClassAttendance(f.store, staffCtx(at(1, 8)), ada.signUp.id, "attended")).rejects.toThrow("That class has not started yet.");
-      await expect(markClassAttendance(f.store, memberCtx(f.m.Ada, "Ada", at(1, 9, 30)), ada.signUp.id, "attended")).rejects.toMatchObject({ code: "forbidden" });
-      await expect(markClassAttendance(f.store, staffCtx(at(1, 9, 30)), ben.signUp.id, "attended")).rejects.toThrow(/only be recorded for someone with a chair/);
-      expect(await markClassAttendance(f.store, staffCtx(at(1, 9, 30)), ada.signUp.id, "attended")).toMatchObject({ status: "attended" });
-      await expect(markClassAttendance(f.store, staffCtx(at(1, 9, 31)), ada.signUp.id, "no_show")).rejects.toThrow(/is attended/);
+      await expect(mark(f.store, staffCtx(at(1, 8)), "class", ada.signUp.id, "attended")).rejects.toThrow("opens at 8:30 am, 30 minutes before the start");
+      await expect(mark(f.store, staffCtx(at(1, 8, 45)), "class", ada.signUp.id, "no_show")).rejects.toThrow("has not started yet, so it cannot be a no-show");
+      await expect(mark(f.store, memberCtx(f.m.Ada, "Ada", at(1, 9, 30)), "class", ada.signUp.id, "attended")).rejects.toMatchObject({ code: "forbidden" });
+      await expect(mark(f.store, staffCtx(at(1, 9, 30)), "class", ben.signUp.id, "attended")).rejects.toThrow(/waiting list without a chair/);
+      expect(await mark(f.store, staffCtx(at(1, 9, 30)), "class", ada.signUp.id, "attended")).toMatchObject({ outcome: "attended", previous: null, via: "staff" });
+      expect((await f.store.read()).signups.find((g) => g.id === ada.signUp.id)!.status).toBe("attended");
+      // A mistake can be put right, and the correction is a new line, not an erased one.
+      expect(await mark(f.store, staffCtx(at(1, 9, 31)), "class", ada.signUp.id, "no_show")).toMatchObject({ outcome: "no_show", previous: "attended" });
+      expect((await f.store.read()).signups.find((g) => g.id === ada.signUp.id)!.status).toBe("no_show");
+      await expect(mark(f.store, staffCtx(at(1, 9, 32)), "class", ada.signUp.id, "no_show")).rejects.toThrow("already recorded as a no-show");
     });
   });
 
@@ -570,7 +574,7 @@ describe.each(STORE_KINDS)("classes on the %s store", (kind) => {
       const [underWay] = await schedule(f, { classId: yoga.id, startsAt: at(0, 12) }, at(-1, 12));
       await join(f, "Ada", past.id, at(-3, 9));
       await join(f, "Ada", underWay.id, at(0, 9));
-      await markClassAttendance(f.store, staffCtx(at(-2, 10)), (await lineOf(f, "Ada", past.id))[0].id, "attended");
+      await mark(f.store, staffCtx(at(-2, 10)), "class", (await lineOf(f, "Ada", past.id))[0].id, "attended");
       const before = (await f.store.read()).signups;
       await endHousehold(f.store, clubLedger, staffCtx(), f.h.Quill);
       expect((await f.store.read()).signups).toEqual(before);
