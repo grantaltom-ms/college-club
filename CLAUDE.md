@@ -51,7 +51,7 @@ Answers Grant gave to the Phase 1 plan (Oct 22, 2026):
 9. QuickBooks CSV export
 10. iCrew history import and cutover tools
 
-**Phase 1 was steps 1 and 2.** Grant then asked for the Postgres store and step 3 (Oct 22, "Postgres Store then Step 3"). Grant then asked for step 4 (events and RSVPs) on Oct 23. Grant then asked for step 5 (the staff office) on Oct 23. Grant then asked for member check-in (the iPad and the phone) on Oct 23. Grant then asked for step 6 (real logins) on Oct 23. Grant then asked for editing a person's details on Oct 23 (open question AK). Do not build steps 7 to 10 until Grant says so. Where a Phase 1 choice affects them, leave room for it and say so. Finish step 1, open a pull request, and wait for Grant's review before starting step 2.
+**Phase 1 was steps 1 and 2.** Grant then asked for the Postgres store and step 3 (Oct 22, "Postgres Store then Step 3"). Grant then asked for step 4 (events and RSVPs) on Oct 23. Grant then asked for step 5 (the staff office) on Oct 23. Grant then asked for member check-in (the iPad and the phone) on Oct 23. Grant then asked for step 6 (real logins) on Oct 23. Grant then asked for editing a person's details on Oct 23 (open question AK; built and merged as PR 20). Grant then asked for "the next step" and chose **step 8 (public website pages)** over step 7 on Oct 23 (see "Step 8" below). Do not build steps 7, 9 or 10 until Grant says so. Where a Phase 1 choice affects them, leave room for it and say so. Finish step 1, open a pull request, and wait for Grant's review before starting step 2.
 
 ## The dashboard next door (do not touch)
 
@@ -271,6 +271,12 @@ The building comparison: the front desk correcting a name or phone number on a l
 - **Screens.** On each household's page (staff only) every adult has "Change name, email or phone..." which opens `/club/admin/households/[id]/members/[memberId]/edit`: a form with what is on file, a note that a change of email signs the person out of every device, and the engine's own words when something is wrong (the form comes back with what was typed). The handler is `/api/club/households/update-member` (`startPost`, so staff only and "not found" on the live site). After saving, the household page says what happened ("Details saved...", and, for an email change, that the person was signed out of every device). The staff-only tools and the file are the only places any of this shows.
 - **Not built, on purpose:** members editing their own details (question AO); asking the old address to confirm a change; telling the person by email that their address changed (there is no real sender yet); editing the household name, membership type or join date (the type already has its own tool); "sign out everywhere" without an email change (question AM).
 
+## Step 8: public website pages (in progress, started Oct 23)
+
+Grant's answers (Oct 23): the public pages live **under `/site`**, hidden on the live site exactly like `/club` (visible on previews, in development and in CI; "page not found" on production), so every dashboard link stays exactly as it is and nothing public goes live before cutover. At cutover (open question D) Grant and the board decide where the dashboard moves and the public site takes the home address. The **words are carried over from the current Wix site**, read as a visitor reads it (public pages only, no Wix account access, no changes to Wix), once Grant has confirmed the site's web address. Pages: **Home, About, Membership, Contact, Rowing and fitness programs, and a Sign in link** in the header that goes to the existing `/club/sign-in`. **No forms** yet: contact details only (no real email sender exists, and a public form would collect strangers' details with nowhere safe to send them). Not chosen, so not built: a public events list (it would need a "show to the public" choice on each event).
+
+Grant's answers to the step 7 plan, given in the same round and **parked for when step 7 starts**: the real roster comes from the **QuickBooks customer list**; the import works as **upload, preview, then confirm** (nothing saved until staff press confirm, every problem explained in words); and it is **built and tested with invented files only**, with the real import done later at switch-on by staff after the email sender, the staff list and `CLUB_SITE_URL` are settled (AI, AN). QuickBooks customers are households, usually without individual adults or emails, so step 7 will need a way to add the adults (a second column set, or adding them in the household desk afterwards): ask Grant when it starts.
+
 ## Testing (required; nothing is done until all of this passes)
 
 CI runs on every push and pull request: install, lint, type check, unit tests, build, browser tests.
@@ -446,3 +452,8 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
 - **Checks at the end:** see the pull request.
 - **Next:** Grant reviews. Step 7 (importing real members) only if Grant says so, and not before the real email sender, the staff list and `CLUB_SITE_URL` are settled (AI, AN).
 - **Blocked / needs Grant:** `CCS_ALLOW_SAMPLE_DATA=1` in Vercel **Preview** only, so preview links show the invented club; branch protection on `main`; the real email sender and who owns the account (AI, E); rule numbers for boats, classes, events, check-in and login; real qualification names.
+
+### Oct 23, 2026 (night): step 8 started, public website pages
+- **Asked by Grant:** "Do the next step". The question round showed Grant meant **step 8** (not step 7). Answers recorded under "Step 8" above (and the parked step 7 answers).
+- **Preview link:** after merging PR 20 Grant added `CCS_ALLOW_SAMPLE_DATA=1` for Preview in Vercel. A Vercel setting only applies to builds made after it is saved, so the preview built just before showed "not found"; a fresh build is needed (any push, or Redeploy in Vercel).
+- **Next:** confirm the Wix site's web address with Grant, read its public pages, build `/site`.
