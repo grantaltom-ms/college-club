@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BOOKING_STATUSES, BOOKING_TYPES, HISTORY_KINDS } from "../types";
 import raw from "../settings/booking-rules.json";
 import { SAMPLE_ITEMS } from "../sample/equipment";
-import { createScratchDb, type ScratchDb } from "./testdb";
+import { createScratchDb, recordOutcome, type ScratchDb } from "./testdb";
 
 /**
  * The booking rules the DATABASE enforces by itself, tested against a real Postgres. The headline: two members
@@ -91,8 +91,8 @@ describe.skipIf(!ADMIN_URL)("the booking tables", () => {
       const item = await freshItem();
       const a = (await book({ item, start: T(10), end: T(11) })).rows[0].id;
       const b = (await book({ item, start: T(11), end: T(12) })).rows[0].id;
-      await q(`update club.bookings set status = 'completed' where id = $1`, [a]);
-      await q(`update club.bookings set status = 'no_show' where id = $1`, [b]);
+      await recordOutcome(db.client, "bookings", a, "completed");
+      await recordOutcome(db.client, "bookings", b, "no_show");
       expect(await code(book({ item, booker: members[1], start: T(10, 30), end: T(11, 30) }))).toBe(EXCLUSION_VIOLATION);
       expect(await code(book({ item, booker: members[1], start: T(11), end: T(11, 30) }))).toBe(EXCLUSION_VIOLATION);
     });
@@ -199,9 +199,12 @@ describe.skipIf(!ADMIN_URL)("the booking tables", () => {
       await expect(q(`update club.bookings set starts_at = $2, ends_at = $3 where id = $1`, [id, T(16), T(17)])).rejects.toThrow("cannot be moved or handed over");
       await expect(q(`update club.bookings set booker_id = $2 where id = $1`, [id, members[1]])).rejects.toThrow("cannot be moved or handed over");
       await expect(q(`update club.bookings set item_id = $2 where id = $1`, [id, items.Osprey])).rejects.toThrow("cannot be moved or handed over");
-      await q(`update club.bookings set status = 'completed' where id = $1`, [id]);
+      await recordOutcome(db.client, "bookings", id, "completed");
+      // An outcome can be corrected between completed and no-show (with its line in the record), but is otherwise final.
       await expect(q(`update club.bookings set status = 'upcoming' where id = $1`, [id])).rejects.toThrow("already completed cannot change again");
-      await expect(q(`update club.bookings set status = 'no_show' where id = $1`, [id])).rejects.toThrow("already completed cannot change again");
+      await expect(q(`update club.bookings set status = 'cancelled', cancelled_by_kind = 'staff', cancelled_by_label = 'x' where id = $1`, [id])).rejects.toThrow("already completed cannot change again");
+      await recordOutcome(db.client, "bookings", id, "no_show");
+      await recordOutcome(db.client, "bookings", id, "completed");
     });
 
     it("is never lost by deleting the boat or the member", async () => {

@@ -16,6 +16,9 @@ import { clockValue, idParam, intParam, NOTICES } from "@/club/web";
 import { EventPlaceholderNote } from "../../PlaceholderNote";
 import { PartyStepper } from "../../PartyStepper";
 import { SignedOut } from "../../SignedOut";
+import { rowFor } from "@/club/engine/attendance";
+import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
+import { AttendanceButtons } from "../../AttendanceButtons";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
@@ -234,17 +237,10 @@ export default async function EventPage({ params, searchParams }: { params: Prom
                   {line.name}
                   {line.guests > 0 ? ` · party of ${1 + line.guests}` : ""} · {line.status === "waitlisted" ? `waitlist, ${ordinal(line.place ?? 1)} in line${line.holdUntil ? `, held until ${formatClock(line.holdUntil)}` : ""}` : line.status.replace("_", " ")}
                   {line.via === "email_link" ? " · from an email link" : ""}
-                  {line.status === "going" && started && event.status === "scheduled" && (
-                    <form method="post" action="/api/club/events/attendance" style={{ display: "inline" }}>
-                      <input type="hidden" name="id" value={line.rsvpId} />{" "}
-                      <button type="submit" name="outcome" value="attended" className="club-button club-button-quiet" aria-label={`Mark ${line.name} attended`}>
-                        Attended
-                      </button>{" "}
-                      <button type="submit" name="outcome" value="no_show" className="club-button club-button-quiet" aria-label={`Mark ${line.name} no-show`}>
-                        No-show
-                      </button>
-                    </form>
-                  )}
+                  {(() => {
+                    const row = rowFor(state, "event", line.rsvpId, now, ATTENDANCE_RULES);
+                    return row ? <AttendanceButtons row={row} who={line.name ?? "this person"} back={`/club/events/${event.id}`} /> : null;
+                  })()}
                 </li>
               ))}
             </ul>

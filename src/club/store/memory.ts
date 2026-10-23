@@ -12,6 +12,17 @@ export interface ClubStore {
   transaction<T>(fn: (state: ClubState, newId: () => string) => Promise<T>): Promise<T>;
 }
 
+/**
+ * Brings a copy of the club up to date with the clock before anyone reads or changes it (today: boat and space bookings and
+ * class chairs that nobody checked in for become no-shows once their time has run out). A store given one applies it to
+ * what readers see and, inside every change, to the working copy, so it is saved along with the change.
+ */
+export type Settler = (state: ClubState, newId: () => string) => void;
+
+export interface MemoryStoreOptions {
+  settle?: Settler;
+}
+
 /** Permanent IDs that read the same on every start, so sample households keep their addresses. */
 export function sequentialIds(): () => string {
   let n = 0;
@@ -22,18 +33,25 @@ export class MemoryClubStore implements ClubStore {
   private state: ClubState;
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(private newId: () => string = () => crypto.randomUUID()) {
-    this.state = { households: [], members: [], qualifications: structuredClone(QUALIFICATIONS), memberQualifications: [], history: [], items: [], outOfService: [], bookings: [], classes: [], sessions: [], signups: [], events: [], rsvps: [] };
+  constructor(
+    private newId: () => string = () => crypto.randomUUID(),
+    private options: MemoryStoreOptions = {},
+  ) {
+    this.state = { households: [], members: [], qualifications: structuredClone(QUALIFICATIONS), memberQualifications: [], history: [], items: [], outOfService: [], bookings: [], classes: [], sessions: [], signups: [], events: [], rsvps: [], attendance: [] };
   }
 
   async read(): Promise<ClubState> {
     await this.queue;
-    return structuredClone(this.state);
+    const snapshot = structuredClone(this.state);
+    // Readers see the settled club, but nothing is saved by looking.
+    this.options.settle?.(snapshot, () => crypto.randomUUID());
+    return snapshot;
   }
 
   transaction<T>(fn: (state: ClubState, newId: () => string) => Promise<T>): Promise<T> {
     const run = this.queue.then(async () => {
       const draft = structuredClone(this.state);
+      this.options.settle?.(draft, this.newId);
       const result = await fn(draft, this.newId);
       this.state = draft;
       return result;

@@ -11,7 +11,6 @@ import {
   checkRsvp,
   createEvent,
   eventView,
-  markRsvpAttendance,
   rsvp,
   updateEvent,
   type NewEvent,
@@ -21,7 +20,7 @@ import { placesText, yoursEventText } from "./event-words";
 import { endHousehold, removeMember } from "./households";
 import { clubLedger } from "./ledger";
 import { historyOf } from "./queries";
-import { NOW, STORE_KINDS, addMembers, at, bookAs, fixtureFor, memberCtx, refusedFor, staffCtx, type Fixture } from "./testkit";
+import { NOW, STORE_KINDS, addMembers, at, bookAs, fixtureFor, memberCtx, refusedFor, staffCtx, mark, type Fixture } from "./testkit";
 
 /**
  * Today is Wed Oct 28, 1 pm. The usual event is "Dinner", Sat Oct 31, 6 to 9 pm. With the placeholder rules:
@@ -489,11 +488,17 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const e = await mkEvent(f, { capacity: 1 });
       const ada = await go(f, "Ada", e.id);
       const ben = await go(f, "Ben", e.id);
-      await expect(markRsvpAttendance(f.store, staffCtx(at(3, 17)), ada.rsvp.id, "attended")).rejects.toThrow("That event has not started yet.");
-      await expect(markRsvpAttendance(f.store, memberCtx(f.m.Ada, "Ada", at(3, 19)), ada.rsvp.id, "attended")).rejects.toMatchObject({ code: "forbidden" });
-      await expect(markRsvpAttendance(f.store, staffCtx(at(3, 19)), ben.rsvp.id, "attended")).rejects.toThrow(/only be recorded for someone with spots/);
-      expect(await markRsvpAttendance(f.store, staffCtx(at(3, 19)), ada.rsvp.id, "attended")).toMatchObject({ status: "attended" });
-      await expect(markRsvpAttendance(f.store, staffCtx(at(3, 20)), ada.rsvp.id, "no_show")).rejects.toThrow(/is attended/);
+      await expect(mark(f.store, staffCtx(at(3, 17)), "event", ada.rsvp.id, "attended")).rejects.toThrow("opens at 5:30 pm, 30 minutes before the start");
+      await expect(mark(f.store, staffCtx(at(3, 17, 45)), "event", ada.rsvp.id, "no_show")).rejects.toThrow("has not started yet, so it cannot be a no-show");
+      await expect(mark(f.store, memberCtx(f.m.Ada, "Ada", at(3, 19)), "event", ada.rsvp.id, "attended")).rejects.toMatchObject({ code: "forbidden" });
+      await expect(mark(f.store, staffCtx(at(3, 19)), "event", ben.rsvp.id, "attended")).rejects.toThrow(/waitlist without spots/);
+      expect(await mark(f.store, staffCtx(at(3, 19)), "event", ada.rsvp.id, "attended")).toMatchObject({ outcome: "attended", previous: null });
+      expect((await f.store.read()).rsvps.find((r) => r.id === ada.rsvp.id)!.status).toBe("attended");
+      // A mistake can be put right, with a note, and the old line stays on the record.
+      await mark(f.store, staffCtx(at(3, 20)), "event", ada.rsvp.id, "no_show", { note: "Left before the toast" });
+      const state = await f.store.read();
+      expect(state.rsvps.find((r) => r.id === ada.rsvp.id)!.status).toBe("no_show");
+      expect(state.attendance.map((l) => [l.outcome, l.previous, l.note])).toEqual([["attended", null, null], ["no_show", "attended", "Left before the toast"]]);
     });
   });
 
@@ -523,7 +528,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const underWay = await mkEvent(f, { title: "Right now", startsAt: at(0, 12), endsAt: at(0, 15) }, at(-1, 12));
       await go(f, "Ada", past.id, 0, at(-3, 9));
       await go(f, "Ada", underWay.id, 0, at(-1, 13));
-      await markRsvpAttendance(f.store, staffCtx(at(-2, 19)), (await linesOf(f, "Ada", past.id))[0].id, "attended");
+      await mark(f.store, staffCtx(at(-2, 19)), "event", (await linesOf(f, "Ada", past.id))[0].id, "attended");
       const before = (await f.store.read()).rsvps;
       await endHousehold(f.store, clubLedger, staffCtx(), f.h.Quill);
       expect((await f.store.read()).rsvps).toEqual(before);

@@ -5,11 +5,14 @@ import { CLASS_RULES } from "../settings/class-rules";
 import { EVENT_RULES } from "../settings/event-rules";
 import { RULE_BOOK, parseRuleBook } from "../settings/rulebook";
 import raw from "../settings/booking-rules.json";
-import { MemoryClubStore, sequentialIds, type ClubStore } from "../store/memory";
+import { MemoryClubStore, sequentialIds, type ClubStore, type Settler } from "../store/memory";
 import { PgClubStore, createClubPool } from "../store/postgres";
 import { addDays, pacificWall } from "../time";
 import type { Actor, Item, RuleBook, RuleValues } from "../types";
 import { BookingRefused, createBooking, type BookingOptions, type BookingRequest, type ReasonCode } from "./bookings";
+import { ATTENDANCE_RULES } from "../settings/attendance-rules";
+import type { AttendanceKind, AttendanceOutcome } from "../types";
+import { attendanceSettler, recordAttendance } from "./attendance";
 import { createHousehold, grantQualification, type Ctx } from "./households";
 
 /** Shared setup for the booking tests: a small invented club and a frozen clock. */
@@ -21,6 +24,10 @@ export const TODAY = "2026-10-28";
 export const staff: Actor = { kind: "staff", label: "Test staff" };
 export const staffCtx = (now: Date = NOW): Ctx => ({ actor: staff, now });
 export const memberCtx = (memberId: string, label = "A Member", now: Date = NOW): Ctx => ({ actor: { kind: "member", memberId, label }, now });
+
+/** Staff record an outcome with the placeholder attendance rules. */
+export const mark = (store: ClubStore, ctx: Ctx, kind: AttendanceKind, id: string, outcome: AttendanceOutcome, extra: { memberId?: string; note?: string } = {}) =>
+  recordAttendance(store, ctx, ATTENDANCE_RULES, { kind, id, outcome, ...extra });
 
 /** A moment on the Pacific clock: `at(1, 7)` is 7 am tomorrow; `at(1, 7, 30)` is 7:30 am. */
 export const at = (daysAhead: number, hour: number, minute = 0, today = TODAY) => pacificWall(addDays(today, daysAhead), hour * 60 + minute);
@@ -46,20 +53,20 @@ afterAll(async () => {
 });
 
 /** A second app server's view of a Postgres test database: its own connections, the same data. */
-export function openAnother(url: string, newId: () => string = () => crypto.randomUUID()): PgClubStore {
+export function openAnother(url: string, newId: () => string = () => crypto.randomUUID(), settle?: Settler): PgClubStore {
   const pool = createClubPool(url, 8);
   cleanups.push(() => pool.end());
-  return new PgClubStore(pool, { newId, now: () => NOW });
+  return new PgClubStore(pool, { newId, now: () => NOW, settle });
 }
 
 /** A new, empty store of the given kind. A Postgres one gets its own throwaway database, removed after the test. */
 export const databaseUrls = new WeakMap<ClubStore, string>();
 
-export async function makeStore(kind: StoreKind, book: RuleBook = RULE_BOOK, newId: () => string = sequentialIds()): Promise<ClubStore> {
-  if (kind === "memory") return new MemoryClubStore(newId);
+export async function makeStore(kind: StoreKind, book: RuleBook = RULE_BOOK, newId: () => string = sequentialIds(), settle?: Settler): Promise<ClubStore> {
+  if (kind === "memory") return new MemoryClubStore(newId, { settle });
   const db = await cloneScratchDb(POSTGRES_URL!);
   const pool = createClubPool(db.url, 8);
-  const store = new PgClubStore(pool, { newId, now: () => NOW });
+  const store = new PgClubStore(pool, { newId, now: () => NOW, settle });
   await store.syncRules(book, CLASS_RULES, EVENT_RULES);
   databaseUrls.set(store, db.url);
   cleanups.push(async () => {
@@ -113,6 +120,14 @@ export async function buildFixtureOn(store: ClubStore, book: RuleBook = RULE_BOO
   });
   const state = await store.read();
   return { store, book, m, h: { Quill: quill.household.id, Reed: reed.household.id }, i: Object.fromEntries(state.items.map((x) => [x.name, x.id])) };
+}
+
+/**
+ * The same invented club on a store that applies the automatic no-show on the given clock, the way the running app does.
+ * The test moves the clock to watch bookings and chairs run out of time.
+ */
+export async function buildFixtureSettling(kind: StoreKind, clock: () => Date): Promise<Fixture> {
+  return buildFixtureOn(await makeStore(kind, RULE_BOOK, sequentialIds(), attendanceSettler(ATTENDANCE_RULES, clock)), RULE_BOOK);
 }
 
 /** The fixture on a chosen store: `const fixture = fixtureFor(kind)`, then `await fixture()` or `await fixture(someRuleBook)`. */

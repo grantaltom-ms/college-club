@@ -317,21 +317,6 @@ export async function leaveClass(store: ClubStore, classRules: ClassRules, ctx: 
   });
 }
 
-/** Staff record what happened after the start: the member came (attended) or did not (no_show). */
-export async function markClassAttendance(store: ClubStore, ctx: Ctx, signUpId: string, outcome: "attended" | "no_show"): Promise<SignUp> {
-  if (ctx.actor.kind !== "staff") throw new ClubError("forbidden", "Only club staff can record attendance.");
-  return store.transaction(async (s) => {
-    const line = s.signups.find((g) => g.id === signUpId);
-    if (!line) throw new ClubError("not_found", "That sign-up no longer exists.");
-    if (line.status !== "enrolled") throw new ClubError("conflict", `Attendance can only be recorded for someone with a chair, and this sign-up is ${line.status.replace("_", " ")}.`);
-    const session = sessionOrThrow(s, line.sessionId);
-    if (ctx.now.getTime() < Date.parse(session.startsAt)) throw new ClubError("conflict", "That class has not started yet.");
-    line.status = outcome;
-    line.statusChangedAt = ctx.now.toISOString();
-    return structuredClone(line);
-  });
-}
-
 /* ---------- Staff: classes, sessions, chairs ---------- */
 
 function requireStaff(actor: Actor) {

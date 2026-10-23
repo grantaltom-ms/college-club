@@ -1,6 +1,6 @@
 import { clubLedger } from "../engine/ledger";
 import { createHousehold, endHousehold, grantQualification, type Ctx, type NewMember } from "../engine/households";
-import { MemoryClubStore, sequentialIds, type ClubStore } from "../store/memory";
+import { MemoryClubStore, sequentialIds, type ClubStore, type MemoryStoreOptions } from "../store/memory";
 import { clubNow } from "../clock";
 import { addDays, middayPacific, pacificDate } from "../time";
 import type { Actor, MembershipType } from "../types";
@@ -110,8 +110,8 @@ export async function seedSample(store: ClubStore, today: string = pacificDate(c
 }
 
 /** A fresh in-memory store holding the sample club. IDs are fixed, so addresses and test links stay the same between runs. */
-export async function buildSampleStore(today?: string, now?: Date): Promise<MemoryClubStore> {
-  const store = new MemoryClubStore(sequentialIds());
+export async function buildSampleStore(today?: string, now?: Date, options?: MemoryStoreOptions): Promise<MemoryClubStore> {
+  const store = new MemoryClubStore(sequentialIds(), options);
   await seedSample(store, today, now);
   return store;
 }

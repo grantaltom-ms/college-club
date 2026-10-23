@@ -59,6 +59,7 @@ describe.skipIf(!ADMIN_URL)("the club database", () => {
     const { rows } = await q(`select table_schema, table_name from information_schema.tables where table_schema not in ('pg_catalog', 'information_schema') order by 1, 2`);
     expect(new Set(rows.map((r) => r.table_schema))).toEqual(new Set(["club"]));
     expect(rows.map((r) => r.table_name)).toEqual([
+      "attendance_log",
       "booking_crew",
       "booking_rule_defaults",
       "bookings",
@@ -82,7 +83,7 @@ describe.skipIf(!ADMIN_URL)("the club database", () => {
 
   it("locks every table to the owner: row level security on, no policies", async () => {
     const { rows } = await q(`select c.relname, c.relrowsecurity from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'club' and c.relkind = 'r'`);
-    expect(rows).toHaveLength(18);
+    expect(rows).toHaveLength(19);
     expect(rows.every((r) => r.relrowsecurity)).toBe(true);
     expect((await q(`select count(*)::int as n from pg_policies where schemaname = 'club'`)).rows[0].n).toBe(0);
   });

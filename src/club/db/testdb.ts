@@ -95,3 +95,44 @@ export async function dropTemplate(adminUrl: string): Promise<void> {
   template = undefined;
   await asAdmin(adminUrl, (c) => c.query(`drop database if exists ${name} with (force)`));
 }
+
+
+/* ---------- Recording an attendance outcome the way the app does: the status change and its line in the check-in record ---------- */
+
+const OUTCOME_TABLES = {
+  bookings: { kind: "booking", fk: "booking_id", member: "booker_id" },
+  class_signups: { kind: "class", fk: "signup_id", member: "member_id" },
+  event_rsvps: { kind: "event", fk: "rsvp_id", member: "member_id" },
+} as const;
+
+const outcomeOfStatus = (status: string) => (status === "completed" || status === "attended" ? "attended" : status === "no_show" ? "no_show" : null);
+
+/**
+ * Sets a booking, sign-up or RSVP to completed / attended / no_show together with the line the database now requires in the
+ * check-in record, in one transaction. A refused change rolls back and throws the database's own error.
+ */
+export async function recordOutcome(
+  client: Pick<Client, "query">,
+  table: keyof typeof OUTCOME_TABLES,
+  id: string,
+  status: string,
+  options: { at?: string; via?: "staff" | "automatic" } = {},
+): Promise<void> {
+  const shape = OUTCOME_TABLES[table];
+  const at = options.at ?? new Date().toISOString();
+  const via = options.via ?? "staff";
+  await client.query("begin");
+  try {
+    const { rows } = await client.query(`select status, ${shape.member} as member_id from club.${table} where id = $1`, [id]);
+    const previous = outcomeOfStatus(rows[0].status);
+    await client.query(`update club.${table} set status = $2, status_changed_at = $3 where id = $1`, [id, status, at]);
+    await client.query(
+      `insert into club.attendance_log (kind, ${shape.fk}, member_id, at, outcome, previous_outcome, by_kind, by_label, via) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [shape.kind, id, rows[0].member_id, at, outcomeOfStatus(status), previous, via === "automatic" ? "system" : "staff", via === "automatic" ? "Automatic no-show" : "Test staff", via],
+    );
+    await client.query("commit");
+  } catch (e) {
+    await client.query("rollback");
+    throw e;
+  }
+}

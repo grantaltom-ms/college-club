@@ -1,0 +1,8 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). Minutes. checkInOpensMinutesBefore: someone can be checked in from this long before the start. noShowAfterEndMinutes: a boat or space booking, or a class chair, that nobody checked in for becomes a no-show this long after it ends (0 means the moment it ends). Change a number here and the check-in screens and the automatic no-show follow.",
+  "defaults": {
+    "checkInOpensMinutesBefore": 30,
+    "noShowAfterEndMinutes": 0
+  }
+}

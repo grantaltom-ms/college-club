@@ -364,21 +364,6 @@ export async function renewHold(store: ClubStore, eventRules: EventRules, ctx: C
   });
 }
 
-/** Staff record who came (attended) and who did not (no_show), once the event has started. */
-export async function markRsvpAttendance(store: ClubStore, ctx: Ctx, rsvpId: string, outcome: "attended" | "no_show"): Promise<Rsvp> {
-  if (ctx.actor.kind !== "staff") throw new ClubError("forbidden", "Only club staff can record attendance.");
-  return store.transaction(async (s) => {
-    const line = s.rsvps.find((r) => r.id === rsvpId);
-    if (!line) throw new ClubError("not_found", "That RSVP no longer exists.");
-    if (line.status !== "going") throw new ClubError("conflict", `Attendance can only be recorded for someone with spots, and this RSVP is ${line.status.replace("_", " ")}.`);
-    const event = eventOrThrow(s, line.eventId);
-    if (ctx.now.getTime() < Date.parse(event.startsAt)) throw new ClubError("conflict", "That event has not started yet.");
-    line.status = outcome;
-    line.statusChangedAt = ctx.now.toISOString();
-    return structuredClone(line);
-  });
-}
-
 /* ---------- Staff: events ---------- */
 
 function requireStaff(actor: Actor) {

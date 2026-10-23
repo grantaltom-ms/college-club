@@ -1,7 +1,7 @@
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { EVENT_STATUSES, HISTORY_KINDS, RSVP_STATUSES, RSVP_VIA } from "../types";
-import { createScratchDb, type ScratchDb } from "./testdb";
+import { createScratchDb, recordOutcome, type ScratchDb } from "./testdb";
 
 /**
  * The event rules the DATABASE enforces by itself, tested against a real Postgres: places are never over-filled (a member
@@ -42,7 +42,9 @@ describe.skipIf(!ADMIN_URL)("the event tables", () => {
   const join = (eventId: string, member: string, guests = 0, status = "going", client: Client = db.client) =>
     client.query(`insert into club.event_rsvps (event_id, member_id, guests, status, created_by_kind, created_by_label) values ($1, $2, $3, $4, 'member', 'A Member') returning id`, [eventId, member, guests, status]);
   const setStatus = (id: string, status: string) =>
-    q(
+    status === "attended" || status === "no_show"
+      ? recordOutcome(db.client, "event_rsvps", id, status)
+      : q(
       `update club.event_rsvps set status = $2, cancelled_by_kind = case when $2 in ('cancelled','late_cancelled') then 'member' end, cancelled_by_label = case when $2 in ('cancelled','late_cancelled') then 'A Member' end where id = $1`,
       [id, status],
     );
@@ -151,8 +153,10 @@ describe.skipIf(!ADMIN_URL)("the event tables", () => {
       expect(await code(setStatus(waiting, "late_cancelled"))).toMatch(/./); // leaving a waiting list is never late
       expect(await statusOf(waiting)).toBe("waitlisted");
       expect(await code(setStatus(places, "attended"))).toBeNull();
-      expect(await code(setStatus(places, "no_show"))).toMatch(/./); // finished is final
-      expect(await code(setStatus(places, "going"))).toMatch(/./);
+      expect(await code(setStatus(places, "no_show"))).toBeNull(); // a mistake can be corrected, with a line in the record
+      expect(await code(setStatus(places, "attended"))).toBeNull();
+      expect(await code(setStatus(places, "going"))).toMatch(/./); // but never back to going
+      expect(await code(setStatus(places, "cancelled"))).toMatch(/./); // or cancelled
       expect(await statusOf(places)).toBe("attended");
 
       const left = (await join(e, members[2])).rows[0].id;
