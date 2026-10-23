@@ -1,0 +1,206 @@
+/* The public website: the club's own look (fonts and colors come from globals.css), roomier than the member area. */
+.site {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-frame {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.site main {
+  flex: 1;
+  padding-bottom: 56px;
+}
+
+.site-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.site-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 28px;
+  padding-top: 14px;
+  padding-bottom: 10px;
+}
+
+.site-wordmark {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 22px;
+}
+
+.site-header nav a {
+  display: inline-block;
+  padding: 10px 0;
+  color: var(--waterloo);
+  text-decoration: none;
+}
+
+.site-header nav a:hover {
+  text-decoration: underline;
+}
+
+.site-header nav a.site-signin {
+  margin-left: 4px;
+  padding: 6px 16px;
+  border: 1px solid var(--waterloo);
+  border-radius: 4px;
+}
+
+.site-banner {
+  padding: 8px 0;
+  background: var(--oyster-50);
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.9rem;
+  color: var(--cyberspace);
+}
+
+.site-banner p {
+  margin: 0 auto;
+}
+
+.site-hero {
+  padding: 44px 0 20px;
+}
+
+.site-hero h1 {
+  font-size: 2.2rem;
+  line-height: 1.2;
+  margin: 0 0 14px;
+}
+
+.site-lede {
+  font-size: 1.25rem;
+  color: var(--cyberspace);
+  max-width: 40em;
+  margin: 0 0 14px;
+}
+
+.site-button {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 12px 22px;
+  background: var(--waterloo);
+  color: #fff;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.site-button:hover {
+  background: var(--cyberspace);
+}
+
+.site-preview-note {
+  margin: 18px 0 8px;
+  padding: 10px 14px;
+  border: 1px dashed var(--debonair);
+  background: var(--oyster-50);
+  border-radius: 4px;
+  font-size: 0.95rem;
+  color: var(--cyberspace);
+}
+
+.site-section {
+  margin: 36px 0 0;
+}
+
+.site-section h2 {
+  font-size: 1.4rem;
+  margin: 0 0 12px;
+}
+
+.site-section p {
+  max-width: 44em;
+  margin: 0 0 12px;
+}
+
+.site-section ul {
+  max-width: 44em;
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+
+.site-section li {
+  margin: 0 0 8px;
+}
+
+.site-section ul.site-cards {
+  max-width: none;
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.site-card {
+  margin: 0;
+  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+}
+
+.site-card h3 {
+  font-size: 1.15rem;
+  margin: 0 0 8px;
+}
+
+.site-card p {
+  margin: 0 0 6px;
+}
+
+.site-people {
+  list-style: none;
+  padding: 0;
+}
+
+.site-footer {
+  border-top: 1px solid var(--hairline);
+  background: var(--card);
+  padding: 24px 0;
+  font-size: 0.95rem;
+  color: var(--cyberspace);
+}
+
+.site-footer-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px 32px;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .site-hero {
+    padding-top: 28px;
+  }
+  .site-hero h1 {
+    font-size: 1.8rem;
+  }
+  .site-header nav {
+    gap: 0 16px;
+  }
+}
