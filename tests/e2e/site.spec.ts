@@ -119,7 +119,7 @@ test.describe("what the pages say", () => {
     await expect(page.getByTestId("site-preview-note")).toContainText("This preview has no forms yet");
   });
 
-  test("Contact gives the address, phone, email, hours and the directors, with working phone and email links", async ({ page }) => {
+  test("Contact gives the address, phone, membership email, hours and the directors' names, with working phone and email links", async ({ page }) => {
     await page.goto("/site/contact");
     const details = page.getByTestId("contact-details");
     await expect(details.getByRole("link", { name: "membership@collegeclubseattle.com" })).toHaveAttribute("href", "mailto:membership@collegeclubseattle.com");
@@ -128,21 +128,34 @@ test.describe("what the pages say", () => {
     await expect(details).toContainText("Office: Mon-Fri 8am-4pm, Sat by appointment");
     await expect(details).toContainText("Caitlin Sogn (Admin)");
     await expect(details).toContainText("Julia Gamache (Operations)");
-    await expect(details.getByRole("link", { name: "caitlin.sogn@collegeclubseattle.com" })).toHaveAttribute("href", "mailto:caitlin.sogn@collegeclubseattle.com");
+    // The directors are named, but their own email addresses are not shown (Grant, Oct 23).
+    await expect(details.getByRole("link", { name: /caitlin|julia/i })).toHaveCount(0);
+    await expect(page.getByTestId("site-preview-note")).toContainText("left out on purpose");
     await expect(details).toContainText("11 East Allison Street");
     await expect(details).toContainText("Seattle, WA 98102");
   });
 
-  test("About and Rowing and fitness say plainly that they are drafts built only from public sentences", async ({ page }) => {
+  test("About and Rowing and fitness say plainly that they are placeholders built only from public sentences", async ({ page }) => {
     for (const path of ["/site/about", "/site/programs"]) {
       await page.goto(path);
       const note = page.getByTestId("site-preview-note");
       await expect(note, path).toContainText("Preview note, not part of the page.");
-      await expect(note, path).toContainText("Draft.");
+      await expect(note, path).toContainText("Placeholder.");
       await expect(note, path).toContainText("for members only");
     }
     await page.goto("/site/programs");
     await expect(page.getByRole("listitem").filter({ hasText: "Rowing (experienced)" })).toBeVisible();
+  });
+
+  test("show one public email address, the membership one, on every page, and nobody's own address", async ({ page }) => {
+    for (const { path } of PAGES) {
+      await page.goto(path);
+      const hrefs = await page.locator('a[href^="mailto:"]').evaluateAll((links) => links.map((a) => a.getAttribute("href")));
+      expect(new Set(hrefs), path).toEqual(new Set(["mailto:membership@collegeclubseattle.com"]));
+      const text = await page.locator("body").innerText();
+      expect(new Set(text.match(/[\w.+-]+@[\w.-]+\.\w+/g)), path).toEqual(new Set(["membership@collegeclubseattle.com"]));
+      expect(text, path).not.toMatch(/caitlin\.sogn@|julia@/i);
+    }
   });
 
   test("shows no member, household or booking information from the club's records", async ({ page }) => {

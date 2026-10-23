@@ -26,10 +26,8 @@ export default async function ContactPage() {
         <h2>Directors</h2>
         <ul className="site-people">
           {club.people.map((person) => (
-            <li key={person.email}>
+            <li key={person.name}>
               <strong>{person.name}</strong> ({person.role})
-              <br />
-              <a href={`mailto:${person.email}`}>{person.email}</a>
             </li>
           ))}
         </ul>

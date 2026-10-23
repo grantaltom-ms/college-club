@@ -54,7 +54,8 @@ export interface SiteContent {
     phone: string;
     email: string;
     hours: { club: string; office: string };
-    people: { name: string; role: string; email: string }[];
+    /** Names and roles only: the directors' own email addresses are never shown on the public site. */
+    people: { name: string; role: string }[];
   };
   pages: Record<PageKey, Page>;
 }
@@ -154,9 +155,9 @@ export function parseSiteContent(input: Json): SiteContent {
   if (address.length === 0) fail("club.address", "needs at least one line.");
   if (!Array.isArray(club.people)) return fail("club.people", "must be a list (it may be empty).");
   const people = (club.people as Json[]).map((p, i) => {
-    if (!isObject(p)) return fail(`club.people[${i}]`, "must have a name, role and email.");
-    onlyKeys(`club.people[${i}]`, p, ["name", "role", "email"]);
-    return { name: text(`club.people[${i}].name`, p.name, 80), role: text(`club.people[${i}].role`, p.role, 80), email: email(`club.people[${i}].email`, p.email) };
+    if (!isObject(p)) return fail(`club.people[${i}]`, "must have a name and a role.");
+    onlyKeys(`club.people[${i}]`, p, ["name", "role"]);
+    return { name: text(`club.people[${i}].name`, p.name, 80), role: text(`club.people[${i}].role`, p.role, 80) };
   });
   const pagesIn = input.pages;
   if (!isObject(pagesIn)) return fail("pages", "must be an object.");

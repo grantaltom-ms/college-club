@@ -38,7 +38,17 @@ describe("the public site's words (src/site/content/site.json)", () => {
     expect(SITE.club).toMatchObject({ name: "College Club Seattle", phone: "206-622-0624", email: "membership@collegeclubseattle.com" });
     expect(SITE.club.address).toEqual(["11 East Allison Street", "Seattle, WA 98102"]);
     expect(SITE.club.hours).toEqual({ club: "5am-8pm daily, 24/7 fob access", office: "Mon-Fri 8am-4pm, Sat by appointment" });
-    expect(SITE.club.people.map((p) => p.name)).toEqual(["Caitlin Sogn", "Julia Gamache"]);
+    // Names and roles only: the directors' own email addresses are never on the public site (Grant, Oct 23).
+    expect(SITE.club.people).toEqual([
+      { name: "Caitlin Sogn", role: "Admin" },
+      { name: "Julia Gamache", role: "Operations" },
+    ]);
+  });
+
+  it("show one public email address, the membership one, and no director's own address, anywhere in the content", () => {
+    const everything = JSON.stringify(SITE);
+    expect(new Set(everything.match(/[\w.+-]+@[\w.-]+\.\w+/g))).toEqual(new Set([SITE.club.email]));
+    expect(everything).not.toMatch(/caitlin\.sogn@|julia@/i);
   });
 
   it("show both membership types with their prices, as the current public site does", () => {
@@ -68,10 +78,12 @@ describe("the public site's words (src/site/content/site.json)", () => {
     expect(all).not.toMatch(/https?:\/\//);
   });
 
-  it("say where the words came from, and flag the two pages built only from public sentences", () => {
+  it("say where the words came from, and flag the two placeholder pages built only from public sentences", () => {
     expect(SITE.copiedFrom).toContain("Oct 23, 2026");
-    expect(SITE.pages.about.previewNote).toMatch(/^Draft\./);
-    expect(SITE.pages.programs.previewNote).toMatch(/^Draft\./);
+    expect(SITE.copiedFrom).toContain("directors' own email addresses are deliberately left out");
+    expect(SITE.pages.about.previewNote).toMatch(/^Placeholder\./);
+    expect(SITE.pages.programs.previewNote).toMatch(/^Placeholder\./);
+    expect(SITE.pages.contact.previewNote).toContain("left out on purpose");
   });
 });
 
@@ -113,7 +125,7 @@ describe("a mistake in the content file is refused in plain words", () => {
     expect(breaks((c) => (c.club.phone = "622-0624"))).toThrow('club.phone "622-0624" must look like 206-555-0100.');
     expect(breaks((c) => (c.club.phone = "(206) 622-0624"))).toThrow("must look like 206-555-0100.");
     expect(breaks((c) => (c.club.email = "membership-at-club"))).toThrow('club.email "membership-at-club" does not look like an email address.');
-    expect(breaks((c) => (c.club.people[1].email = "julia@"))).toThrow("club.people[1].email");
+    expect(breaks((c) => (c.club.people[1].email = "julia@collegeclubseattle.com"))).toThrow("club.people[1].email is not something this file knows about");
   });
 
   it("refuses a button that goes anywhere but this site or the sign-in", () => {

@@ -1,5 +1,5 @@
 {
-  "copiedFrom": "Words copied on Oct 23, 2026 from the public pages of the club's current website (collegeclubseattle.com): Home, Membership and Contact. The About and Rowing and fitness pages use only sentences from those public pages, because the current site's own pages for them are for members only.",
+  "copiedFrom": "Words copied on Oct 23, 2026 from the public pages of the club's current website (collegeclubseattle.com): Home, Membership and Contact. The directors' own email addresses are deliberately left out (Grant, Oct 23): the one public email is the membership address. The About and Rowing and fitness pages are placeholders that use only sentences from those public pages, because the current site's own pages for them are for members only.",
   "club": {
     "name": "College Club Seattle",
     "tagline": "A member-owned waterfront club on Lake Union since 2013. A Seattle institution since 1910.",
@@ -16,13 +16,11 @@
     "people": [
       {
         "name": "Caitlin Sogn",
-        "role": "Admin",
-        "email": "caitlin.sogn@collegeclubseattle.com"
+        "role": "Admin"
       },
       {
         "name": "Julia Gamache",
-        "role": "Operations",
-        "email": "julia@collegeclubseattle.com"
+        "role": "Operations"
       }
     ]
   },
@@ -69,7 +67,7 @@
       "intro": [
         "The College Club Seattle is located at 11 East Allison Street and offers unmatched access to Lake Union, stunning views of the city skyline and a membership experience unlike any other."
       ],
-      "previewNote": "Draft. This page uses only sentences from the club's public pages. The current site's own Club information page is for members only, so its text has not been carried over yet.",
+      "previewNote": "Placeholder. This page uses only sentences from the club's public pages for now. The current site's own Club information page is for members only, so its text has not been carried over.",
       "sections": [
         {
           "heading": "On the lake",
@@ -91,7 +89,7 @@
       "intro": [
         "The College Club Seattle is located at 11 East Allison Street and offers unmatched access to Lake Union, stunning views of the city skyline and a membership experience unlike any other."
       ],
-      "previewNote": "The current site has Apply today and Request a tour forms. This preview has no forms yet, so the page points to the membership email and phone instead.",
+      "previewNote": "The current site has Apply today and Request a tour forms. This preview has no forms yet (they need the club's real email sending), so the page points to the membership email and phone instead.",
       "sections": [
         {
           "heading": "A membership for you and your family",
@@ -153,7 +151,7 @@
       "intro": [
         "Access to quality rowing classes and equipment."
       ],
-      "previewNote": "Draft. This page uses only sentences from the club's public pages. The current site's own Programs and Rowing pages are for members only, so their text has not been carried over yet.",
+      "previewNote": "Placeholder. This page uses only sentences from the club's public pages for now. The current site's own Programs and Rowing pages are for members only, so their text has not been carried over.",
       "sections": [
         {
           "heading": "On the water",
@@ -189,7 +187,8 @@
       "intro": [
         "Visit us at 11 E Allison Street Seattle, WA 98102."
       ],
-      "sections": []
+      "sections": [],
+      "previewNote": "The current site lists the directors' own email addresses. They are left out on purpose: everything goes to the membership email for now, and a contact form comes later."
     }
   }
 }
