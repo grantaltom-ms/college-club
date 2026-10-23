@@ -1,3 +1,4 @@
+import { pacificMinutes } from "./time";
 import { BOOKING_TYPES, type BookingType, type RuleValues } from "./types";
 
 /** Helpers for reading the address and form fields of the member pages. Anything unexpected falls back to a safe default. */
@@ -40,6 +41,20 @@ export function timeParam(value: Param): number | null {
   if (!m) return null;
   const minutes = Number(m[1]) * 60 + Number(m[2]);
   return Number(m[1]) < 24 && Number(m[2]) < 60 ? minutes : null;
+}
+
+/** Dollars typed into a form ("25", "12.50", "") as cents. Empty means no price (null); anything else that is not money is undefined. */
+export function centsFromForm(value: string): number | null | undefined {
+  const v = value.trim().replace(/^\$/, "");
+  if (v === "") return null;
+  if (!/^\d{1,5}(\.\d{1,2})?$/.test(v)) return undefined;
+  return Math.round(Number(v) * 100);
+}
+
+/** A moment's Pacific clock time as a form value: "18:30". */
+export function clockValue(at: Date | string): string {
+  const minutes = pacificMinutes(typeof at === "string" ? new Date(at) : at);
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
 /** A whole number from the address within a range, or the fallback. */
@@ -87,4 +102,6 @@ export const NOTICES: Record<string, string> = {
   conflict: "That has already changed. Reload and try again.",
   signed_out: "Choose a test member first.",
   duplicate_class: "There is already a class with that name. Pick another name.",
+  link: "That link does not work. Ask club staff for a new one.",
+  limit: "The limit cannot go below the number of people already going. Cancel some RSVPs first, or choose a bigger number.",
 };

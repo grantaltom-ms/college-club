@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BookingRefused, cancelBooking, createBooking } from "../engine/bookings";
 import { SignUpRefused, createClass, leaveClass, scheduleSessions, signUp } from "../engine/classes";
+import { RsvpRefused, cancelRsvp, createEvent, placesTaken, rsvp } from "../engine/events";
 import { createHousehold, endHousehold } from "../engine/households";
 import { clubLedger } from "../engine/ledger";
 import { waitlistPlace } from "../engine/queries";
@@ -8,6 +9,7 @@ import { addMembers, at, makeStore, NOW, openAnother, databaseUrls, memberCtx, s
 import { ClubError } from "../errors";
 import { seedSample } from "../sample/club";
 import { CLASS_RULES } from "../settings/class-rules";
+import { EVENT_RULES } from "../settings/event-rules";
 import { RULE_BOOK } from "../settings/rulebook";
 import { addDays, pacificDate } from "../time";
 import { MemoryClubStore, sequentialIds } from "./memory";
@@ -36,6 +38,10 @@ describe("the Postgres store's safeguards (no database needed)", () => {
       expect(translateDatabaseError({ code: "23514", message })).toMatchObject({ code: "conflict", message });
     }
     expect(translateDatabaseError({ code: "23505", constraint: "class_signups_one_live" })).toMatchObject({ code: "conflict", message: "That person is already on this class's sign-up sheet." });
+    for (const message of ["That event is full.", "That event was cancelled.", "The limit cannot go below the 5 people already going."]) {
+      expect(translateDatabaseError({ code: "23514", message })).toMatchObject({ code: "conflict", message });
+    }
+    expect(translateDatabaseError({ code: "23505", constraint: "event_rsvps_one_live" })).toMatchObject({ code: "conflict", message: "That person is already on this event's list." });
     // Anything else from the database is not shown to members as it is.
     const unknownCheck = { code: "23514", message: 'new row for relation "members" violates check constraint "x"' };
     expect(translateDatabaseError(unknownCheck)).toBe(unknownCheck);
@@ -219,6 +225,55 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       const live = (await f.store.read()).signups.filter((g) => g.sessionId === session.id && [f.m.Ada, f.m.Ben, f.m.Cy].includes(g.memberId) && (g.status === "enrolled" || g.status === "waitlisted"));
       expect(live).toHaveLength(0);
       if (joined.status === "rejected") expect((joined.reason as SignUpRefused).reasons.map((r) => r.code)).toEqual(["member_blocked"]);
+    });
+  });
+
+  describe("event RSVPs race too", () => {
+    async function twoServersWithAnEvent(capacity = 6) {
+      const f = await fixture();
+      const b = { ...f, store: openAnother(databaseUrls.get(f.store)!) };
+      const event = await createEvent(f.store, staffCtx(), { title: "Dinner", startsAt: at(3, 18), endsAt: at(3, 21), capacity });
+      const go = (server: typeof f, who: string, guests = 0) => rsvp(server.store, EVENT_RULES, memberCtx(who, who), { eventId: event.id, memberId: who, guests });
+      return { f, b, event, go };
+    }
+
+    it("twenty members, some with guests, on two servers grab a six-place event: never more than six places", async () => {
+      const { f, b, event, go } = await twoServersWithAnEvent();
+      const people = await addMembers(f, 20);
+      const results = await Promise.allSettled(people.map((id, i) => go(i % 2 === 0 ? f : b, id, i % 3 === 0 ? 2 : 0)));
+      expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+      const state = await f.store.read();
+      expect(placesTaken(state, event.id)).toBeLessThanOrEqual(6);
+      expect(new Set(state.rsvps.map((r) => r.memberId)).size).toBe(state.rsvps.length);
+      // Nobody waiting could have used the places still free: the line really was stuck behind groups that did not fit.
+      const free = 6 - placesTaken(state, event.id);
+      for (const r of state.rsvps.filter((x) => x.status === "waitlisted")) expect(1 + r.guests).toBeGreaterThan(free);
+    }, 60000);
+
+    it("someone cancelling on one server while someone RSVPs on the other never loses or double-fills a place", async () => {
+      const { f, b, event, go } = await twoServersWithAnEvent(3);
+      const people = await addMembers(f, 4);
+      const first = await go(f, f.m.Ada);
+      await go(f, f.m.Dee);
+      await go(f, people[0]);
+      const waiting = await go(f, people[1]);
+      expect(waiting.outcome).toBe("waitlisted");
+      const [left, joined] = await Promise.allSettled([cancelRsvp(f.store, EVENT_RULES, memberCtx(f.m.Ada, "Ada"), first.rsvp.id), go(b, people[2])]);
+      expect(left.status).toBe("fulfilled");
+      expect(joined.status).toBe("fulfilled");
+      const state = await f.store.read();
+      expect(placesTaken(state, event.id)).toBe(3);
+      expect(state.rsvps.find((r) => r.memberId === people[1])?.status).toBe("going");
+      expect(state.rsvps.find((r) => r.memberId === people[2])?.status).toBe("waitlisted");
+    });
+
+    it("an ending household and a new RSVP by one of its adults cannot both win", async () => {
+      const { f, b, event, go } = await twoServersWithAnEvent();
+      const [ended, joined] = await Promise.allSettled([endHousehold(f.store, clubLedger, staffCtx(), f.h.Quill), go(b, f.m.Ada, 1)]);
+      expect(ended.status).toBe("fulfilled");
+      const live = (await f.store.read()).rsvps.filter((r) => r.eventId === event.id && [f.m.Ada, f.m.Ben, f.m.Cy].includes(r.memberId) && (r.status === "going" || r.status === "waitlisted"));
+      expect(live).toHaveLength(0);
+      if (joined.status === "rejected") expect((joined.reason as RsvpRefused).reasons.map((r) => r.code)).toEqual(["member_blocked"]);
     });
   });
 

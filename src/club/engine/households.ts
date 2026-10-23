@@ -30,6 +30,11 @@ export interface BookingLedger {
    * Returns the IDs of the sign-ups cancelled. Optional, so a ledger that knows nothing of classes still works.
    */
   cancelFutureSignUps?(input: { state: ClubState; memberIds: string[]; now: Date; reason: string; actor: Actor }): Promise<string[]>;
+  /**
+   * Takes these members off the lists of events still to come and moves the waiting lists up behind them.
+   * Returns the IDs of the RSVPs cancelled. Optional, so a ledger that knows nothing of events still works.
+   */
+  cancelFutureRsvps?(input: { state: ClubState; memberIds: string[]; now: Date; reason: string; actor: Actor }): Promise<string[]>;
 }
 
 export interface NewMember {
@@ -174,6 +179,10 @@ export async function removeMember(
     if (dropped.length > 0) {
       log(s, newId, ctx, household.id, "signups_cancelled", `${dropped.length} future class sign-up${dropped.length === 1 ? "" : "s"} cancelled for ${fullName(member)}.`, { count: dropped.length });
     }
+    const replies = (await ledger.cancelFutureRsvps?.({ state: s, memberIds: [member.id], now: ctx.now, reason: `${fullName(member)} was removed from the household`, actor: ctx.actor })) ?? [];
+    if (replies.length > 0) {
+      log(s, newId, ctx, household.id, "rsvps_cancelled", `${replies.length} future event RSVP${replies.length === 1 ? "" : "s"} cancelled for ${fullName(member)}.`, { count: replies.length });
+    }
   });
 }
 
@@ -239,6 +248,10 @@ export async function endHousehold(
     const dropped = (await ledger.cancelFutureSignUps?.({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor })) ?? [];
     if (dropped.length > 0) {
       log(s, newId, ctx, household.id, "signups_cancelled", `${dropped.length} future class sign-up${dropped.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: dropped.length });
+    }
+    const replies = (await ledger.cancelFutureRsvps?.({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor })) ?? [];
+    if (replies.length > 0) {
+      log(s, newId, ctx, household.id, "rsvps_cancelled", `${replies.length} future event RSVP${replies.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: replies.length });
     }
     return { endedOn, blocked: memberIds, cancelledBookings: cancelled };
   });

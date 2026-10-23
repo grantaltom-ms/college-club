@@ -28,12 +28,17 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         `/club/classes/${FIRST_HOUSEHOLD}`,
         "/club/classes/manage",
         "/club/my-classes",
+        "/club/events",
+        "/club/events/manage",
+        `/club/events/${FIRST_HOUSEHOLD}`,
+        `/club/rsvp/${FIRST_HOUSEHOLD}/${FIRST_HOUSEHOLD}/${"A".repeat(43)}`,
+        `/api/club/events/${FIRST_HOUSEHOLD}/links`,
       ];
       for (const path of paths) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Yoga|Erg Conditioning|Stretch|Boathouse gym/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as/i);
       }
     });
 
@@ -50,7 +55,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
       }
     });
 
-    test("no booking, cancelling, equipment or class request does anything, even with a test-member cookie", async () => {
+    test("no booking, cancelling, equipment, class or event request does anything, even with a test-member cookie", async () => {
       const posts: [string, Record<string, string>][] = [
         ["/api/club/bookings", { item: FIRST_HOUSEHOLD, start: "2026-10-29T14:00:00.000Z", minutes: "60", for: FIRST_HOUSEHOLD }],
         ["/api/club/bookings/cancel", { id: FIRST_HOUSEHOLD }],
@@ -63,6 +68,15 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         ["/api/club/classes/cancel-session", { session: FIRST_HOUSEHOLD, reason: "Test" }],
         ["/api/club/classes/capacity", { session: FIRST_HOUSEHOLD, capacity: "5" }],
         ["/api/club/classes/attendance", { id: FIRST_HOUSEHOLD, outcome: "attended" }],
+        ["/api/club/events/rsvp", { event: FIRST_HOUSEHOLD, people: "2", for: FIRST_HOUSEHOLD }],
+        ["/api/club/events/leave", { id: FIRST_HOUSEHOLD }],
+        ["/api/club/events/guests", { id: FIRST_HOUSEHOLD, people: "2" }],
+        ["/api/club/events/keep", { id: FIRST_HOUSEHOLD }],
+        ["/api/club/events/link", { event: FIRST_HOUSEHOLD, member: FIRST_HOUSEHOLD, token: "A".repeat(43), action: "rsvp", people: "1" }],
+        ["/api/club/events/create", { title: "Test", date: "2026-11-04", start: "19:00", end: "21:00" }],
+        ["/api/club/events/update", { event: FIRST_HOUSEHOLD, title: "Test" }],
+        ["/api/club/events/cancel", { event: FIRST_HOUSEHOLD, reason: "Test" }],
+        ["/api/club/events/attendance", { id: FIRST_HOUSEHOLD, outcome: "attended" }],
       ];
       for (const [path, body] of posts) {
         const res = await fetch(`${base}${path}`, {

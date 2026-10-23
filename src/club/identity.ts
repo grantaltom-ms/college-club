@@ -1,5 +1,7 @@
 import { clubEnabled } from "./enabled";
 import { fullName, householdOf, memberById } from "./engine/queries";
+import { verifyRsvpLinkToken } from "./engine/rsvp-links";
+import { getLinkSecret } from "./link-secret";
 import type { ClubStore } from "./store/memory";
 import { getClubStore } from "./store/instance";
 import { SAMPLE_STAFF } from "./sample/club";
@@ -53,4 +55,28 @@ export function toEngineActor(current: CurrentActor): Actor {
 export function canViewHousehold(current: CurrentActor | null, householdId: string): boolean {
   if (!current) return false;
   return current.kind === "staff" || current.household.id === householdId;
+}
+
+/**
+ * The adult an emailed RSVP link belongs to, if the link is genuine: this event, this member, and the secret code made for
+ * exactly that pair. Opening a link signs nobody in and sets no cookie; it only lets that one adult answer for that one event.
+ * (Step 6 may replace this with real logins; the link then just opens the event page.)
+ */
+export async function resolveRsvpLink(
+  store: ClubStore,
+  secret: string,
+  link: { eventId: string; memberId: string; token: string },
+): Promise<{ member: Member; household: Household } | null> {
+  if (!verifyRsvpLinkToken(secret, link.eventId, link.memberId, link.token)) return null;
+  const state = await store.read();
+  const member = memberById(state, link.memberId);
+  const household = member && householdOf(state, member.householdId);
+  return member && household ? { member, household } : null;
+}
+
+/** The request's RSVP link owner, or null when the link is not genuine (or the member area is switched off). */
+export async function getRsvpLinkActor(link: { eventId: string; memberId: string; token: string }) {
+  const secret = clubEnabled() ? getLinkSecret() : null;
+  if (!secret) return null;
+  return resolveRsvpLink(await getClubStore(), secret, link);
 }

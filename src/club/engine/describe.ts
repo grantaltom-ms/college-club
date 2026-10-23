@@ -1,7 +1,7 @@
 import { classRulesFor } from "../settings/class-rules";
 import { rulesFor } from "../settings/rulebook";
 import { clockToMinutes, formatClock, formatMinutes, pacificWall } from "../time";
-import type { ClassRules, ClassTemplate, ClubState, Item, RuleBook } from "../types";
+import type { ClassRules, ClassTemplate, ClubState, EventRules, Item, RuleBook } from "../types";
 
 /** The rules that apply to one item, in plain words, for the booking form. Every number comes from the settings file. */
 export function describeRules(state: ClubState, book: RuleBook, item: Item): { heading: string; lines: string[]; placeholder: boolean } {
@@ -39,4 +39,19 @@ export function describeClassRules(classRules: ClassRules, template: ClassTempla
     "Nobody can be in two places at once: a class cannot overlap another class (or a waiting-list place), or a boat you have booked.",
   ];
   return { heading: `Rules for ${template.name}`, lines, placeholder: classRules.placeholder };
+}
+
+/** The rules that apply to event RSVPs, in plain words, for the event page. Every number comes from the settings file. */
+export function describeEventRules(eventRules: EventRules): { heading: string; lines: string[]; placeholder: boolean } {
+  const r = eventRules.defaults;
+  const lines = [
+    `RSVP once for yourself${r.maxGuests > 0 ? `, and choose how many people are coming, up to ${r.maxGuests + 1} counting you` : ""}. Everyone in your party takes one spot. If the event has a limit and your whole party does not fit, you can join the waitlist for the whole party, or RSVP for a smaller one.`,
+    `RSVPs close ${formatMinutes(r.closeMinutesBefore)} before the start, unless the event says otherwise.`,
+    r.waitlistMax > 0
+      ? `The waitlist holds up to ${r.waitlistMax} ${r.waitlistMax === 1 ? "party" : "parties"}.${r.waitlistHoldMinutes > 0 ? ` Your place on it is removed ${formatMinutes(r.waitlistHoldMinutes)} after the last time you pressed a button there (press Keep my place to hold it another ${formatMinutes(r.waitlistHoldMinutes)}).` : ""} When spots free up, the first party in line that fits gets them at once, until ${formatMinutes(r.promoteUntilMinutesBefore)} before the start. After that, free spots go to whoever asks first.`
+      : "There is no waitlist: when an event is full, it is full.",
+    `Cancel at least ${formatMinutes(r.cancelCutoffMinutes)} before the start, or it counts as a late cancellation. Leaving the waitlist is never late.`,
+    "Events do not clash with boats or classes: you can row and go to dinner on the same night.",
+  ];
+  return { heading: "How RSVPs work", lines, placeholder: eventRules.placeholder };
 }

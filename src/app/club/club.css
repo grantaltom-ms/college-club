@@ -389,3 +389,40 @@ details summary {
   align-items: center;
   color: var(--waterloo);
 }
+
+/* The "how many people" picker on event pages. Big tap targets for phones. */
+.party-label {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.party-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.party-step {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--waterloo);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--waterloo);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.party-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.party-count {
+  min-width: 2ch;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 600;
+}

@@ -1,0 +1,12 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). Minutes are minutes before the event starts. These are the house rules for RSVPs to club events. Change a number here and the event screens and rule checks follow.",
+  "defaults": {
+    "closeMinutesBefore": 60,
+    "cancelCutoffMinutes": 2880,
+    "promoteUntilMinutesBefore": 120,
+    "waitlistMax": 30,
+    "waitlistHoldMinutes": 60,
+    "maxGuests": 4
+  }
+}
