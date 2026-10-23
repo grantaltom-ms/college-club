@@ -27,7 +27,7 @@ export default defineConfig({
       ? [
           {
             name: "postgres",
-            testMatch: /club(-booking|-classes|-events|-staff|-checkin)?\.spec\.ts/,
+            testMatch: /club(-booking|-classes|-events|-staff|-checkin|-signin)?\.spec\.ts/,
             use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${PORT_POSTGRES}` },
           },
         ]
@@ -49,6 +49,8 @@ export default defineConfig({
         CLUB_LINK_SECRET: "playwright-only-link-secret-0001",
         // Test-only; gives the front-desk iPad a fixed private address on this server.
         CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001",
+        // Test-only; invented staff who can sign in by email link on this server.
+        CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer; sam.deskwell@example.org=Sam Deskwell",
       },
     },
     {
@@ -59,7 +61,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       // The iPad secret is set on purpose: even with the right secret there must be no iPad here.
-      env: { CCS_ALLOW_SAMPLE_DATA: "", VERCEL_ENV: "", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001" },
+      env: { CCS_ALLOW_SAMPLE_DATA: "", VERCEL_ENV: "", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer" },
     },
     {
       // The worst mistake: the sample-data switch is on, but this is the live production site.
@@ -67,7 +69,7 @@ export default defineConfig({
       url: `http://localhost:${PORT_LIVE_SITE}/favicon.ico`,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
-      env: { CCS_ALLOW_SAMPLE_DATA: "1", VERCEL_ENV: "production", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001" },
+      env: { CCS_ALLOW_SAMPLE_DATA: "1", VERCEL_ENV: "production", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer" },
     },
     ...(E2E_DB
       ? [
@@ -78,7 +80,7 @@ export default defineConfig({
             url: `http://localhost:${PORT_POSTGRES}/club/act-as`,
             reuseExistingServer: false,
             timeout: 120_000,
-            env: { CCS_ALLOW_SAMPLE_DATA: "1", CCS_CLUB_NOW: "2026-10-28T20:00:00Z", CLUB_DATABASE_URL: E2E_DB, CLUB_TEST_DATABASE_URL: ADMIN_DB!, CLUB_LINK_SECRET: "playwright-only-link-secret-0002", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0002" },
+            env: { CCS_ALLOW_SAMPLE_DATA: "1", CCS_CLUB_NOW: "2026-10-28T20:00:00Z", CLUB_DATABASE_URL: E2E_DB, CLUB_TEST_DATABASE_URL: ADMIN_DB!, CLUB_LINK_SECRET: "playwright-only-link-secret-0002", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0002", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer; sam.deskwell@example.org=Sam Deskwell" },
           },
         ]
       : []),

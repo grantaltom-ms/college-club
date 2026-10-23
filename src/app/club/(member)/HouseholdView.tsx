@@ -48,7 +48,8 @@ function MemberCard({ state, member, household, staff }: { state: ClubState; mem
         <dl className="club-slots" aria-label={`Linked accounts for ${fullName(member)}`}>
           <Slot label="Brivo credential" value={member.brivoCredentialId} />
           <Slot label="Mailchimp contact" value={member.mailchimpContactId} />
-          <Slot label="Login" value={member.loginId} />
+          <dt>Login</dt>
+          <dd data-testid="login-state">{member.loginId ? "has signed in" : "has not signed in yet"}</dd>
         </dl>
       )}
     </li>

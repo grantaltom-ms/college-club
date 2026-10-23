@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { clubEnabled } from "@/club/enabled";
+import { pickerEnabled } from "@/club/enabled";
 import { ACTOR_COOKIE, parseActorCookie } from "@/club/identity";
 import { memberById } from "@/club/engine/queries";
 import { getClubStore } from "@/club/store/instance";
 
-/** The "act as this test member" picker posts here. It does not exist at all unless the member area is switched on. */
+/** The "act as this test member" picker posts here. It does not exist at all unless invented data is allowed. */
 export async function POST(request: NextRequest) {
-  if (!clubEnabled()) return new NextResponse(null, { status: 404 });
+  if (!pickerEnabled()) return new NextResponse(null, { status: 404 });
 
   const form = await request.formData();
   const choice = String(form.get("actor") ?? "");

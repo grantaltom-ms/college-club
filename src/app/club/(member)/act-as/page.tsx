@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+import { pickerEnabled } from "@/club/enabled";
 import { fullName, membersOf } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
@@ -5,18 +7,19 @@ import { getClubStore } from "@/club/store/instance";
 import { formatDay } from "@/club/time";
 
 /**
- * The stand-in for logging in. It only exists while the member area itself is switched on (see club/enabled.ts),
- * and goes away when real logins arrive in step 6.
+ * The test shortcut for trying the club as different invented people. It only exists where invented data is allowed
+ * (see club/enabled.ts), never for real members; real people sign in by email link.
  */
 export default async function ActAs() {
   await requireClub();
+  if (!pickerEnabled()) notFound();
   const actor = await getCurrentActor();
   const state = await (await getClubStore()).read();
   const households = [...state.households].sort((a, b) => a.displayName.localeCompare(b.displayName));
   return (
     <section>
       <h1>Act as a test member</h1>
-      <p>Pick who you want to be. Real logins come later; this just lets us try the club as different people.</p>
+      <p>Pick who you want to be. This test shortcut lets us try the club as different invented people; real people sign in by email link.</p>
       <form method="post" action="/api/club/act-as">
         <p>
           <button type="submit" name="actor" value="staff" className="club-button">

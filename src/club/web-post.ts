@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { clubNow } from "./clock";
-import { clubEnabled } from "./enabled";
+import { clubEnabled, outboxEnabled, pickerEnabled } from "./enabled";
 import { ClubError } from "./errors";
 import { fullName, memberById } from "./engine/queries";
 import { getCurrentActor, getRsvpLinkActor, ipadCodeIsGenuine, toEngineActor, type CurrentActor } from "./identity";
@@ -11,7 +11,7 @@ import type { Ctx } from "./engine/households";
 export async function startPost(request: NextRequest): Promise<{ response: NextResponse } | { actor: CurrentActor; ctx: Ctx; form: FormData; store: Awaited<ReturnType<typeof getClubStore>> }> {
   if (!clubEnabled()) return { response: new NextResponse(null, { status: 404 }) };
   const actor = await getCurrentActor();
-  if (!actor) return { response: see(request, "/club/act-as") };
+  if (!actor) return { response: see(request, pickerEnabled() ? "/club/act-as" : "/club/sign-in") };
   let form: FormData;
   try {
     form = await request.formData();
@@ -89,4 +89,40 @@ export async function startIpadPost(request: NextRequest): Promise<{ response: N
   const member = memberById(await store.read(), memberId);
   if (!member) return notFound;
   return { ctx: { actor: { kind: "member", memberId, label: fullName(member) }, now: clubNow() }, form, store, code, memberId };
+}
+
+/**
+ * Whether a form post comes from this site's own pages. Browsers say where a post came from; a post from another site is
+ * refused. (A post with no such information at all, such as a plain command-line request, is let through: it carries none of the
+ * visitor's cookies either way unless they were sent on purpose.)
+ */
+export function sameOrigin(request: NextRequest): boolean {
+  const site = request.headers.get("sec-fetch-site");
+  if (site && site !== "same-origin" && site !== "none") return false;
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === (request.headers.get("x-forwarded-host") ?? request.headers.get("host"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The site's own address for sign-in emails. On a real site it must be set (CLUB_SITE_URL), because an address taken from the
+ * visitor's request could be forged to send a victim's sign-in link to someone else's server. Only in a test build, where the
+ * "email" never leaves the server, is the address of the request itself good enough.
+ */
+export function siteOrigin(request: NextRequest): string | null {
+  const configured = process.env.CLUB_SITE_URL?.trim();
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      if (url.protocol === "https:" || url.protocol === "http:") return url.origin;
+    } catch {
+      // fall through: a bad setting is no setting
+    }
+    return null;
+  }
+  return outboxEnabled() ? request.nextUrl.origin : null;
 }

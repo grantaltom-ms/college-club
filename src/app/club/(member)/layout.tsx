@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pickerEnabled } from "@/club/enabled";
 import { fullName } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
@@ -26,7 +27,13 @@ export default async function MemberLayout({ children }: { children: React.React
             {actor?.kind === "member" && <Link href="/club/my-classes">My classes</Link>}
             {actor?.kind === "staff" && <Link href="/club/admin">Staff office</Link>}
             {actor?.kind === "staff" && <Link href="/club/equipment">Equipment</Link>}
-            <Link href="/club/act-as">Switch test member</Link>
+            {actor === null && <Link href="/club/sign-in">Sign in</Link>}
+            {pickerEnabled() && <Link href="/club/act-as">Switch test member</Link>}
+            {actor?.source === "login" && (
+              <form method="post" action="/api/club/sign-out">
+                <button type="submit">Sign out</button>
+              </form>
+            )}
           </nav>
         </div>
       </header>
@@ -35,7 +42,13 @@ export default async function MemberLayout({ children }: { children: React.React
           Test build. Every household, member and booking here is invented. Nothing is connected to real club data.
         </p>
         <p className="club-acting" data-testid="acting-as">
-          {actor === null ? "Not acting as anyone." : actor.kind === "staff" ? `Acting as ${actor.label}.` : `Acting as ${fullName(actor.member)}.`}
+          {actor === null
+            ? "Not acting as anyone."
+            : actor.source === "login"
+              ? `Signed in as ${actor.kind === "staff" ? actor.label : fullName(actor.member)}.`
+              : actor.kind === "staff"
+                ? `Acting as ${actor.label}.`
+                : `Acting as ${fullName(actor.member)}.`}
         </p>
         <main>{children}</main>
       </div>
