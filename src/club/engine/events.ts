@@ -346,6 +346,18 @@ function checkedFields(f: EventFields): EventFields {
   return { title, description, location, startsAt: f.startsAt, endsAt: f.endsAt, capacity: f.capacity, priceCents: f.priceCents, replyBy: f.replyBy };
 }
 
+/** The plain-words problem with these event fields, or null if they are fine to schedule. Reads only: for forms to explain. */
+export function eventFieldsProblem(input: NewEvent, now: Date): string | null {
+  try {
+    const f = checkedFields({ description: "", location: "", capacity: null, priceCents: null, replyBy: null, ...input });
+    if (f.startsAt.getTime() <= now.getTime()) return "The event must start in the future.";
+    return null;
+  } catch (e) {
+    if (e instanceof ClubError) return e.message;
+    throw e;
+  }
+}
+
 export type NewEvent = Pick<EventFields, "title" | "startsAt" | "endsAt"> & Partial<Omit<EventFields, "title" | "startsAt" | "endsAt">>;
 
 /** Staff add an event. */

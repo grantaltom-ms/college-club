@@ -76,6 +76,7 @@ export async function resolveRsvpLink(
 
 /** The request's RSVP link owner, or null when the link is not genuine (or the member area is switched off). */
 export async function getRsvpLinkActor(link: { eventId: string; memberId: string; token: string }) {
-  if (!clubEnabled()) return null;
-  return resolveRsvpLink(await getClubStore(), getLinkSecret(), link);
+  const secret = clubEnabled() ? getLinkSecret() : null;
+  if (!secret) return null;
+  return resolveRsvpLink(await getClubStore(), secret, link);
 }

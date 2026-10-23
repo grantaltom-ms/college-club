@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { clubNow } from "./clock";
 import { clubEnabled } from "./enabled";
 import { ClubError } from "./errors";
-import { getCurrentActor, toEngineActor, type CurrentActor } from "./identity";
+import { fullName } from "./engine/queries";
+import { getCurrentActor, getRsvpLinkActor, toEngineActor, type CurrentActor } from "./identity";
 import { getClubStore } from "./store/instance";
 import type { Ctx } from "./engine/households";
 
@@ -42,4 +43,27 @@ export function fields(form: FormData, name: string, limit = 12): string[] {
 export function noticeCode(e: unknown): string {
   if (e instanceof ClubError && e.code !== "refused") return e.code;
   throw e;
+}
+
+/**
+ * What every emailed-link form handler starts with. The member area must be on, the form must be readable, and the link
+ * must be genuine (this event, this member, the right secret code). Anything else answers "not found" and does nothing:
+ * the same answer for every wrong link, so a stranger learns nothing. The link signs nobody in and sets no cookie.
+ */
+export async function startLinkPost(request: NextRequest): Promise<{ response: NextResponse } | { ctx: Ctx; form: FormData; store: Awaited<ReturnType<typeof getClubStore>>; link: { eventId: string; memberId: string; token: string } }> {
+  const notFound = { response: new NextResponse(null, { status: 404 }) };
+  if (!clubEnabled()) return notFound;
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return notFound;
+  }
+  const id = (name: string) => /^[0-9a-f-]{36}$/.test(field(form, name)) ? field(form, name) : "";
+  const token = field(form, "token", 100);
+  const link = { eventId: id("event"), memberId: id("member"), token };
+  if (!link.eventId || !link.memberId || !/^[A-Za-z0-9_-]{20,64}$/.test(token)) return notFound;
+  const owner = await getRsvpLinkActor(link);
+  if (!owner) return notFound;
+  return { ctx: { actor: { kind: "member", memberId: owner.member.id, label: fullName(owner.member) }, now: clubNow() }, form, store: await getClubStore(), link };
 }

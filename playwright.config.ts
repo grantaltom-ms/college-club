@@ -27,7 +27,7 @@ export default defineConfig({
       ? [
           {
             name: "postgres",
-            testMatch: /club(-booking|-classes)?\.spec\.ts/,
+            testMatch: /club(-booking|-classes|-events)?\.spec\.ts/,
             use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${PORT_POSTGRES}` },
           },
         ]
@@ -45,6 +45,8 @@ export default defineConfig({
         CCS_ALLOW_SAMPLE_DATA: "1",
         // The member area's clock stands still at 1 pm Pacific on Wed Oct 28, 2026, so the tests never depend on the time of day.
         CCS_CLUB_NOW: "2026-10-28T20:00:00Z",
+        // Test-only; makes the emailed RSVP links work on this server.
+        CLUB_LINK_SECRET: "playwright-only-link-secret-0001",
       },
     },
     {
@@ -73,7 +75,7 @@ export default defineConfig({
             url: `http://localhost:${PORT_POSTGRES}/club/act-as`,
             reuseExistingServer: false,
             timeout: 120_000,
-            env: { CCS_ALLOW_SAMPLE_DATA: "1", CCS_CLUB_NOW: "2026-10-28T20:00:00Z", CLUB_DATABASE_URL: E2E_DB, CLUB_TEST_DATABASE_URL: ADMIN_DB! },
+            env: { CCS_ALLOW_SAMPLE_DATA: "1", CCS_CLUB_NOW: "2026-10-28T20:00:00Z", CLUB_DATABASE_URL: E2E_DB, CLUB_TEST_DATABASE_URL: ADMIN_DB!, CLUB_LINK_SECRET: "playwright-only-link-secret-0002" },
           },
         ]
       : []),
