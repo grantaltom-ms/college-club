@@ -53,6 +53,8 @@ export interface NewHousehold {
   primary: NewMember;
   additional?: NewMember[];
   notes?: string;
+  /** The household's customer ID in QuickBooks, when it is known (the roster import fills it). Unique across the club. */
+  quickbooksId?: string;
 }
 
 const FORBIDDEN = "Only club staff can do that.";
@@ -90,7 +92,7 @@ function problemOf(check: () => void): string | null {
   }
 }
 
-const isRealDay = (day: string) => {
+export const isRealDay = (day: string) => {
   const at = new Date(`${day}T00:00:00Z`);
   return /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === day;
 };
@@ -156,26 +158,50 @@ function activeHousehold(s: ClubState, id: string): Household {
   return household;
 }
 
+/**
+ * Writes a new household into a working copy: the household, each adult, and the "joined" and "member added" lines in its
+ * file. Used by `createHousehold` (one household) and by the roster import (many households in one all-or-nothing change).
+ * `source` says where it came from when it was not typed in at the front desk ("an import file").
+ */
+export function addHouseholdRecords(
+  s: ClubState,
+  newId: () => string,
+  ctx: Ctx,
+  input: NewHousehold,
+  how: { source?: string } = {},
+): { household: Household; members: Member[] } {
+  const quickbooksId = input.quickbooksId === undefined ? null : text(input.quickbooksId, "The QuickBooks ID", 100);
+  if (quickbooksId !== null) {
+    const taken = s.households.find((h) => h.quickbooksId === quickbooksId);
+    if (taken) throw new ClubError("conflict", `QuickBooks ID ${quickbooksId} already belongs to ${taken.displayName}.`);
+  }
+  const household: Household = {
+    id: newId(),
+    displayName: text(input.displayName, "The household name", 120),
+    membershipType: input.membershipType,
+    status: "active",
+    joinedOn: input.joinedOn,
+    endedOn: null,
+    quickbooksId,
+    notes: (input.notes ?? "").trim(),
+  };
+  s.households.push(household);
+  const joined = `${household.displayName} joined as ${household.membershipType}.`;
+  log(s, newId, ctx, household.id, "joined", how.source ? `${joined} Added from ${how.source}; join date ${formatDay(household.joinedOn)}.` : joined, {
+    joinedOn: household.joinedOn,
+    membershipType: household.membershipType,
+    ...(quickbooksId !== null ? { quickbooksId } : {}),
+    ...(how.source ? { source: how.source } : {}),
+  });
+  const members = [addAdult(s, newId, ctx, household, input.primary, "primary"), ...(input.additional ?? []).map((m) => addAdult(s, newId, ctx, household, m, "additional"))];
+  return { household, members };
+}
+
 /** A household joins: one record for the household and one for each adult, with a "joined" line in its file. */
 export async function createHousehold(store: ClubStore, ctx: Ctx, input: NewHousehold): Promise<{ household: Household; members: Member[] }> {
   requireStaff(ctx.actor);
   checkHouseholdFields(input);
-  return store.transaction(async (s, newId) => {
-    const household: Household = {
-      id: newId(),
-      displayName: text(input.displayName, "The household name", 120),
-      membershipType: input.membershipType,
-      status: "active",
-      joinedOn: input.joinedOn,
-      endedOn: null,
-      quickbooksId: null,
-      notes: (input.notes ?? "").trim(),
-    };
-    s.households.push(household);
-    log(s, newId, ctx, household.id, "joined", `${household.displayName} joined as ${household.membershipType}.`, { joinedOn: household.joinedOn, membershipType: household.membershipType });
-    const members = [addAdult(s, newId, ctx, household, input.primary, "primary"), ...(input.additional ?? []).map((m) => addAdult(s, newId, ctx, household, m, "additional"))];
-    return { household, members };
-  });
+  return store.transaction(async (s, newId) => addHouseholdRecords(s, newId, ctx, input));
 }
 
 export async function addMember(store: ClubStore, ctx: Ctx, householdId: string, input: NewMember): Promise<Member> {

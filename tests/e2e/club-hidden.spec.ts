@@ -45,6 +45,8 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         `/club/admin/households/${FIRST_HOUSEHOLD}/remove/${FIRST_HOUSEHOLD}`,
         `/club/admin/households/${FIRST_HOUSEHOLD}/members/${FIRST_HOUSEHOLD}/edit`,
         "/club/admin/ipad",
+        "/club/admin/import",
+        "/api/club/import/template",
         `/club/ipad/${IPAD_CODE}`,
         `/club/ipad/${IPAD_CODE}?notice=forbidden`,
         `/club/ipad/${IPAD_CODE}/${FIRST_HOUSEHOLD}`,
@@ -60,7 +62,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster/i);
       }
     });
 
@@ -107,6 +109,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         ["/api/club/households/add-member", { household: FIRST_HOUSEHOLD, firstName: "A", lastName: "B", email: "a@example.com" }],
         ["/api/club/households/remove-member", { household: FIRST_HOUSEHOLD, member: FIRST_HOUSEHOLD }],
         ["/api/club/households/update-member", { household: FIRST_HOUSEHOLD, member: FIRST_HOUSEHOLD, firstName: "A", lastName: "B", email: "a@example.com" }],
+        ["/club/admin/import", {}],
         ["/api/club/households/change-type", { household: FIRST_HOUSEHOLD, type: "Resident" }],
         ["/api/club/households/grant", { household: FIRST_HOUSEHOLD, member: FIRST_HOUSEHOLD, code: "scull-1" }],
         ["/api/club/households/end", { household: FIRST_HOUSEHOLD }],
