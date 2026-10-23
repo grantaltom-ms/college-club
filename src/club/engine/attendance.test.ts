@@ -4,7 +4,7 @@ import { ATTENDANCE_RULES } from "../settings/attendance-rules";
 import { EVENT_RULES } from "../settings/event-rules";
 import { MemoryClubStore } from "../store/memory";
 import type { AttendanceRules, ClubState } from "../types";
-import { attendanceSettler, describeAttendanceRules, needsALook, recordAttendance, reservationsFor, rowFor, settleAttendance } from "./attendance";
+import { aroundNow, attendanceSettler, checkInNeeded, describeAttendanceRules, needsALook, recordAttendance, reservationsFor, rowFor, settleAttendance } from "./attendance";
 import { cancelBooking } from "./bookings";
 import { createClass, scheduleSessions, signUp } from "./classes";
 import { createEvent, rsvp } from "./events";
@@ -96,6 +96,34 @@ describe.each(STORE_KINDS)("check-ins and the automatic no-show on the %s store"
       clock.now = at(1, 8);
       const state = await f.store.read();
       expect(state.bookings.filter((b) => [dock.id, kayak.id].includes(b.id)).map((b) => b.status)).toEqual(["no_show", "no_show"]);
+    });
+  });
+
+  describe("a kind of booking that needs no check-in", () => {
+    it("is never marked a no-show, is refused a check-in, and stays off every staff list", async () => {
+      const { f, clock } = await club(kind);
+      await f.store.transaction(async (s, newId) => {
+        const id = newId();
+        s.items.push({ id, name: "Clubhouse room", classCode: "room-space", ruleOverrides: {} });
+        f.i["Clubhouse room"] = id;
+      });
+      const room = (await booking(f, "Ada", "Clubhouse room", 1, 9, 10)).booking;
+      const boat = (await booking(f, "Dee", "Heron", 1, 9, 10)).booking;
+      clock.now = at(1, 12);
+      const state = await f.store.read();
+      // The boat nobody checked in for is a no-show; the room booking is simply over.
+      expect(state.bookings.find((b) => b.id === boat.id)!.status).toBe("no_show");
+      expect(state.bookings.find((b) => b.id === room.id)).toMatchObject({ status: "upcoming", statusChangedAt: room.statusChangedAt });
+      expect(state.attendance.map((l) => l.recordId)).toEqual([boat.id]);
+      expect(checkInNeeded(state, room, ATTENDANCE_RULES)).toBe(false);
+      expect(checkInNeeded(state, boat, ATTENDANCE_RULES)).toBe(true);
+      // Staff cannot check it in or mark it, and it is on none of their lists.
+      await expect(mark(f.store, staffCtx(clock.now), "booking", room.id, "attended")).rejects.toThrow("Room Space reservations do not need a check-in.");
+      await expect(mark(f.store, staffCtx(clock.now), "booking", room.id, "no_show")).rejects.toThrow("do not need a check-in");
+      expect(rowFor(state, "booking", room.id, clock.now, ATTENDANCE_RULES)).toBeNull();
+      expect(needsALook(state, clock.now, ATTENDANCE_RULES).map((r) => r.id)).toEqual([boat.id]);
+      expect(reservationsFor(state, f.m.Ada, clock.now, ATTENDANCE_RULES, { hoursBack: 48 })).toEqual([]);
+      expect(aroundNow(state, clock.now, ATTENDANCE_RULES, 6).map((r) => r.id)).toEqual([boat.id]);
     });
   });
 
@@ -299,6 +327,13 @@ describe("the automatic no-show as a plain rule", () => {
     expect(s.bookings.at(-1)).toMatchObject({ status: "no_show", statusChangedAt: at(1, 8, 15).toISOString() });
   });
 
+  it("leaves out whatever kind of booking the rules say needs no check-in, and marks it again if the rules change", async () => {
+    const s = await state();
+    expect(settleAttendance(structuredClone(s), at(1, 9), rulesWith({ checkInNotNeededFor: ["Shell"] }), ids())).toEqual([]);
+    const marked = settleAttendance(s, at(1, 9), rulesWith({ checkInNotNeededFor: [] }), ids());
+    expect(marked).toHaveLength(1);
+  });
+
   it("does nothing the second time it runs", async () => {
     const s = await state();
     expect(settleAttendance(s, at(1, 9), ATTENDANCE_RULES, ids())).toHaveLength(1);
@@ -316,9 +351,13 @@ describe("the automatic no-show as a plain rule", () => {
     expect(describeAttendanceRules(ATTENDANCE_RULES)).toEqual([
       "Check-in opens 30 minutes before the start.",
       "A boat or space booking, or a class chair, that nobody checked in for becomes a no-show the moment it ends.",
+      "Room Space and Work Space reservations do not need a check-in: they are never marked a no-show.",
       "Events are not marked automatically; staff mark who came.",
       "Staff can correct any of these afterwards. The correction is added to the record; nothing is erased.",
     ]);
+    // With nothing exempt, the line is left out; with three kinds it reads as a list.
+    expect(describeAttendanceRules(rulesWith({ checkInNotNeededFor: [] })).join(" ")).not.toContain("do not need a check-in");
+    expect(describeAttendanceRules(rulesWith({ checkInNotNeededFor: ["Room Space", "Work Space", "Dock Space"] }))[2]).toBe("Room Space, Work Space and Dock Space reservations do not need a check-in: they are never marked a no-show.");
     expect(describeAttendanceRules(rulesWith({ checkInOpensMinutesBefore: 0, noShowAfterEndMinutes: 90 })).slice(0, 2)).toEqual([
       "Check-in opens at the start.",
       "A boat or space booking, or a class chair, that nobody checked in for becomes a no-show 1 hour 30 minutes after it ends.",

@@ -89,6 +89,8 @@ export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<
   await bookToday("Mink", "Priya Rao", 12, 0, 120);
   await bookToday("Beaver", "Dev Rao", 13, 30, 60);
   await bookToday("Drift", "Julien Moreau", 15, 0, 60);
+  // The club room needs no check-in, so this one that is over this morning is simply finished, never a no-show.
+  await bookToday("Clubhouse room", "Yuki Nakamura", 9, 0, 60);
 
   // Merganser is being repaired, from now until staff return it.
   await takeOutOfService(store, ctx, item("Merganser"), { reason: "Rigger being repaired", expectedReturn: addDays(today, 5) });

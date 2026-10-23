@@ -393,6 +393,8 @@ export interface AttendanceRuleValues {
   checkInOpensMinutesBefore: number;
   /** A boat or space booking, or a class chair, that nobody checked in for becomes a no-show this many minutes after it ends. */
   noShowAfterEndMinutes: number;
+  /** Kinds of booking that need no check-in at all (the club room, work-from-club): never a no-show, never on the check-in lists. */
+  checkInNotNeededFor: BookingType[];
 }
 
 export interface AttendanceRules {

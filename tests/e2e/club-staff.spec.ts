@@ -48,6 +48,7 @@ test.describe("the staff office board", () => {
     await expect(page.getByTestId("placeholder-note")).toBeVisible();
     await expect(page.getByTestId("attendance-rules")).toContainText("Check-in opens 30 minutes before the start.");
     await expect(page.getByTestId("attendance-rules")).toContainText("becomes a no-show the moment it ends");
+    await expect(page.getByTestId("attendance-rules")).toContainText("Room Space and Work Space reservations do not need a check-in");
     await expect(page.getByTestId("attendance-rules")).toContainText("Events are not marked automatically");
   });
 
@@ -82,6 +83,29 @@ test.describe("the staff office board", () => {
     await actAs(page, "Alex Brooks");
     await page.goto("/club/my-bookings");
     await expect(page.getByRole("list", { name: "Past bookings" }).getByTestId("booking-row").filter({ hasText: "Cormorant" }).getByTestId("booking-status")).toHaveText("Completed");
+  });
+
+  test("a club-room booking needs no check-in: it is simply finished, never a no-show, and nothing is offered for it", async ({ page }) => {
+    await actAs(page, "Test staff");
+    // All bookings: it is in the past list, finished, with no check-in buttons.
+    await page.goto("/club/my-bookings");
+    const room = page.getByRole("list", { name: "Past bookings" }).getByTestId("booking-row").filter({ hasText: "Clubhouse room" }).filter({ hasText: "Yuki Nakamura" });
+    await expect(room.getByTestId("booking-status")).toHaveText("Finished");
+    await expect(room.getByTestId("attendance-buttons")).toHaveCount(0);
+    // A boat that was over with nobody checked in, beside it, is a no-show with buttons.
+    const boat = page.getByRole("list", { name: "Past bookings" }).getByTestId("booking-row").filter({ hasText: "Cormorant" }).filter({ hasText: "Alex Brooks" });
+    await expect(boat.getByTestId("booking-status")).toHaveText(/No-show|Completed/);
+    // It is on neither of the staff lists.
+    await page.goto("/club/admin");
+    await expect(page.getByTestId("needs-look").getByText("Clubhouse room")).toHaveCount(0);
+    await page.goto("/club/admin/check-in");
+    await expect(page.getByTestId("around-now").getByText("Clubhouse room")).toHaveCount(0);
+    await searchFor(page, "Yuki");
+    await expect(page.getByTestId("person-empty")).toBeVisible();
+    // The member sees the same.
+    await actAs(page, "Yuki Nakamura");
+    await page.goto("/club/my-bookings");
+    await expect(page.getByRole("list", { name: "Past bookings" }).getByTestId("booking-row").filter({ hasText: "Clubhouse room" }).getByTestId("booking-status")).toHaveText("Finished");
   });
 
   test("staff can confirm that an automatic no-show was right, which takes it off the list", async ({ page }) => {

@@ -1,5 +1,6 @@
 import { ClubError } from "../errors";
 import type { ClubStore, Settler } from "../store/memory";
+import { RULE_BOOK, classOf } from "../settings/rulebook";
 import { formatClock, formatMinutes } from "../time";
 import type {
   Actor,
@@ -8,6 +9,7 @@ import type {
   AttendanceOutcome,
   AttendanceRules,
   Booking,
+  BookingType,
   ClubState,
   Rsvp,
   SignUp,
@@ -54,8 +56,26 @@ interface Target {
   record: Booking | SignUp | Rsvp;
 }
 
-function bookingTarget(s: ClubState, b: Booking): Target {
+/** What kind of booking an item takes (Shell, Room Space, ...), or null if its class is not in the rules file. */
+function bookingTypeOf(s: ClubState, itemId: string): BookingType | null {
+  const item = s.items.find((i) => i.id === itemId);
+  if (!item) return null;
+  try {
+    return classOf(RULE_BOOK, item).type;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a booking is the kind that gets checked in. The club room and work-from-club, say, are not. */
+export function checkInNeeded(state: ClubState, booking: Booking, rules: AttendanceRules): boolean {
+  const type = bookingTypeOf(state, booking.itemId);
+  return type === null || !rules.defaults.checkInNotNeededFor.includes(type);
+}
+
+function bookingTarget(s: ClubState, b: Booking, rules: AttendanceRules): Target {
   const item = s.items.find((i) => i.id === b.itemId);
+  const type = bookingTypeOf(s, b.itemId);
   return {
     kind: "booking",
     id: b.id,
@@ -65,7 +85,12 @@ function bookingTarget(s: ClubState, b: Booking): Target {
     startsAt: b.startsAt,
     endsAt: b.endsAt,
     status: b.status,
-    blocked: b.status === "cancelled" || b.status === "late_cancelled" ? "That booking was cancelled, so there is nothing to check in." : null,
+    blocked:
+      b.status === "cancelled" || b.status === "late_cancelled"
+        ? "That booking was cancelled, so there is nothing to check in."
+        : !checkInNeeded(s, b, rules)
+          ? `${type} reservations do not need a check-in.`
+          : null,
     record: b,
   };
 }
@@ -119,12 +144,12 @@ function rsvpTarget(s: ClubState, r: Rsvp): Target | null {
   };
 }
 
-function targetOf(s: ClubState, kind: AttendanceKind, id: string): Target {
+function targetOf(s: ClubState, kind: AttendanceKind, id: string, rules: AttendanceRules): Target {
   const found =
     kind === "booking"
       ? (() => {
           const b = s.bookings.find((x) => x.id === id);
-          return b ? bookingTarget(s, b) : null;
+          return b ? bookingTarget(s, b, rules) : null;
         })()
       : kind === "class"
         ? (() => {
@@ -165,7 +190,11 @@ export function settleAttendance(state: ClubState, now: Date, rules: AttendanceR
     setOutcome(t, "no_show", at);
     written.push({ id: newId(), kind: t.kind, recordId: t.id, memberId: t.memberId, at, outcome: "no_show", previous: null, by: AUTOMATIC, via: "automatic", note: null });
   };
-  for (const b of state.bookings) if (b.status === "upcoming") mark(bookingTarget(state, b));
+  for (const b of state.bookings) {
+    if (b.status !== "upcoming") continue;
+    const t = bookingTarget(state, b, rules);
+    if (t.blocked === null) mark(t);
+  }
   for (const g of state.signups) {
     if (g.status !== "enrolled") continue;
     const t = signUpTarget(state, g);
@@ -202,7 +231,7 @@ export async function recordAttendance(store: ClubStore, ctx: Ctx, rules: Attend
   if (note.length > NOTE_MAX) throw new ClubError("invalid", `The note must be ${NOTE_MAX} characters or fewer.`);
 
   return store.transaction(async (s, newId) => {
-    const t = targetOf(s, input.kind, input.id);
+    const t = targetOf(s, input.kind, input.id, rules);
     if (t.blocked) throw new ClubError("conflict", t.blocked);
 
     const who = input.memberId ?? t.memberId;
@@ -284,16 +313,16 @@ function rowOf(state: ClubState, t: Target, memberId: string, now: Date, rules: 
 /** One reservation as staff would see it, or null when it cannot be checked in (cancelled, or waiting without a chair). */
 export function rowFor(state: ClubState, kind: AttendanceKind, id: string, now: Date, rules: AttendanceRules, memberId?: string): AttendanceRow | null {
   try {
-    const t = targetOf(state, kind, id);
+    const t = targetOf(state, kind, id, rules);
     return t.blocked === null ? rowOf(state, t, memberId ?? t.memberId, now, rules) : null;
   } catch {
     return null;
   }
 }
 
-function everyTarget(state: ClubState): Target[] {
+function everyTarget(state: ClubState, rules: AttendanceRules): Target[] {
   return [
-    ...state.bookings.map((b) => bookingTarget(state, b)),
+    ...state.bookings.map((b) => bookingTarget(state, b, rules)),
     ...state.signups.map((g) => signUpTarget(state, g)).filter((t): t is Target => t !== null),
     ...state.rsvps.map((r) => rsvpTarget(state, r)).filter((t): t is Target => t !== null),
   ].filter((t) => t.blocked === null);
@@ -306,7 +335,7 @@ function everyTarget(state: ClubState): Target[] {
 export function reservationsFor(state: ClubState, memberId: string, now: Date, rules: AttendanceRules, window: { hoursBack?: number; hoursAhead?: number } = {}): AttendanceRow[] {
   const from = now.getTime() - (window.hoursBack ?? 24) * 3600000;
   const until = now.getTime() + (window.hoursAhead ?? 24) * 3600000;
-  return everyTarget(state)
+  return everyTarget(state, rules)
     .filter((t) => t.people.includes(memberId) && Date.parse(t.endsAt) >= from && Date.parse(t.startsAt) <= until)
     .map((t) => rowOf(state, t, memberId, now, rules))
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.title.localeCompare(b.title));
@@ -316,7 +345,7 @@ export function reservationsFor(state: ClubState, memberId: string, now: Date, r
 export function aroundNow(state: ClubState, now: Date, rules: AttendanceRules, hours = 2): AttendanceRow[] {
   const from = now.getTime() - hours * 3600000;
   const until = now.getTime() + hours * 3600000;
-  return everyTarget(state)
+  return everyTarget(state, rules)
     .filter((t) => Date.parse(t.endsAt) >= from && Date.parse(t.startsAt) <= until)
     .map((t) => rowOf(state, t, t.memberId, now, rules))
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
@@ -328,12 +357,14 @@ export function aroundNow(state: ClubState, now: Date, rules: AttendanceRules, h
  */
 export function needsALook(state: ClubState, now: Date, rules: AttendanceRules, days = 3): AttendanceRow[] {
   const from = now.getTime() - days * 86400000;
-  return everyTarget(state)
+  return everyTarget(state, rules)
     .filter((t) => Date.parse(t.endsAt) >= from && Date.parse(t.endsAt) <= now.getTime())
     .map((t) => rowOf(state, t, t.memberId, now, rules))
     .filter((r) => r.automatic)
     .sort((a, b) => b.endsAt.localeCompare(a.endsAt) || a.title.localeCompare(b.title));
 }
+
+const listOf = (items: string[]) => (items.length <= 2 ? items.join(" and ") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`);
 
 /** The rules in plain words, for the staff screens. */
 export function describeAttendanceRules(rules: AttendanceRules): string[] {
@@ -343,6 +374,7 @@ export function describeAttendanceRules(rules: AttendanceRules): string[] {
     grace > 0
       ? `A boat or space booking, or a class chair, that nobody checked in for becomes a no-show ${formatMinutes(grace)} after it ends.`
       : "A boat or space booking, or a class chair, that nobody checked in for becomes a no-show the moment it ends.",
+    ...(rules.defaults.checkInNotNeededFor.length > 0 ? [`${listOf(rules.defaults.checkInNotNeededFor)} reservations do not need a check-in: they are never marked a no-show.`] : []),
     "Events are not marked automatically; staff mark who came.",
     "Staff can correct any of these afterwards. The correction is added to the record; nothing is erased.",
   ];
