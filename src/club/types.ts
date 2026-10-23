@@ -411,8 +411,8 @@ export type AttendanceKind = (typeof ATTENDANCE_KINDS)[number];
 export const ATTENDANCE_OUTCOMES = ["attended", "no_show"] as const;
 export type AttendanceOutcome = (typeof ATTENDANCE_OUTCOMES)[number];
 
-/** How it was recorded: by staff at the front desk, by the system when the time ran out, or (a later step) by the member on the iPad. */
-export const ATTENDANCE_VIA = ["staff", "automatic", "ipad"] as const;
+/** How it was recorded: by staff at the front desk, by the system when the time ran out, or by the member themselves on the front-desk iPad or on their own phone. */
+export const ATTENDANCE_VIA = ["staff", "automatic", "ipad", "phone"] as const;
 export type AttendanceVia = (typeof ATTENDANCE_VIA)[number];
 
 /** One line in the check-in record. Lines are only ever added, never changed or removed; a correction is a new line. */

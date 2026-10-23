@@ -121,6 +121,8 @@ export const NOTICES: Record<string, string> = {
   signed_out: "Choose a test member first.",
   duplicate_class: "There is already a class with that name. Pick another name.",
   link: "That link does not work. Ask club staff for a new one.",
-  not_open: "Check-in is not open yet for that. The list below shows when it opens.",
+  not_open: "Check-in is not open yet for that. The page shows when it opens.",
+  already_recorded: "That is already checked in.",
+  too_late: "The time for that has passed, so it counts as a no-show. Ask club staff to put it right.",
   limit: "The limit cannot go below the number of people already going. Cancel some RSVPs first, or choose a bigger number.",
 };

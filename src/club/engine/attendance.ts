@@ -8,6 +8,7 @@ import type {
   AttendanceKind,
   AttendanceOutcome,
   AttendanceRules,
+  AttendanceVia,
   Booking,
   BookingType,
   ClubState,
@@ -15,7 +16,7 @@ import type {
   SignUp,
 } from "../types";
 import type { Ctx } from "./households";
-import { fullName, memberById } from "./queries";
+import { fullName, householdOf, memberById } from "./queries";
 
 /**
  * Who came and who did not, for boat and space bookings, class chairs and event RSVPs.
@@ -271,6 +272,152 @@ export async function recordAttendance(store: ClubStore, ctx: Ctx, rules: Attend
   });
 }
 
+/* ---------- Members checking themselves in ---------- */
+
+/** The two ways a member checks in without staff: on the front-desk iPad, or on their own phone. */
+export const SELF_CHECK_IN_VIA = ["ipad", "phone"] as const;
+export type SelfCheckInVia = (typeof SELF_CHECK_IN_VIA)[number];
+
+export interface SelfCheckInInput {
+  kind: AttendanceKind;
+  id: string;
+  via: SelfCheckInVia;
+}
+
+/** The moment an unchecked booking or chair becomes a no-show: the end plus the grace minutes. */
+const dueAt = (t: Target, rules: AttendanceRules) => Date.parse(t.endsAt) + rules.defaults.noShowAfterEndMinutes * 60000;
+const opensAt = (t: Target, rules: AttendanceRules) => Date.parse(t.startsAt) - rules.defaults.checkInOpensMinutesBefore * 60000;
+
+/** Whether a member may check in for things at all: still an active adult in a household that is still active. */
+function canCheckIn(state: ClubState, memberId: string): boolean {
+  const member = memberById(state, memberId);
+  return member?.status === "active" && householdOf(state, member.householdId)?.status === "active";
+}
+
+/**
+ * A member checks themselves in, on the iPad or on their own phone: "I'm here". The building comparison: signing the
+ * clipboard yourself instead of asking the front desk to.
+ *
+ * Only for a boat or space outing or a class chair they are really on (the booker or crew, or the person with the chair),
+ * from when check-in opens until the time runs out. Events are ticked off by staff. Club room and work-from-club reservations
+ * need no check-in at all. A member can only say "I came": they cannot undo it, and a no-show is put right by staff. On a
+ * multi-seat boat there is one outcome per outing, so anyone on it can tap and the line records who did.
+ */
+export async function memberCheckIn(store: ClubStore, ctx: Ctx, rules: AttendanceRules, input: SelfCheckInInput): Promise<AttendanceEntry> {
+  if (ctx.actor.kind !== "member") throw new ClubError("forbidden", "Only a member can check themselves in.");
+  if (!(SELF_CHECK_IN_VIA as readonly string[]).includes(input.via)) throw new ClubError("invalid", "Choose the iPad or the phone.");
+  if (input.kind === "event") throw new ClubError("forbidden", "Events are checked off by club staff.");
+  const who = ctx.actor.memberId;
+
+  return store.transaction(async (s, newId) => {
+    if (!canCheckIn(s, who)) throw new ClubError("forbidden", "Only active members can check in.");
+    const t = targetOf(s, input.kind, input.id, rules);
+    if (t.blocked) throw new ClubError("conflict", t.blocked);
+    if (!t.people.includes(who)) throw new ClubError("forbidden", "That is not your reservation.");
+
+    const current = outcomeOf(t.status);
+    if (current === "attended") throw new ClubError("already_recorded", `${t.title} is already checked in.`);
+    if (current === "no_show") throw new ClubError("too_late", `${t.title} was marked a no-show. Ask club staff to put it right.`);
+    const now = ctx.now.getTime();
+    if (now < opensAt(t, rules)) {
+      throw new ClubError("not_open", `Check-in for ${t.title} opens at ${formatClock(new Date(opensAt(t, rules)))}.`);
+    }
+    if (now >= dueAt(t, rules)) throw new ClubError("too_late", `The time for ${t.title} has passed. Ask club staff to put it right.`);
+
+    const at = ctx.now.toISOString();
+    setOutcome(t, "attended", at);
+    const entry: AttendanceEntry = { id: newId(), kind: input.kind, recordId: input.id, memberId: who, at, outcome: "attended", previous: null, by: ctx.actor, via: input.via, note: null };
+    s.attendance.push(entry);
+    return structuredClone(entry);
+  });
+}
+
+/** Where one reservation stands for the person looking at it: not open yet, open now, or already checked in. */
+export type SelfCheckInPhase = { phase: "not_yet"; opensAt: string } | { phase: "open" } | { phase: "done" };
+
+/** One thing a member can check in for (or just did), as the iPad and the phone show it. */
+export interface CheckInChoice {
+  kind: AttendanceKind;
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  /** The others on a boat or space outing. */
+  withNames: string[];
+  state: SelfCheckInPhase;
+}
+
+function phaseOf(t: Target, memberId: string, state: ClubState, now: Date, rules: AttendanceRules): SelfCheckInPhase | null {
+  if (t.blocked !== null || t.kind === "event" || !t.people.includes(memberId) || !canCheckIn(state, memberId)) return null;
+  const outcome = outcomeOf(t.status);
+  const ms = now.getTime();
+  if (outcome === "attended") return ms < Date.parse(t.endsAt) ? { phase: "done" } : null;
+  if (outcome === "no_show") return null;
+  if (ms >= dueAt(t, rules)) return null;
+  const opens = opensAt(t, rules);
+  return ms >= opens ? { phase: "open" } : { phase: "not_yet", opensAt: new Date(opens).toISOString() };
+}
+
+function choiceOf(state: ClubState, t: Target, memberId: string, phase: SelfCheckInPhase): CheckInChoice {
+  return {
+    kind: t.kind,
+    id: t.id,
+    title: t.title,
+    startsAt: t.startsAt,
+    endsAt: t.endsAt,
+    withNames: t.people.filter((p) => p !== memberId).map((p) => fullName(memberById(state, p)!)),
+    state: phase,
+  };
+}
+
+/** Where one reservation stands for this member, or null when it is not theirs, needs no check-in, is over, or is cancelled. */
+export function selfCheckInPhase(state: ClubState, kind: AttendanceKind, id: string, memberId: string, now: Date, rules: AttendanceRules): SelfCheckInPhase | null {
+  try {
+    return phaseOf(targetOf(state, kind, id, rules), memberId, state, now, rules);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What one member can check in for right now (open), has just checked in for and is still under way (done), or will be able
+ * to check in for within `hoursAhead` hours (not yet). Boat and space outings and class chairs only, by start time.
+ */
+export function checkInChoices(state: ClubState, memberId: string, now: Date, rules: AttendanceRules, hoursAhead = 24): CheckInChoice[] {
+  const until = now.getTime() + hoursAhead * 3600000;
+  const choices: CheckInChoice[] = [];
+  for (const t of everyTarget(state, rules)) {
+    const phase = phaseOf(t, memberId, state, now, rules);
+    if (!phase) continue;
+    if (phase.phase === "not_yet" && Date.parse(phase.opensAt) > until) continue;
+    choices.push(choiceOf(state, t, memberId, phase));
+  }
+  return choices.sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.title.localeCompare(b.title));
+}
+
+/** A person the iPad lists: they have something to check in for right now. */
+export interface CheckInPerson {
+  memberId: string;
+  name: string;
+  /** Only when someone else listed has the same name: their household, so the two can be told apart. */
+  household: string | null;
+}
+
+/**
+ * Who the front-desk iPad lists: only members with something they can check in for this minute (not the whole membership),
+ * by last name. Two people with the same name are told apart by their household.
+ */
+export function checkInPeople(state: ClubState, now: Date, rules: AttendanceRules): CheckInPerson[] {
+  const open = new Set<string>();
+  for (const t of everyTarget(state, rules)) {
+    for (const p of t.people) if (phaseOf(t, p, state, now, rules)?.phase === "open") open.add(p);
+  }
+  const people = [...open].map((id) => memberById(state, id)!).sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || a.id.localeCompare(b.id));
+  const counts = new Map<string, number>();
+  for (const m of people) counts.set(fullName(m), (counts.get(fullName(m)) ?? 0) + 1);
+  return people.map((m) => ({ memberId: m.id, name: fullName(m), household: (counts.get(fullName(m)) ?? 0) > 1 ? householdOf(state, m.householdId)!.displayName : null }));
+}
+
 /* ---------- What staff see ---------- */
 
 export interface AttendanceRow {
@@ -285,11 +432,24 @@ export interface AttendanceRow {
   outcome: AttendanceOutcome | null;
   /** True when the system recorded the no-show and no person has looked at it since. */
   automatic: boolean;
+  /** How the latest line was written (the front desk, the iPad, a phone, the system), or null while nothing is recorded. */
+  via: AttendanceVia | null;
+  /** Who wrote the latest line, when that is not the person the row is for (a crew member's tap, say). */
+  recordedBy: string | null;
   /** The others on a boat or space outing. */
   withNames: string[];
   /** Check-in is open now (or was, and nothing has been recorded). */
   checkInOpen: boolean;
   started: boolean;
+}
+
+/**
+ * How a check-in was made, in words for staff to read after "checked in": nothing when staff did it themselves,
+ * " from their phone" or " on the iPad" when the member did, with " by Ben Quill" when it was someone else on the outing.
+ */
+export function howCheckedIn(row: Pick<AttendanceRow, "outcome" | "via" | "recordedBy">): string {
+  if (row.outcome !== "attended" || (row.via !== "ipad" && row.via !== "phone")) return "";
+  return `${row.recordedBy ? ` by ${row.recordedBy}` : ""} ${row.via === "ipad" ? "on the iPad" : "from their phone"}`;
 }
 
 function rowOf(state: ClubState, t: Target, memberId: string, now: Date, rules: AttendanceRules): AttendanceRow {
@@ -304,6 +464,8 @@ function rowOf(state: ClubState, t: Target, memberId: string, now: Date, rules: 
     endsAt: t.endsAt,
     outcome: outcomeOf(t.status),
     automatic: outcomeOf(t.status) === "no_show" && latest?.via === "automatic",
+    via: latest?.via ?? null,
+    recordedBy: latest && latest.by.kind === "member" && latest.by.memberId !== memberId ? latest.by.label : null,
     withNames: t.people.filter((p) => p !== memberId).map((p) => fullName(memberById(state, p)!)),
     checkInOpen: now.getTime() >= startsAt - rules.defaults.checkInOpensMinutesBefore * 60000,
     started: now.getTime() >= startsAt,
@@ -375,6 +537,7 @@ export function describeAttendanceRules(rules: AttendanceRules): string[] {
       ? `A boat or space booking, or a class chair, that nobody checked in for becomes a no-show ${formatMinutes(grace)} after it ends.`
       : "A boat or space booking, or a class chair, that nobody checked in for becomes a no-show the moment it ends.",
     ...(rules.defaults.checkInNotNeededFor.length > 0 ? [`${listOf(rules.defaults.checkInNotNeededFor)} reservations do not need a check-in: they are never marked a no-show.`] : []),
+    "Members can check themselves in on the front-desk iPad or on their own phone while check-in is open; the record shows which. Events are not checked in by members.",
     "Events are not marked automatically; staff mark who came.",
     "Staff can correct any of these afterwards. The correction is added to the record; nothing is erased.",
   ];

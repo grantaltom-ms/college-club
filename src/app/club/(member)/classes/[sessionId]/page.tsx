@@ -14,7 +14,7 @@ import { formatDayLong, formatRange, pacificDate } from "@/club/time";
 import { idParam, NOTICES } from "@/club/web";
 import { ClassPlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
-import { rowFor } from "@/club/engine/attendance";
+import { howCheckedIn, rowFor } from "@/club/engine/attendance";
 import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
 import { AttendanceButtons } from "../../AttendanceButtons";
 
@@ -183,10 +183,15 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
             <ul className="club-list" aria-label="Sign-up sheet" data-testid="sheet">
               {view.sheet.map((line) => (
                 <li key={line.signUpId} data-testid="sheet-line" data-status={line.status}>
-                  {line.name} · {line.status === "waitlisted" ? `waiting, ${ordinal(line.place ?? 1)} in line` : line.status.replace("_", " ")}
                   {(() => {
                     const row = rowFor(state, "class", line.signUpId, now, ATTENDANCE_RULES);
-                    return row ? <AttendanceButtons row={row} who={line.name ?? "this person"} back={`/club/classes/${session.id}`} /> : null;
+                    return (
+                      <>
+                        {line.name} · {line.status === "waitlisted" ? `waiting, ${ordinal(line.place ?? 1)} in line` : line.status.replace("_", " ")}
+                        {row ? howCheckedIn(row) : ""}
+                        {row ? <AttendanceButtons row={row} who={line.name ?? "this person"} back={`/club/classes/${session.id}`} /> : null}
+                      </>
+                    );
                   })()}
                 </li>
               ))}

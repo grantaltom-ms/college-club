@@ -352,6 +352,7 @@ describe("the automatic no-show as a plain rule", () => {
       "Check-in opens 30 minutes before the start.",
       "A boat or space booking, or a class chair, that nobody checked in for becomes a no-show the moment it ends.",
       "Room Space and Work Space reservations do not need a check-in: they are never marked a no-show.",
+      "Members can check themselves in on the front-desk iPad or on their own phone while check-in is open; the record shows which. Events are not checked in by members.",
       "Events are not marked automatically; staff mark who came.",
       "Staff can correct any of these afterwards. The correction is added to the record; nothing is erased.",
     ]);

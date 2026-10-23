@@ -481,3 +481,137 @@ details summary {
 .club-count {
   font-weight: 600;
 }
+
+/* "I'm here": the member's own check-in button on their phone. Big enough to tap with a wet thumb. */
+.club-checkin {
+  margin: 12px 0 4px;
+}
+
+.club-checkin .club-button {
+  min-height: 48px;
+  padding: 12px 20px;
+  font-size: 1.05rem;
+}
+
+/* The front-desk iPad: big, plain, nothing to get lost in. */
+.ipad {
+  min-height: 100vh;
+  background: var(--paper, #fff);
+}
+
+.ipad-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--card);
+}
+
+.ipad-title {
+  font-size: 1.2rem;
+  color: var(--slate);
+}
+
+.ipad-main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px 24px 48px;
+  font-size: 1.15rem;
+}
+
+.ipad-main h1 {
+  font-size: 2rem;
+}
+
+.ipad-search-label {
+  display: block;
+  margin: 8px 0 6px;
+  color: var(--slate);
+}
+
+.ipad-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  font-size: 1.6rem;
+  border: 2px solid var(--hairline);
+  border-radius: 6px;
+}
+
+.ipad-names,
+.ipad-cards {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.ipad-name {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 72px;
+  padding: 12px 20px;
+  font-size: 1.6rem;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--card);
+  border: 2px solid var(--hairline);
+  border-radius: 8px;
+}
+
+.ipad-name:active,
+.ipad-name:focus-visible {
+  border-color: var(--ink);
+}
+
+.ipad-household {
+  font-size: 0.95rem;
+  color: var(--slate);
+}
+
+.ipad-card {
+  padding: 16px 20px;
+  background: var(--card);
+  border: 2px solid var(--hairline);
+  border-radius: 8px;
+}
+
+.ipad-card h2 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+}
+
+.ipad-card p {
+  margin: 0 0 12px;
+}
+
+.ipad-go {
+  width: 100%;
+  min-height: 72px;
+  font-size: 1.6rem;
+}
+
+.ipad-done {
+  font-size: 1.4rem;
+  color: var(--ink);
+}
+
+.ipad-note {
+  font-size: 1.3rem;
+}
+
+.ipad-none {
+  margin: 24px 0;
+  font-size: 1.3rem;
+  color: var(--slate);
+}
+
+.ipad-back {
+  display: inline-block;
+  padding: 14px 0;
+  font-size: 1.2rem;
+}
