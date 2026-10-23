@@ -28,7 +28,7 @@ function Row({ state, line, session, now }: { state: ClubState; line: SignUp; se
   const live = line.status === "enrolled" || line.status === "waitlisted";
   const upcoming = live && session.status === "scheduled" && Date.parse(session.startsAt) > now.getTime();
   const place = waitlistPlace(state, line.id);
-  const status = session.status === "cancelled" ? "Class cancelled" : upcoming || !live ? STATUS[line.status] : line.status === "enrolled" ? "Awaiting attendance record" : "Did not get a chair";
+  const status = session.status === "cancelled" ? "Class cancelled" : upcoming || !live ? STATUS[line.status] : line.status === "enrolled" ? "Awaiting check-in" : "Did not get a chair";
   const late = line.status === "enrolled" && Date.parse(session.startsAt) - now.getTime() < classRulesFor(CLASS_RULES, template).cancelCutoffMinutes * 60000;
   return (
     <li className="club-card" data-testid="class-row" data-status={line.status} data-class={template.name}>

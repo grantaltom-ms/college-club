@@ -312,6 +312,16 @@ export function reservationsFor(state: ClubState, memberId: string, now: Date, r
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.title.localeCompare(b.title));
 }
 
+/** Everything on or about to start across the club, from a couple of hours back to a couple of hours ahead, for the front desk. */
+export function aroundNow(state: ClubState, now: Date, rules: AttendanceRules, hours = 2): AttendanceRow[] {
+  const from = now.getTime() - hours * 3600000;
+  const until = now.getTime() + hours * 3600000;
+  return everyTarget(state)
+    .filter((t) => Date.parse(t.endsAt) >= from && Date.parse(t.startsAt) <= until)
+    .map((t) => rowOf(state, t, t.memberId, now, rules))
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
+}
+
 /**
  * Automatic no-shows from the last few days that no person has looked at yet: each is either right (nobody came) or a
  * forgotten iPad tap that staff can put right. Newest first.

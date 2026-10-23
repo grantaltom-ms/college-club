@@ -59,7 +59,9 @@ test("partners can share an email address and a three-adult household lists all 
 test("staff see every household and can open any of them, with the staff-only records", async ({ page }) => {
   await actAs(page, "Test staff");
   await expect(page.getByRole("heading", { level: 1, name: "Households" })).toBeVisible();
-  await expect(page.getByTestId("household-row")).toHaveCount(14);
+  // The 14 invented households, plus any that other tests on this shared server have added through the staff desk.
+  expect(await page.getByTestId("household-row").count()).toBeGreaterThanOrEqual(14);
+  await expect(page.getByRole("link", { name: "The Lindqvist household" })).toBeVisible();
   await page.getByRole("link", { name: "The Nakamura household" }).click();
   await expect(page.getByTestId("household-name")).toHaveText("The Nakamura household");
   await expect(page.getByLabel("Household records")).toContainText("QuickBooks ID");
@@ -71,7 +73,7 @@ test("a member can open their own household's address but not anyone else's", as
   await actAs(page, "Test staff");
   await page.goto("/club");
   const links = await page.getByTestId("household-row").getByRole("link").evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute("href")!));
-  expect(links).toHaveLength(14);
+  expect(links.length).toBeGreaterThanOrEqual(14); // the 14 invented ones, plus any other tests have added
   await actAs(page, "Erik Lindqvist");
   let own = 0;
   for (const href of links) {
@@ -109,8 +111,9 @@ test("switching between test members again and again always shows the right pers
 
 test("the picker lists every household and adult, and the active ones can all be chosen", async ({ page }) => {
   await page.goto("/club/act-as");
-  await expect(page.getByTestId("act-as-household")).toHaveCount(14);
-  await expect(page.getByRole("button", { name: /^Act as / })).toHaveCount(1 + 24); // test staff + 24 adults in 14 households
+  // The 14 invented households have 24 adults; tests that add households through the staff desk only ever add more.
+  expect(await page.getByTestId("act-as-household").count()).toBeGreaterThanOrEqual(14);
+  expect(await page.getByRole("button", { name: /^Act as / }).count()).toBeGreaterThanOrEqual(1 + 24); // test staff + the 24 invented adults
 });
 
 test("a forged or broken test-member cookie is treated as nobody", async ({ page, context, baseURL }) => {

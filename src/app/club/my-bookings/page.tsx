@@ -1,12 +1,15 @@
 import { clubNow } from "@/club/clock";
+import { rowFor } from "@/club/engine/attendance";
 import { fullName, memberById } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
+import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
 import { RULE_BOOK, rulesFor } from "@/club/settings/rulebook";
 import { getClubStore } from "@/club/store/instance";
 import { formatDayLong, formatRange, pacificDate } from "@/club/time";
 import type { Booking, ClubState } from "@/club/types";
 import { idParam, NOTICES } from "@/club/web";
+import { AttendanceButtons } from "../AttendanceButtons";
 import { PlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
 
@@ -26,8 +29,9 @@ function Row({ state, booking, viewerId, now, staff }: { state: ClubState; booki
   const crew = booking.crew.map((id) => fullName(memberById(state, id)!));
   const mine = booking.bookerId === viewerId;
   const finished = Date.parse(booking.endsAt) <= now.getTime();
-  const status = booking.status === "upcoming" && finished ? "Awaiting attendance record" : STATUS[booking.status];
+  const status = booking.status === "upcoming" && finished ? "Awaiting check-in" : STATUS[booking.status];
   const cancellable = booking.status === "upcoming" && Date.parse(booking.startsAt) > now.getTime() && (mine || staff);
+  const attendance = staff ? rowFor(state, "booking", booking.id, now, ATTENDANCE_RULES) : null;
   const cutoff = rulesFor(RULE_BOOK, item).rules.cancelCutoffMinutes;
   const late = mine && Date.parse(booking.startsAt) - now.getTime() < cutoff * 60000;
   return (
@@ -44,6 +48,7 @@ function Row({ state, booking, viewerId, now, staff }: { state: ClubState; booki
         {booking.override ? ` · staff override: ${booking.override.reason}` : ""}
         {booking.cancelReason ? ` · ${booking.cancelReason}` : ""}
       </p>
+      {staff && attendance && <AttendanceButtons row={attendance} who={fullName(booker)} back="/club/my-bookings" />}
       {cancellable && (
         <form method="post" action="/api/club/bookings/cancel">
           <input type="hidden" name="id" value={booking.id} />
