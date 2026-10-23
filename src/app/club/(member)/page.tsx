@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pickerEnabled } from "@/club/enabled";
 import { householdOf, membersOf } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
@@ -14,8 +15,13 @@ export default async function ClubHome() {
       <section>
         <h1>Welcome</h1>
         <p>
-          There are no real logins yet. <Link href="/club/act-as">Choose a test member</Link> to see the club the way they would.
+          <Link href="/club/sign-in">Sign in</Link> with your email address to see your household, book boats and spaces, and join classes and events.
         </p>
+        {pickerEnabled() && (
+          <p>
+            Just trying it out? <Link href="/club/act-as">Choose a test member</Link> to see the club the way they would.
+          </p>
+        )}
       </section>
     );
   }

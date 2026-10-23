@@ -48,12 +48,18 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         `/club/ipad/${IPAD_CODE}?notice=forbidden`,
         `/club/ipad/${IPAD_CODE}/${FIRST_HOUSEHOLD}`,
         `/club/ipad/${"A".repeat(43)}`,
+        "/club/sign-in",
+        "/club/sign-in?sent=1",
+        "/club/sign-in?out=1",
+        "/club/sign-in?notice=signin_link",
+        `/club/sign-in/${"A".repeat(43)}`,
+        "/club/outbox",
       ];
       for (const path of paths) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look/i);
       }
     });
 
@@ -92,6 +98,9 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         ["/api/club/events/cancel", { event: FIRST_HOUSEHOLD, reason: "Test" }],
         ["/api/club/attendance", { kind: "booking", id: FIRST_HOUSEHOLD, outcome: "attended", back: "/club/admin" }],
         ["/api/club/check-in", { kind: "booking", id: FIRST_HOUSEHOLD, back: "/club/my-bookings" }],
+        ["/api/club/sign-in/request", { email: "erik.lindqvist@example.com" }],
+        ["/api/club/sign-in/confirm", { token: "A".repeat(43), identity: "staff:alex.staffer@example.org" }],
+        ["/api/club/sign-out", {}],
         ["/api/club/ipad/check-in", { code: IPAD_CODE, member: FIRST_HOUSEHOLD, kind: "booking", id: FIRST_HOUSEHOLD }],
         ["/api/club/households/create", { name: "Test", type: "Resident", joined: "2026-10-22", firstName: "A", lastName: "B", email: "a@example.com" }],
         ["/api/club/households/add-member", { household: FIRST_HOUSEHOLD, firstName: "A", lastName: "B", email: "a@example.com" }],
@@ -116,6 +125,16 @@ for (const [name, base] of Object.entries(HIDDEN)) {
       const res = await fetch(`${base}/club`, { headers: { Cookie: "ccs_test_actor=staff" } });
       expect(res.status).toBe(404);
       expect(await res.text()).not.toMatch(/Households|Lindqvist/);
+    });
+
+    test("a signed-in cookie opens nothing, and no sign-in email is ever made or sent", async () => {
+      const res = await fetch(`${base}/club/my-bookings`, { headers: { Cookie: `ccs_session=${"A".repeat(43)}; ccs_signin_who=staff:alex.staffer@example.org` } });
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toMatch(/Signed in as|My bookings|Alex Staffer/);
+      const asked = await fetch(`${base}/api/club/sign-in/request`, { method: "POST", redirect: "manual", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ email: "alex.staffer@example.org" }) });
+      expect(asked.status).toBe(404);
+      expect(asked.headers.get("set-cookie")).toBeNull();
+      expect(asked.headers.get("location")).toBeNull();
     });
 
     test("the rest of the site is untouched", async ({ page }) => {

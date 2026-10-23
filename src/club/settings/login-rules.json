@@ -1,0 +1,9 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). linkMinutes: a sign-in link works for this many minutes and only once. sessionDays: how long someone stays signed in on a device before the link must be used again. linksPerHourPerEmail: how many sign-in links one email address can ask for in an hour (more are quietly ignored, so nobody can flood someone's inbox).",
+  "defaults": {
+    "linkMinutes": 15,
+    "sessionDays": 30,
+    "linksPerHourPerEmail": 5
+  }
+}

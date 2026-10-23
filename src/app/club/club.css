@@ -615,3 +615,30 @@ details summary {
   padding: 14px 0;
   font-size: 1.2rem;
 }
+
+/* Sign-in: the test outbox shows plain-text emails, and Sign out sits in the menu like a link. */
+.club-pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--oyster-50);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.club-header nav form {
+  display: inline;
+}
+
+.club-header nav button {
+  display: inline-block;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  color: var(--waterloo);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
