@@ -172,6 +172,18 @@ describe.skipIf(!ADMIN_URL)("the event tables", () => {
       await expect(q(`update club.event_rsvps set guests = 3 where id = $1`, [line])).rejects.toThrow(/cannot change/);
     });
 
+    it("lets only someone waiting have a hold on the waiting list, and the hold must be cleared when they move on", async () => {
+      const e = (await event({ capacity: 5 })).rows[0].id;
+      const hold = T(17);
+      const waiting = (await q(`insert into club.event_rsvps (event_id, member_id, guests, status, hold_until, created_by_kind, created_by_label) values ($1, $2, 0, 'waitlisted', $3, 'member', 'A Member') returning id`, [e, members[0], hold])).rows[0].id;
+      // Someone with places has no hold, from the start...
+      expect(await code(q(`insert into club.event_rsvps (event_id, member_id, guests, status, hold_until, created_by_kind, created_by_label) values ($1, $2, 0, 'going', $3, 'member', 'A Member')`, [e, members[1], hold]))).toBe(CHECK_VIOLATION);
+      // ...and a waiting place that moves up keeps no hold behind.
+      expect(await code(q(`update club.event_rsvps set status = 'going' where id = $1`, [waiting]))).toBe(CHECK_VIOLATION);
+      expect(await code(q(`update club.event_rsvps set status = 'going', hold_until = null where id = $1`, [waiting]))).toBeNull();
+      expect((await q(`select hold_until from club.event_rsvps where id = $1`, [waiting])).rows[0].hold_until).toBeNull();
+    });
+
     it("cannot bring a cancelled event back", async () => {
       const e = (await event()).rows[0].id;
       await q(`update club.events set status = 'cancelled', cancelled_by_kind = 'staff', cancelled_by_label = 'Test staff' where id = $1`, [e]);

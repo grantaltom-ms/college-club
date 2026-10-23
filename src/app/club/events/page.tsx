@@ -41,7 +41,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
       {upcoming.length === 0 && <p data-testid="no-events">No events are coming up.</p>}
       <ul className="club-cards" aria-label="Events">
         {upcoming.map((event) => {
-          const view = eventView(state, event, viewer);
+          const view = eventView(state, event, viewer, now);
           const yours = yoursEventText(view.yours);
           return (
             <li key={event.id} className="club-card" data-testid="event-card" data-event={event.title} data-event-id={event.id}>
@@ -51,7 +51,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
               <p>
                 {eventWhen(event)}
                 {event.location ? ` · ${event.location}` : ""}
-                {event.priceCents !== null ? ` · ${priceText(event.priceCents)}${event.priceCents > 0 ? " a place" : ""}` : ""}
+                {event.priceCents !== null ? ` · ${priceText(event.priceCents)}${event.priceCents > 0 ? " a spot" : ""}` : ""}
               </p>
               <p className="club-meta">
                 <span data-testid="event-places">{placesText(view)}</span>

@@ -69,6 +69,44 @@ function liveRsvp(state: ClubState, eventId: string, memberId: string): Rsvp | u
   return state.rsvps.find((r) => r.eventId === eventId && r.memberId === memberId && (r.status === "going" || r.status === "waitlisted"));
 }
 
+/* ---------- The hold on a place on the waiting list ---------- */
+
+/** What a place on the waiting list is told when its hold has run out. */
+export const HOLD_RAN_OUT = "Your place on the waitlist ran out, so it was removed. Join the waitlist again.";
+
+/** True when a waiting RSVP's hold has run out. A hold of null never runs out. */
+export const holdExpired = (r: Rsvp, now: Date) => r.status === "waitlisted" && r.holdUntil !== null && Date.parse(r.holdUntil) <= now.getTime();
+
+/** The moment a hold made at `from` runs out, or null when holds never run out. */
+export function holdEndsAt(eventRules: EventRules, from: Date): string | null {
+  const minutes = eventRules.defaults.waitlistHoldMinutes;
+  return minutes > 0 ? new Date(from.getTime() + ms(minutes)).toISOString() : null;
+}
+
+/**
+ * Removes the places on waiting lists whose hold has run out, as the system (not the member's doing, and never a late
+ * cancellation). Every change that touches an event does this first, so the record stays honest; the screens also ignore
+ * expired holds, so they are right even before the next change. Returns the RSVPs removed.
+ */
+export function sweepExpiredHolds(state: ClubState, now: Date): Rsvp[] {
+  const removed: Rsvp[] = [];
+  for (const line of state.rsvps) {
+    if (!holdExpired(line, now)) continue;
+    line.status = "cancelled";
+    line.statusChangedAt = now.toISOString();
+    line.holdUntil = null;
+    line.cancelledBy = { kind: "system", label: "Waiting-list hold ran out" };
+    line.cancelReason = HOLD_RAN_OUT;
+    removed.push(line);
+  }
+  return removed;
+}
+
+/** The lists as they stand at a moment: places whose hold has run out are gone. For reading only. */
+const withoutExpiredHolds = (state: ClubState, now: Date): ClubState => ({ ...state, rsvps: state.rsvps.filter((r) => !holdExpired(r, now)) });
+
+const alreadyMessage = (line: Rsvp) => (line.cancelReason === HOLD_RAN_OUT ? HOLD_RAN_OUT : `That RSVP is already ${line.status.replace("_", " ")}.`);
+
 /** The last moment to RSVP: the moment staff set, or the rule's number of minutes before the start. */
 export const closesAt = (event: ClubEvent, rules: EventRules) => (event.replyBy ? Date.parse(event.replyBy) : Date.parse(event.startsAt) - ms(rules.defaults.closeMinutesBefore));
 
@@ -97,7 +135,8 @@ function guestsOrThrow(guests: number | undefined): number {
  * Every reason this RSVP cannot be made, in a fixed order, in plain language. Empty means it can be.
  * Reads only. Used by the event page (to explain) and by rsvp (to decide).
  */
-export function checkRsvp(state: ClubState, eventRules: EventRules, ctx: Ctx, req: RsvpRequest): RsvpReason[] {
+export function checkRsvp(fullState: ClubState, eventRules: EventRules, ctx: Ctx, req: RsvpRequest): RsvpReason[] {
+  const state = withoutExpiredHolds(fullState, ctx.now);
   const event = eventOrThrow(state, req.eventId);
   const member = memberOrThrow(state, req.memberId);
   const rules = eventRules.defaults;
@@ -129,8 +168,8 @@ export function checkRsvp(state: ClubState, eventRules: EventRules, ctx: Ctx, re
     const claim = existing.status === "waitlisted" && (left === null || need <= left) && now >= promoteCutoff(event, eventRules);
     if (!claim) {
       const place = waitPlace(state, existing.id);
-      const extra = existing.guests > 0 ? ` with ${plural(existing.guests, "guest")}` : "";
-      add("already_going", existing.status === "going" ? `${who} ${isYou ? "are" : "is"} already going${extra}.` : `${who} ${isYou ? "are" : "is"} already on the waiting list${extra}, ${ordinal(place ?? 1)} in line.`);
+      const party = existing.guests > 0 ? `a party of ${1 + existing.guests}` : "";
+      add("already_going", existing.status === "going" ? `${who} ${isYou ? "are" : "is"} already going${party ? `, party of ${1 + existing.guests}` : ""}.` : `${who} ${isYou ? "are" : "is"} already on the waitlist${party ? ` for ${party}` : ""}, ${ordinal(place ?? 1)} in line.`);
       return reasons;
     }
   }
@@ -139,15 +178,15 @@ export function checkRsvp(state: ClubState, eventRules: EventRules, ctx: Ctx, re
     add("closed", event.replyBy ? `RSVPs for ${event.title} closed ${formatDayLong(pacificDate(new Date(event.replyBy)))} at ${formatClock(event.replyBy)}.` : `RSVPs for ${event.title} closed ${formatMinutes(rules.closeMinutesBefore)} before it starts.`);
   }
   if (!existing && guests > rules.maxGuests) {
-    add("too_many_guests", rules.maxGuests === 0 ? "Guests cannot be added to an RSVP for this event." : `You can bring up to ${plural(rules.maxGuests, "guest")}.`);
+    add("too_many_guests", rules.maxGuests === 0 ? "Only one person can RSVP at a time for this event." : `A party can have up to ${rules.maxGuests + 1} people, counting you.`);
   }
   if (existing) return reasons;
 
   // Not enough places, and the waiting list is full too.
   const left = placesLeft(state, event);
   if (left !== null && need > left && waitingCount(state, event.id) >= rules.waitlistMax) {
-    const lack = left === 0 ? `${event.title} is full` : `${event.title} has only ${plural(left, "place")} left and this RSVP needs ${need}`;
-    add("waitlist_full", rules.waitlistMax === 0 ? `${lack}, and it has no waiting list.` : `${lack}, and its waiting list is full too (${plural(rules.waitlistMax, "person").replace("persons", "people")}).`);
+    const lack = left === 0 ? `${event.title} is full` : `${event.title} has only ${plural(left, "spot")} left and this party needs ${need}`;
+    add("waitlist_full", rules.waitlistMax === 0 ? `${lack}, and it has no waitlist.` : `${lack}, and its waitlist is full too (${plural(rules.waitlistMax, "party").replace("partys", "parties")}).`);
   }
   return reasons;
 }
@@ -160,6 +199,7 @@ export function checkRsvp(state: ClubState, eventRules: EventRules, ctx: Ctx, re
  * place goes to whoever asks first. Works on the all-or-nothing change's copy of the data. Returns the RSVPs that got places.
  */
 export function promoteWaitlist(state: ClubState, eventRules: EventRules, eventId: string, now: Date): Rsvp[] {
+  sweepExpiredHolds(state, now);
   const event = eventOrThrow(state, eventId);
   if (event.status !== "scheduled" || now.getTime() >= promoteCutoff(event, eventRules)) return [];
   let left = placesLeft(state, event);
@@ -171,6 +211,7 @@ export function promoteWaitlist(state: ClubState, eventRules: EventRules, eventI
     line.status = "going";
     line.promotedAt = now.toISOString();
     line.statusChangedAt = now.toISOString();
+    line.holdUntil = null;
     promoted.push(line);
     if (left !== null) left -= need;
   }
@@ -194,6 +235,7 @@ export async function rsvp(store: ClubStore, eventRules: EventRules, ctx: Ctx, r
   if (ctx.actor.kind === "system") throw new ClubError("forbidden", "Only a member or club staff can RSVP.");
   if (ctx.actor.kind === "member" && ctx.actor.memberId !== req.memberId) throw new ClubError("forbidden", "You can only RSVP for yourself.");
   return store.transaction(async (s, newId) => {
+    sweepExpiredHolds(s, ctx.now);
     const reasons = checkRsvp(s, eventRules, ctx, req);
     if (reasons.length > 0) throw new RsvpRefused(reasons);
     const event = eventOrThrow(s, req.eventId);
@@ -205,6 +247,7 @@ export async function rsvp(store: ClubStore, eventRules: EventRules, ctx: Ctx, r
       waiting.status = "going";
       waiting.promotedAt = at;
       waiting.statusChangedAt = at;
+      waiting.holdUntil = null;
       return { rsvp: structuredClone(waiting), outcome: "going" as const, place: null };
     }
 
@@ -225,6 +268,7 @@ export async function rsvp(store: ClubStore, eventRules: EventRules, ctx: Ctx, r
       createdBy: ctx.actor,
       statusChangedAt: at,
       promotedAt: null,
+      holdUntil: fits ? null : holdEndsAt(eventRules, ctx.now),
       cancelledBy: null,
       cancelReason: null,
     };
@@ -237,27 +281,30 @@ export async function rsvp(store: ClubStore, eventRules: EventRules, ctx: Ctx, r
 export async function changeGuests(store: ClubStore, eventRules: EventRules, ctx: Ctx, rsvpId: string, guests: number): Promise<{ rsvp: Rsvp; promoted: Rsvp[] }> {
   const wanted = guestsOrThrow(guests);
   return store.transaction(async (s) => {
+    sweepExpiredHolds(s, ctx.now);
     const line = s.rsvps.find((r) => r.id === rsvpId);
     if (!line) throw new ClubError("not_found", "That RSVP no longer exists.");
     if (ctx.actor.kind === "system") throw new ClubError("forbidden", "Only the member, or club staff, can change an RSVP.");
     if (ctx.actor.kind === "member" && ctx.actor.memberId !== line.memberId) throw new ClubError("forbidden", "You can only change your own RSVP.");
-    if (line.status !== "going" && line.status !== "waitlisted") throw new ClubError("conflict", `That RSVP is already ${line.status.replace("_", " ")}.`);
+    if (line.status !== "going" && line.status !== "waitlisted") throw new ClubError("conflict", alreadyMessage(line));
     const event = eventOrThrow(s, line.eventId);
     if (event.status !== "scheduled") throw new ClubError("conflict", "That event was cancelled.");
     if (ctx.now.getTime() >= Date.parse(event.startsAt)) throw new ClubError("conflict", "That event has already started, so this can no longer be changed here. Ask club staff.");
     const rules = eventRules.defaults;
-    if (wanted > rules.maxGuests) throw new ClubError("conflict", rules.maxGuests === 0 ? "Guests cannot be added to an RSVP for this event." : `You can bring up to ${plural(rules.maxGuests, "guest")}.`);
+    if (wanted > rules.maxGuests) throw new ClubError("conflict", rules.maxGuests === 0 ? "Only one person can RSVP at a time for this event." : `A party can have up to ${rules.maxGuests + 1} people, counting you.`);
     if (wanted === line.guests) return { rsvp: structuredClone(line), promoted: [] };
     if (wanted > line.guests) {
-      if (ctx.now.getTime() >= closesAt(event, eventRules)) throw new ClubError("conflict", "RSVPs have closed, so guests can no longer be added.");
+      if (ctx.now.getTime() >= closesAt(event, eventRules)) throw new ClubError("conflict", "RSVPs have closed, so the party can no longer get bigger.");
       const left = placesLeft(s, event);
       const extra = wanted - line.guests;
       if (line.status === "going" && left !== null && extra > left) {
-        throw new ClubError("conflict", left === 0 ? `${event.title} is full, so no more guests can be added.` : `Only ${plural(left, "place")} ${left === 1 ? "is" : "are"} left, so you can add up to ${plural(left, "more guest")}.`);
+        throw new ClubError("conflict", left === 0 ? `${event.title} is full, so the party cannot get bigger.` : `Only ${plural(left, "spot")} ${left === 1 ? "is" : "are"} left, so your party can grow by ${left} at most.`);
       }
     }
     line.guests = wanted;
-    const promoted = line.status === "going" ? promoteWaitlist(s, eventRules, event.id, ctx.now) : [];
+    // Pressing a button on a waiting place keeps it for another hold. A party that now fits (or places given back) moves the line up.
+    if (line.status === "waitlisted") line.holdUntil = holdEndsAt(eventRules, ctx.now);
+    const promoted = promoteWaitlist(s, eventRules, event.id, ctx.now);
     return { rsvp: structuredClone(line), promoted: structuredClone(promoted) };
   });
 }
@@ -276,21 +323,44 @@ export interface LeaveResult {
  */
 export async function cancelRsvp(store: ClubStore, eventRules: EventRules, ctx: Ctx, rsvpId: string, options: { reason?: string } = {}): Promise<LeaveResult> {
   return store.transaction(async (s) => {
+    sweepExpiredHolds(s, ctx.now);
     const line = s.rsvps.find((r) => r.id === rsvpId);
     if (!line) throw new ClubError("not_found", "That RSVP no longer exists.");
     if (ctx.actor.kind === "system") throw new ClubError("forbidden", "Only the member, or club staff, can cancel an RSVP.");
     if (ctx.actor.kind === "member" && ctx.actor.memberId !== line.memberId) throw new ClubError("forbidden", "You can only cancel your own RSVP.");
-    if (line.status !== "going" && line.status !== "waitlisted") throw new ClubError("conflict", `That RSVP is already ${line.status.replace("_", " ")}.`);
+    if (line.status !== "going" && line.status !== "waitlisted") throw new ClubError("conflict", alreadyMessage(line));
     const event = eventOrThrow(s, line.eventId);
     if (ctx.now.getTime() >= Date.parse(event.startsAt)) throw new ClubError("conflict", "That event has already started, so the RSVP cannot be cancelled here. Ask club staff.");
     const hadPlaces = line.status === "going";
     const late = ctx.actor.kind === "member" && hadPlaces && ctx.now.getTime() > Date.parse(event.startsAt) - ms(eventRules.defaults.cancelCutoffMinutes);
     line.status = late ? "late_cancelled" : "cancelled";
     line.statusChangedAt = ctx.now.toISOString();
+    line.holdUntil = null;
     line.cancelledBy = ctx.actor;
     line.cancelReason = options.reason?.trim() || null;
     const promoted = hadPlaces ? promoteWaitlist(s, eventRules, event.id, ctx.now) : [];
     return { rsvp: structuredClone(line), late, promoted: structuredClone(promoted) };
+  });
+}
+
+/**
+ * "Keep my place": the member (or staff) presses a button on a waiting place, and it is held for another hour (or whatever
+ * the rule says). Places that are not waiting have nothing to keep. A place whose hold already ran out is gone: join again.
+ */
+export async function renewHold(store: ClubStore, eventRules: EventRules, ctx: Ctx, rsvpId: string): Promise<Rsvp> {
+  return store.transaction(async (s) => {
+    sweepExpiredHolds(s, ctx.now);
+    const line = s.rsvps.find((r) => r.id === rsvpId);
+    if (!line) throw new ClubError("not_found", "That RSVP no longer exists.");
+    if (ctx.actor.kind === "system") throw new ClubError("forbidden", "Only the member, or club staff, can keep a place on the waitlist.");
+    if (ctx.actor.kind === "member" && ctx.actor.memberId !== line.memberId) throw new ClubError("forbidden", "You can only keep your own place.");
+    if (line.status === "going") throw new ClubError("conflict", "You already have spots, so there is nothing to keep.");
+    if (line.status !== "waitlisted") throw new ClubError("conflict", alreadyMessage(line));
+    const event = eventOrThrow(s, line.eventId);
+    if (event.status !== "scheduled") throw new ClubError("conflict", "That event was cancelled.");
+    if (ctx.now.getTime() >= Date.parse(event.startsAt)) throw new ClubError("conflict", "That event has already started, so this can no longer be changed here. Ask club staff.");
+    line.holdUntil = holdEndsAt(eventRules, ctx.now);
+    return structuredClone(line);
   });
 }
 
@@ -300,7 +370,7 @@ export async function markRsvpAttendance(store: ClubStore, ctx: Ctx, rsvpId: str
   return store.transaction(async (s) => {
     const line = s.rsvps.find((r) => r.id === rsvpId);
     if (!line) throw new ClubError("not_found", "That RSVP no longer exists.");
-    if (line.status !== "going") throw new ClubError("conflict", `Attendance can only be recorded for someone with places, and this RSVP is ${line.status.replace("_", " ")}.`);
+    if (line.status !== "going") throw new ClubError("conflict", `Attendance can only be recorded for someone with spots, and this RSVP is ${line.status.replace("_", " ")}.`);
     const event = eventOrThrow(s, line.eventId);
     if (ctx.now.getTime() < Date.parse(event.startsAt)) throw new ClubError("conflict", "That event has not started yet.");
     line.status = outcome;
@@ -395,6 +465,7 @@ export async function createEvent(store: ClubStore, ctx: Ctx, input: NewEvent): 
 export async function updateEvent(store: ClubStore, eventRules: EventRules, ctx: Ctx, eventId: string, patch: Partial<EventFields>): Promise<{ event: ClubEvent; promoted: Rsvp[] }> {
   requireStaff(ctx.actor);
   return store.transaction(async (s) => {
+    sweepExpiredHolds(s, ctx.now);
     const event = eventOrThrow(s, eventId);
     if (event.status !== "scheduled") throw new ClubError("conflict", "That event was cancelled, so it cannot be changed.");
     if (ctx.now.getTime() >= Date.parse(event.startsAt)) throw new ClubError("conflict", "That event has already started, so it cannot be changed.");
@@ -442,6 +513,7 @@ export async function cancelEvent(store: ClubStore, ctx: Ctx, eventId: string, i
   if (!reason) throw new ClubError("invalid", "Say why the event is cancelled; members will see the reason.");
   if (reason.length > 300) throw new ClubError("invalid", "The reason must be 300 characters or fewer.");
   return store.transaction(async (s) => {
+    sweepExpiredHolds(s, ctx.now);
     const event = eventOrThrow(s, eventId);
     if (event.status === "cancelled") throw new ClubError("conflict", "That event is already cancelled.");
     if (ctx.now.getTime() >= Date.parse(event.startsAt)) throw new ClubError("conflict", "That event has already started, so it cannot be cancelled.");
@@ -457,6 +529,7 @@ export async function cancelEvent(store: ClubStore, ctx: Ctx, eventId: string, i
       affected.push({ rsvpId: line.id, memberId: member.id, name: fullName(member), email: member.email, phone: member.phone, guests: line.guests, status: line.status });
       line.status = "cancelled";
       line.statusChangedAt = at;
+      line.holdUntil = null;
       line.cancelledBy = ctx.actor;
       line.cancelReason = `The event was cancelled: ${reason}`.slice(0, 300);
     }
@@ -475,6 +548,8 @@ export interface RsvpLine {
   status: Rsvp["status"];
   /** Counting from 1, when waiting. */
   place: number | null;
+  /** While waiting: when this place is removed unless kept. null otherwise, and when holds never run out. */
+  holdUntil: string | null;
   via: RsvpVia;
   mine: boolean;
 }
@@ -495,7 +570,8 @@ export interface EventView {
 }
 
 /** An event as a viewer may see it. Members see counts and their own RSVP, never others' names. */
-export function eventView(state: ClubState, event: ClubEvent, viewer: { kind: "member"; memberId: string } | { kind: "staff" }): EventView {
+export function eventView(fullState: ClubState, event: ClubEvent, viewer: { kind: "member"; memberId: string } | { kind: "staff" }, now: Date): EventView {
+  const state = withoutExpiredHolds(fullState, now);
   const lines = state.rsvps
     .filter((r) => r.eventId === event.id)
     .map((r): RsvpLine => {
@@ -507,6 +583,7 @@ export function eventView(state: ClubState, event: ClubEvent, viewer: { kind: "m
         guests: r.guests,
         status: r.status,
         place: waitPlace(state, r.id),
+        holdUntil: r.holdUntil,
         via: r.via,
         mine: viewer.kind === "member" && viewer.memberId === r.memberId,
       };
@@ -533,6 +610,7 @@ export function eventView(state: ClubState, event: ClubEvent, viewer: { kind: "m
 export function eventLedger(eventRules: EventRules): Required<Pick<BookingLedger, "cancelFutureRsvps">> {
   return {
     async cancelFutureRsvps({ state, memberIds, now, reason, actor }) {
+      sweepExpiredHolds(state, now);
       const leaving = new Set(memberIds);
       const cancelled: string[] = [];
       const touched = new Set<string>();
@@ -543,6 +621,7 @@ export function eventLedger(eventRules: EventRules): Required<Pick<BookingLedger
         if (line.status === "going") touched.add(event.id);
         line.status = "cancelled";
         line.statusChangedAt = now.toISOString();
+        line.holdUntil = null;
         line.cancelledBy = actor;
         line.cancelReason = reason;
         cancelled.push(line.id);

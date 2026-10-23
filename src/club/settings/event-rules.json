@@ -6,6 +6,7 @@
     "cancelCutoffMinutes": 2880,
     "promoteUntilMinutesBefore": 120,
     "waitlistMax": 30,
+    "waitlistHoldMinutes": 60,
     "maxGuests": 4
   }
 }

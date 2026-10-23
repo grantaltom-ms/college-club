@@ -1,12 +1,12 @@
 import type { NextRequest } from "next/server";
-import { RsvpRefused, cancelRsvp, changeGuests, rsvp } from "@/club/engine/events";
+import { RsvpRefused, cancelRsvp, changeGuests, renewHold, rsvp } from "@/club/engine/events";
 import { ClubError } from "@/club/errors";
 import { EVENT_RULES } from "@/club/settings/event-rules";
 import { idParam, intParam } from "@/club/web";
 import { field, see, startLinkPost } from "@/club/web-post";
 
 /**
- * The buttons on a personal emailed link post here: RSVP, change guests, or cancel. The link must be genuine, and it can
+ * The buttons on a personal emailed link post here: RSVP, change the party, keep a place on the waitlist, or cancel. The link must be genuine, and it can
  * only touch this member's own RSVP to this one event. It never signs anyone in.
  */
 export async function POST(request: NextRequest) {
@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
   const { ctx, form, store, link } = started;
   const here = `/club/rsvp/${link.eventId}/${link.memberId}/${link.token}`;
   const action = field(form, "action");
-  const guests = intParam(field(form, "guests"), 0, 20, 0);
+  const people = intParam(field(form, "instead") || field(form, "people"), 1, 21, 1);
+  const guests = people - 1;
   try {
     if (action === "rsvp") {
       const { rsvp: line } = await rsvp(store, EVENT_RULES, ctx, { eventId: link.eventId, memberId: link.memberId, guests }, { via: "email_link" });
@@ -29,13 +30,17 @@ export async function POST(request: NextRequest) {
       await changeGuests(store, EVENT_RULES, ctx, mine.id, guests);
       return see(request, `${here}?done=${mine.id}`);
     }
+    if (action === "keep") {
+      await renewHold(store, EVENT_RULES, ctx, mine.id);
+      return see(request, `${here}?done=${mine.id}`);
+    }
     if (action === "cancel") {
       await cancelRsvp(store, EVENT_RULES, ctx, mine.id);
       return see(request, `${here}?done=${mine.id}`);
     }
     return see(request, `${here}?notice=invalid`);
   } catch (e) {
-    if (e instanceof RsvpRefused) return see(request, `${here}?guests=${guests}`);
+    if (e instanceof RsvpRefused) return see(request, `${here}?people=${people}`);
     if (e instanceof ClubError) return see(request, `${here}?notice=${e.code}`);
     throw e;
   }

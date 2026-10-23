@@ -10,12 +10,12 @@ export async function POST(request: NextRequest) {
   if ("response" in started) return started.response;
   const { ctx, form, store } = started;
   const id = idParam(field(form, "id"));
-  const guests = intParam(field(form, "guests"), 0, 20, -1);
-  if (!id || guests < 0) return see(request, "/club/events?notice=invalid");
+  const people = intParam(field(form, "people"), 1, 21, 0);
+  if (!id || people < 1) return see(request, "/club/events?notice=invalid");
   const eventId = (await store.read()).rsvps.find((r) => r.id === id)?.eventId;
   const page = eventId ? `/club/events/${eventId}` : "/club/events";
   try {
-    await changeGuests(store, EVENT_RULES, ctx, id, guests);
+    await changeGuests(store, EVENT_RULES, ctx, id, people - 1);
     return see(request, `${page}?changed=1`);
   } catch (e) {
     if (!(e instanceof ClubError)) throw e;

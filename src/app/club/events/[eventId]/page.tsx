@@ -8,11 +8,13 @@ import { fullName, householdOf, ordinal } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor, toEngineActor } from "@/club/identity";
 import { getLinkSecret } from "@/club/link-secret";
+import { afterJoiningWaitlist } from "@/club/party-words";
 import { EVENT_RULES } from "@/club/settings/event-rules";
 import { getClubStore } from "@/club/store/instance";
 import { formatClock, formatDayLong, pacificDate } from "@/club/time";
 import { clockValue, idParam, intParam, NOTICES } from "@/club/web";
 import { EventPlaceholderNote } from "../../PlaceholderNote";
+import { PartyStepper } from "../../PartyStepper";
 import { SignedOut } from "../../SignedOut";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -22,8 +24,6 @@ const EVENT_NOTICES: Record<string, string> = {
   ...NOTICES,
   started: "That event has already started, so this can no longer be done here.",
 };
-
-const money = (cents: number) => priceText(cents);
 
 export default async function EventPage({ params, searchParams }: { params: Promise<{ eventId: string }>; searchParams: Promise<Search> }) {
   await requireClub();
@@ -38,7 +38,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
 
   const staff = actor.kind === "staff";
   const rules = EVENT_RULES.defaults;
-  const view = eventView(state, event, staff ? { kind: "staff" } : { kind: "member", memberId: actor.member.id });
+  const view = eventView(state, event, staff ? { kind: "staff" } : { kind: "member", memberId: actor.member.id }, now);
   const started = Date.parse(event.startsAt) <= now.getTime();
   const open = event.status === "scheduled" && !started;
   const ctx = { actor: toEngineActor(actor), now };
@@ -48,16 +48,19 @@ export default async function EventPage({ params, searchParams }: { params: Prom
     .filter((m) => m.status === "active" && householdOf(state, m.householdId)?.status === "active")
     .sort((a, b) => fullName(a).localeCompare(fullName(b)));
   const forId = staff ? (people.find((m) => m.id === idParam(query.for))?.id ?? null) : actor.member.id;
-  const guests = intParam(one(query.guests), 0, rules.maxGuests, 0);
-  const reasons: RsvpReason[] | null = forId && open ? checkRsvp(state, EVENT_RULES, ctx, { eventId: event.id, memberId: forId, guests }) : null;
+  const party = intParam(one(query.people), 1, rules.maxGuests + 1, 1);
+  const reasons: RsvpReason[] | null = forId && open ? checkRsvp(state, EVENT_RULES, ctx, { eventId: event.id, memberId: forId, guests: party - 1 }) : null;
+  // A full waitlist is shown live by the number picker; anything else that stands in the way replaces the picker.
+  const blocking = reasons?.filter((r) => r.code !== "waitlist_full") ?? [];
   const forLine = forId ? view.sheet.find((l) => l.memberId === forId && (l.status === "going" || l.status === "waitlisted")) ?? (staff ? null : view.yours) : null;
   const claim = !!forLine && forLine.status === "waitlisted" && reasons !== null && reasons.length === 0;
   const lateIfCancelled = forLine?.status === "going" && Date.parse(event.startsAt) - now.getTime() < rules.cancelCutoffMinutes * 60000;
-  const willWait = view.left !== null && 1 + guests > view.left;
+  const holdWords = (holdUntil: string | null) => (holdUntil ? `Your place is held until ${formatClock(holdUntil)}. Press Keep my place to hold it for another ${rules.waitlistHoldMinutes === 60 ? "hour" : `${rules.waitlistHoldMinutes} minutes`}.` : "");
+  const stepperBase = { name: "people", max: rules.maxGuests + 1, priceCents: event.priceCents };
 
   const joinedId = idParam(query.joined);
   const joined = joinedId ? state.rsvps.find((r) => r.id === joinedId && r.eventId === event.id) : undefined;
-  const joinedPlace = joined ? state.rsvps.filter((r) => r.eventId === event.id && r.status === "waitlisted").findIndex((r) => r.id === joined.id) + 1 : 0;
+  const joinedLine = joined ? view.sheet.find((l) => l.rsvpId === joined.id) ?? (view.yours?.rsvpId === joined.id ? view.yours : undefined) : undefined;
   const notice = EVENT_NOTICES[one(query.notice) ?? ""];
   const cancelledNames = event.status === "cancelled" && staff ? state.rsvps.filter((r) => r.eventId === event.id && r.cancelReason?.startsWith("The event was cancelled")) : [];
   const explained = describeEventRules(EVENT_RULES);
@@ -65,7 +68,6 @@ export default async function EventPage({ params, searchParams }: { params: Prom
   const closes = closesAt(event, EVENT_RULES);
   const closesWords = `${formatDayLong(pacificDate(new Date(closes)))} at ${formatClock(new Date(closes))}`;
   const price = event.priceCents;
-  const guestChoices = Array.from({ length: rules.maxGuests + 1 }, (_, n) => n);
 
   return (
     <section>
@@ -81,8 +83,8 @@ export default async function EventPage({ params, searchParams }: { params: Prom
       {event.description && <p>{event.description}</p>}
       <p className="club-meta" data-testid="event-places">
         {placesText(view)}
-        {event.capacity !== null ? ` (limit ${event.capacity}${view.waiting > 0 ? `, ${view.waiting} waiting` : ""})` : ""}
-        {price !== null ? ` · ${money(price)}${price > 0 ? " a place" : ""}` : ""}
+        {event.capacity !== null ? ` (limit ${event.capacity}${view.waiting > 0 ? `, ${view.waiting} on the waitlist` : ""})` : ""}
+        {price !== null ? ` · ${priceText(price)}${price > 0 ? " a spot" : ""}` : ""}
       </p>
       {price !== null && price > 0 && <p className="club-meta">Prices are recorded with each RSVP and billed with the household&rsquo;s dues later. Nothing is charged in this test build.</p>}
 
@@ -91,9 +93,11 @@ export default async function EventPage({ params, searchParams }: { params: Prom
           This event was cancelled{event.cancelReason ? `: ${event.cancelReason}` : "."}
         </p>
       )}
-      {joined && (
-        <p className="club-success" role="status" data-testid="joined-note">
-          {joined.status === "going" ? `${staff ? "RSVP made." : "You are going."} ${1 + joined.guests} place${joined.guests === 0 ? "" : "s"} taken.` : `On the waiting list, ${ordinal(joinedPlace)} in line. If places free up, the first group that fits gets them at once.`}
+      {joined && joinedLine && (
+        <p className={joined.status === "going" ? "club-success" : "club-alert"} role="status" data-testid="joined-note">
+          {joined.status === "going"
+            ? `${staff ? "RSVP made." : "You are going."} ${1 + joined.guests} ${joined.guests === 0 ? "spot" : "spots"} taken.`
+            : afterJoiningWaitlist({ people: 1 + joined.guests, left: view.left, holdMinutes: rules.waitlistHoldMinutes, until: joined.holdUntil ? formatClock(joined.holdUntil) : undefined, place: joinedLine.place ?? 1 })}
         </p>
       )}
       {one(query.changed) && (
@@ -132,40 +136,48 @@ export default async function EventPage({ params, searchParams }: { params: Prom
             <>
               <p data-testid="your-place">
                 {staff ? `${fullName(people.find((m) => m.id === forId)!)}: ` : ""}
-                {forLine.status === "going" ? `${staff ? "is" : "You are"} going${forLine.guests > 0 ? `, with ${forLine.guests} guest${forLine.guests === 1 ? "" : "s"}` : ""}.` : `${staff ? "is" : "You are"} on the waiting list${forLine.guests > 0 ? `, with ${forLine.guests} guest${forLine.guests === 1 ? "" : "s"}` : ""}, ${ordinal(forLine.place ?? 1)} in line.`}
+                {staff ? (forLine.status === "going" ? `is going${forLine.guests > 0 ? `, party of ${1 + forLine.guests}` : ""}.` : `is on the waitlist${forLine.guests > 0 ? ` for a party of ${1 + forLine.guests}` : ""}, ${ordinal(forLine.place ?? 1)} in line.`) : yoursEventText(forLine)}
               </p>
+              {forLine.status === "waitlisted" && (
+                <form method="post" action="/api/club/events/keep">
+                  <input type="hidden" name="id" value={forLine.rsvpId} />
+                  {holdWords(forLine.holdUntil) && (
+                    <p className="club-meta" data-testid="hold-note">
+                      {holdWords(forLine.holdUntil)}
+                    </p>
+                  )}
+                  <button type="submit" className="club-button club-button-quiet" data-testid="keep-place">
+                    Keep my place
+                  </button>
+                </form>
+              )}
               {claim && (
                 <form method="post" action="/api/club/events/rsvp">
                   <input type="hidden" name="event" value={event.id} />
-                  <input type="hidden" name="guests" value={forLine.guests} />
+                  <input type="hidden" name="people" value={1 + forLine.guests} />
                   {staff && <input type="hidden" name="for" value={forId!} />}
-                  <p className="club-meta">Places are free, and the automatic move-up has ended, so they go to whoever asks first.</p>
+                  <p className="club-meta">Spots are free, and the automatic move-up has ended, so they go to whoever asks first.</p>
                   <button type="submit" className="club-button">
-                    Take the free places
+                    Take the free spots
                   </button>
                 </form>
               )}
               <form method="post" action="/api/club/events/guests" className="club-form">
                 <input type="hidden" name="id" value={forLine.rsvpId} />
-                <p>
-                  <label htmlFor="change-guests">Guests</label>
-                  <select id="change-guests" name="guests" defaultValue={String(forLine.guests)}>
-                    {guestChoices.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>{" "}
-                  <button type="submit" className="club-button club-button-quiet">
-                    Change guests
-                  </button>
-                </p>
+                <PartyStepper
+                  {...stepperBase}
+                  mode="change"
+                  initial={1 + forLine.guests}
+                  hasSpots={forLine.status === "going"}
+                  fits={view.left === null ? null : forLine.status === "going" ? 1 + forLine.guests + view.left : view.left}
+                  submitLabel="Change my party"
+                />
               </form>
               <form method="post" action="/api/club/events/leave">
                 <input type="hidden" name="id" value={forLine.rsvpId} />
                 {lateIfCancelled && !staff && <p className="club-meta">Cancelling now counts as a late cancellation.</p>}
                 <button type="submit" className="club-button club-button-quiet">
-                  {forLine.status === "waitlisted" ? "Leave the waiting list" : "Cancel my RSVP"}
+                  {forLine.status === "waitlisted" ? "Leave the waitlist" : "Cancel my RSVP"}
                 </button>
               </form>
             </>
@@ -173,47 +185,34 @@ export default async function EventPage({ params, searchParams }: { params: Prom
 
           {!forLine && forId && (
             <>
-              <form method="get" className="club-form" action={`/club/events/${event.id}`}>
-                {staff && <input type="hidden" name="for" value={forId} />}
-                <p>
-                  <label htmlFor="guests">Guests you are bringing (not members)</label>
-                  <select id="guests" name="guests" defaultValue={String(guests)}>
-                    {guestChoices.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>{" "}
-                  <button type="submit" className="club-button club-button-quiet">
-                    Update
-                  </button>
-                </p>
-              </form>
-              {price !== null && price > 0 && (
-                <p className="club-meta" data-testid="price-total">
-                  {1 + guests} place{guests === 0 ? "" : "s"} × {money(price)} = {money((1 + guests) * price)}
-                </p>
-              )}
-              {reasons && reasons.length > 0 ? (
+              {blocking.length > 0 ? (
                 <div className="club-alert" role="alert" data-testid="refusal">
                   <p>{staff ? "This RSVP cannot be made:" : "You cannot RSVP:"}</p>
                   <ul>
-                    {reasons.map((r) => (
+                    {blocking.map((r) => (
                       <li key={r.code}>{r.message}</li>
                     ))}
                   </ul>
                 </div>
               ) : (
-                <form method="post" action="/api/club/events/rsvp">
+                <form method="post" action="/api/club/events/rsvp" className="club-form">
                   <input type="hidden" name="event" value={event.id} />
-                  <input type="hidden" name="guests" value={guests} />
                   {staff && <input type="hidden" name="for" value={forId} />}
-                  <p className="club-meta">
-                    {willWait ? `Your group of ${1 + guests} does not fit in the ${view.left} place${view.left === 1 ? "" : "s"} left. You can join the waiting list; the first group that fits gets places the moment they free up.` : "There is room for your group."} RSVPs close {closesWords}.
-                  </p>
-                  <button type="submit" className="club-button">
-                    {willWait ? "Join the waiting list" : "RSVP"}
-                  </button>
+                  {reasons?.some((r) => r.code === "waitlist_full") && (
+                    <p className="club-alert" role="alert" data-testid="refusal">
+                      {reasons.find((r) => r.code === "waitlist_full")!.message}
+                    </p>
+                  )}
+                  <PartyStepper
+                    {...stepperBase}
+                    mode="join"
+                    initial={party}
+                    left={view.left}
+                    waitlistOpen={rules.waitlistMax > 0}
+                    waitlistRoom={Math.max(0, rules.waitlistMax - view.waiting)}
+                    holdMinutes={rules.waitlistHoldMinutes}
+                  />
+                  <p className="club-meta">RSVPs close {closesWords}.</p>
                 </form>
               )}
             </>
@@ -233,7 +232,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
               {view.sheet.map((line) => (
                 <li key={line.rsvpId} data-testid="sheet-line" data-status={line.status}>
                   {line.name}
-                  {line.guests > 0 ? ` +${line.guests}` : ""} · {line.status === "waitlisted" ? `waiting, ${ordinal(line.place ?? 1)} in line` : line.status.replace("_", " ")}
+                  {line.guests > 0 ? ` · party of ${1 + line.guests}` : ""} · {line.status === "waitlisted" ? `waitlist, ${ordinal(line.place ?? 1)} in line${line.holdUntil ? `, held until ${formatClock(line.holdUntil)}` : ""}` : line.status.replace("_", " ")}
                   {line.via === "email_link" ? " · from an email link" : ""}
                   {line.status === "going" && started && event.status === "scheduled" && (
                     <form method="post" action="/api/club/events/attendance" style={{ display: "inline" }}>
@@ -312,11 +311,11 @@ export default async function EventPage({ params, searchParams }: { params: Prom
                         <input id="e-end" name="end" type="time" defaultValue={clockValue(event.endsAt)} required />
                       </p>
                       <p>
-                        <label htmlFor="e-limit">Limit on places, members and guests together (empty for none)</label>
+                        <label htmlFor="e-limit">Limit on spots, members and guests together (empty for none)</label>
                         <input id="e-limit" name="limit" type="number" min={Math.max(1, view.going)} max={2000} defaultValue={event.capacity ?? ""} />
                       </p>
                       <p>
-                        <label htmlFor="e-price">Price of one place in dollars (empty for not stated, 0 for free)</label>
+                        <label htmlFor="e-price">Price of one spot in dollars (empty for not stated, 0 for free)</label>
                         <input id="e-price" name="price" type="text" inputMode="decimal" defaultValue={event.priceCents === null ? "" : String(event.priceCents / 100)} />
                       </p>
                       <p>
@@ -327,7 +326,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
                         </label>{" "}
                         <input id="e-replyby-time" name="replyByTime" type="time" defaultValue={event.replyBy ? clockValue(event.replyBy) : ""} />
                       </p>
-                      <p className="club-meta">Raising or removing the limit moves the waiting list up at once. A new price applies only to RSVPs made afterwards. Nobody is emailed about a change.</p>
+                      <p className="club-meta">Raising or removing the limit moves the waitlist up at once. A new price applies only to RSVPs made afterwards. Nobody is emailed about a change.</p>
                       <button type="submit" className="club-button">
                         Save changes
                       </button>

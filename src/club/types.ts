@@ -310,6 +310,8 @@ export interface EventRuleValues {
   promoteUntilMinutesBefore: number;
   /** The most RSVPs that can wait for one event. 0 means no waiting list. */
   waitlistMax: number;
+  /** A place on the waiting list is removed this many minutes after the member last pressed a button on it. 0 means it never runs out. */
+  waitlistHoldMinutes: number;
   /** The most guests one member can bring on one RSVP. */
   maxGuests: number;
 }
@@ -377,6 +379,8 @@ export interface Rsvp {
   statusChangedAt: string;
   /** Set when the waiting list moved this person up to places. */
   promotedAt: string | null;
+  /** While waiting: the moment this place on the waiting list is removed unless the member keeps it. null otherwise, and when holds never run out. */
+  holdUntil: string | null;
   cancelledBy: Actor | null;
   cancelReason: string | null;
 }

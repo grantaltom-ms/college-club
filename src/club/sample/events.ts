@@ -1,6 +1,7 @@
 import { createEvent, rsvp } from "../engine/events";
 import { fullName } from "../engine/queries";
 import { EVENT_RULES } from "../settings/event-rules";
+import type { EventRules } from "../types";
 import type { ClubStore } from "../store/memory";
 import { addDays, pacificDate, pacificWall } from "../time";
 import { SAMPLE_STAFF } from "./club";
@@ -9,6 +10,9 @@ import { SAMPLE_STAFF } from "./club";
  * Invented club events: a ticketed social with a limit, a dinner that is full with a waiting list, and a free work
  * party with no limit. Locations, prices and descriptions are made up. Nothing here is a real event.
  */
+/** The sample waitlist places never run out, so the demo dinner keeps its waitlist however long the server has been up. */
+const SAMPLE_RULES: EventRules = { ...EVENT_RULES, defaults: { ...EVENT_RULES.defaults, waitlistHoldMinutes: 0 } };
+
 export async function seedSampleEvents(store: ClubStore, now: Date): Promise<void> {
   const staff = { actor: SAMPLE_STAFF, now };
   const state = await store.read();
@@ -48,7 +52,7 @@ export async function seedSampleEvents(store: ClubStore, now: Date): Promise<voi
     priceCents: 0,
   });
 
-  const go = (eventId: string, name: string, guests = 0) => rsvp(store, EVENT_RULES, { actor: SAMPLE_STAFF, now }, { eventId, memberId: member(name), guests });
+  const go = (eventId: string, name: string, guests = 0) => rsvp(store, SAMPLE_RULES, { actor: SAMPLE_STAFF, now }, { eventId, memberId: member(name), guests });
   // The dinner is full (12 places) with two groups waiting, in this order.
   for (const [name, guests] of [["Erik Lindqvist", 1], ["Maren Lindqvist", 0], ["Jordan Bellweather", 2], ["Sasha Bellweather", 0], ["Tomas Vandermeer", 1], ["Walter Pemberton", 2]] as const) await go(dinner.id, name, guests);
   await go(dinner.id, "Nora Abernathy", 1);

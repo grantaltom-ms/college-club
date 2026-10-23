@@ -7,7 +7,7 @@ const withDefaults = (change: Record<string, unknown>) => ({ ...raw, defaults: {
 describe("the event rules file", () => {
   it("is read, marked as placeholders, and has every rule", () => {
     expect(EVENT_RULES.placeholder).toBe(true);
-    expect(Object.keys(EVENT_RULES.defaults).sort()).toEqual(["cancelCutoffMinutes", "closeMinutesBefore", "maxGuests", "promoteUntilMinutesBefore", "waitlistMax"]);
+    expect(Object.keys(EVENT_RULES.defaults).sort()).toEqual(["cancelCutoffMinutes", "closeMinutesBefore", "maxGuests", "promoteUntilMinutesBefore", "waitlistHoldMinutes", "waitlistMax"]);
   });
 
   it("refuses a missing, misspelled or nonsense rule in words", () => {
@@ -21,7 +21,7 @@ describe("the event rules file", () => {
     expect(() => parseEventRules(null)).toThrow(EventRulesError);
   });
 
-  it("allows no waiting list and no guests", () => {
-    expect(parseEventRules(withDefaults({ waitlistMax: 0, maxGuests: 0 })).defaults).toMatchObject({ waitlistMax: 0, maxGuests: 0 });
+  it("allows no waiting list, no guests, and a waiting place that never runs out", () => {
+    expect(parseEventRules(withDefaults({ waitlistMax: 0, maxGuests: 0, waitlistHoldMinutes: 0 })).defaults).toMatchObject({ waitlistMax: 0, maxGuests: 0, waitlistHoldMinutes: 0 });
   });
 });

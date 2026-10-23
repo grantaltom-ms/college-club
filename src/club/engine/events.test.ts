@@ -16,6 +16,7 @@ import {
   updateEvent,
   type NewEvent,
 } from "./events";
+import type { ClubState } from "../types";
 import { placesText, yoursEventText } from "./event-words";
 import { endHousehold, removeMember } from "./households";
 import { clubLedger } from "./ledger";
@@ -27,14 +28,17 @@ import { NOW, STORE_KINDS, addMembers, at, bookAs, fixtureFor, memberCtx, refuse
  * RSVP closes an hour before (Sat 5 pm), cancelling is late inside 48 hours (after Thu 6 pm), and the waiting list moves
  * up by itself until two hours before (Sat 4 pm).
  */
-const rulesWith = (change: Partial<EventRules["defaults"]>): EventRules => ({ placeholder: true, defaults: { ...EVENT_RULES.defaults, ...change } });
+/** These tests turn the one-hour hold off unless they say otherwise, so waiting places last as long as each test needs. */
+const rulesWith = (change: Partial<EventRules["defaults"]>): EventRules => ({ placeholder: true, defaults: { ...EVENT_RULES.defaults, waitlistHoldMinutes: 0, ...change } });
+const QUIET = rulesWith({});
 const idOf = (f: Fixture, who: string) => f.m[who] ?? who;
+const viewOf = (state: ClubState, e: Parameters<typeof eventView>[1], viewer: Parameters<typeof eventView>[2], now: Date = NOW) => eventView(state, e, viewer, now);
 
 const mkEvent = (f: Fixture, over: Partial<NewEvent> = {}, now: Date = NOW) => createEvent(f.store, staffCtx(now), { title: "Dinner", startsAt: at(3, 18), endsAt: at(3, 21), ...over });
-const go = (f: Fixture, who: string, eventId: string, guests = 0, now: Date = NOW, rules: EventRules = EVENT_RULES) =>
+const go = (f: Fixture, who: string, eventId: string, guests = 0, now: Date = NOW, rules: EventRules = QUIET) =>
   rsvp(f.store, rules, memberCtx(idOf(f, who), who, now), { eventId, memberId: idOf(f, who), guests });
-const leave = (f: Fixture, who: string, rsvpId: string, now: Date = NOW, rules: EventRules = EVENT_RULES) => cancelRsvp(f.store, rules, memberCtx(idOf(f, who), who, now), rsvpId);
-const guestsOf = (f: Fixture, who: string, rsvpId: string, guests: number, now: Date = NOW, rules: EventRules = EVENT_RULES) => changeGuests(f.store, rules, memberCtx(idOf(f, who), who, now), rsvpId, guests);
+const leave = (f: Fixture, who: string, rsvpId: string, now: Date = NOW, rules: EventRules = QUIET) => cancelRsvp(f.store, rules, memberCtx(idOf(f, who), who, now), rsvpId);
+const guestsOf = (f: Fixture, who: string, rsvpId: string, guests: number, now: Date = NOW, rules: EventRules = QUIET) => changeGuests(f.store, rules, memberCtx(idOf(f, who), who, now), rsvpId, guests);
 
 const refusedCodes = async (attempt: Promise<unknown>) => {
   try {
@@ -85,7 +89,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const f = await fixture();
       const e = await mkEvent(f, { priceCents: 2500 });
       const early = await go(f, "Ada", e.id);
-      const { event } = await updateEvent(f.store, EVENT_RULES, staffCtx(), e.id, { title: "Harvest Dinner", location: "The clubhouse", priceCents: 3000 });
+      const { event } = await updateEvent(f.store, QUIET, staffCtx(), e.id, { title: "Harvest Dinner", location: "The clubhouse", priceCents: 3000 });
       expect(event).toMatchObject({ title: "Harvest Dinner", location: "The clubhouse", priceCents: 3000 });
       const late = await go(f, "Ben", e.id);
       expect(early.rsvp.priceCents).toBe(2500);
@@ -96,11 +100,11 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
     it("refuses changes by members, to a cancelled event, to one that has started, or to a time already gone", async () => {
       const f = await fixture();
       const e = await mkEvent(f);
-      await expect(updateEvent(f.store, EVENT_RULES, memberCtx(f.m.Ada, "Ada"), e.id, { title: "Mine" })).rejects.toMatchObject({ code: "forbidden" });
-      await expect(updateEvent(f.store, EVENT_RULES, staffCtx(), e.id, { startsAt: at(0, 12) })).rejects.toThrow("The event must start in the future.");
-      await expect(updateEvent(f.store, EVENT_RULES, staffCtx(at(3, 18, 1)), e.id, { title: "Late" })).rejects.toThrow("That event has already started, so it cannot be changed.");
+      await expect(updateEvent(f.store, QUIET, memberCtx(f.m.Ada, "Ada"), e.id, { title: "Mine" })).rejects.toMatchObject({ code: "forbidden" });
+      await expect(updateEvent(f.store, QUIET, staffCtx(), e.id, { startsAt: at(0, 12) })).rejects.toThrow("The event must start in the future.");
+      await expect(updateEvent(f.store, QUIET, staffCtx(at(3, 18, 1)), e.id, { title: "Late" })).rejects.toThrow("That event has already started, so it cannot be changed.");
       await cancelEvent(f.store, staffCtx(), e.id, { reason: "Storm" });
-      await expect(updateEvent(f.store, EVENT_RULES, staffCtx(), e.id, { title: "Back" })).rejects.toThrow("That event was cancelled, so it cannot be changed.");
+      await expect(updateEvent(f.store, QUIET, staffCtx(), e.id, { title: "Back" })).rejects.toThrow("That event was cancelled, so it cannot be changed.");
     });
   });
 
@@ -112,21 +116,21 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       expect(result).toMatchObject({ outcome: "going", place: null, rsvp: { memberId: f.m.Ada, guests: 2, status: "going", priceCents: 2500, via: "page", eventId: e.id } });
 
       const state = await f.store.read();
-      const asDee = eventView(state, e, { kind: "member", memberId: f.m.Dee });
+      const asDee = viewOf(state, e, { kind: "member", memberId: f.m.Dee });
       expect(asDee).toMatchObject({ going: 3, left: 7, waiting: 0, full: false, yours: null, sheet: [] });
       expect(JSON.stringify(asDee)).not.toMatch(/Ada|Quill/);
-      expect(placesText(asDee)).toBe("7 places left");
-      const asAda = eventView(state, e, { kind: "member", memberId: f.m.Ada });
+      expect(placesText(asDee)).toBe("7 spots left");
+      const asAda = viewOf(state, e, { kind: "member", memberId: f.m.Ada });
       expect(asAda.yours).toMatchObject({ status: "going", guests: 2, name: null });
-      expect(yoursEventText(asAda.yours)).toBe("You are going, with 2 guests.");
-      const asStaff = eventView(state, e, { kind: "staff" });
+      expect(yoursEventText(asAda.yours)).toBe("You are going, party of 3.");
+      const asStaff = viewOf(state, e, { kind: "staff" });
       expect(asStaff.sheet.map((l) => [l.name, l.guests])).toEqual([["Ada Quill", 2]]);
     });
 
     it("remembers that an RSVP came from an emailed link", async () => {
       const f = await fixture();
       const e = await mkEvent(f);
-      const result = await rsvp(f.store, EVENT_RULES, memberCtx(f.m.Ada, "Ada"), { eventId: e.id, memberId: f.m.Ada }, { via: "email_link" });
+      const result = await rsvp(f.store, QUIET, memberCtx(f.m.Ada, "Ada"), { eventId: e.id, memberId: f.m.Ada }, { via: "email_link" });
       expect(result.rsvp.via).toBe("email_link");
       expect((await f.store.read()).rsvps[0].via).toBe("email_link");
     });
@@ -134,8 +138,8 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
     it("lets a member RSVP only for themself, and staff for anyone", async () => {
       const f = await fixture();
       const e = await mkEvent(f);
-      await expect(rsvp(f.store, EVENT_RULES, memberCtx(f.m.Ada, "Ada"), { eventId: e.id, memberId: f.m.Ben })).rejects.toMatchObject({ code: "forbidden" });
-      const byStaff = await rsvp(f.store, EVENT_RULES, staffCtx(), { eventId: e.id, memberId: f.m.Ben });
+      await expect(rsvp(f.store, QUIET, memberCtx(f.m.Ada, "Ada"), { eventId: e.id, memberId: f.m.Ben })).rejects.toMatchObject({ code: "forbidden" });
+      const byStaff = await rsvp(f.store, QUIET, staffCtx(), { eventId: e.id, memberId: f.m.Ben });
       expect(byStaff.rsvp.createdBy).toEqual({ kind: "staff", label: "Test staff" });
     });
 
@@ -145,12 +149,12 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       await go(f, "Ada", e.id, 2);
       await go(f, "Dee", e.id, 1);
       const state = await f.store.read();
-      expect(eventView(state, e, { kind: "staff" })).toMatchObject({ going: 5, left: 0, full: true });
+      expect(viewOf(state, e, { kind: "staff" })).toMatchObject({ going: 5, left: 0, full: true });
       const ben = await go(f, "Ben", e.id);
       const cy = await go(f, "Cy", e.id);
       expect([ben.outcome, ben.place, cy.outcome, cy.place]).toEqual(["waitlisted", 1, "waitlisted", 2]);
-      expect(placesText(eventView(await f.store.read(), e, { kind: "staff" }))).toBe("Full, 2 waiting");
-      expect(yoursEventText(eventView(await f.store.read(), e, { kind: "member", memberId: f.m.Cy }).yours)).toBe("You are on the waiting list, 2nd in line.");
+      expect(placesText(viewOf(await f.store.read(), e, { kind: "staff" }))).toBe("Full, 2 on the waitlist");
+      expect(yoursEventText(viewOf(await f.store.read(), e, { kind: "member", memberId: f.m.Cy }).yours)).toBe("You are on the waitlist, 2nd in line.");
     });
 
     it("keeps a group together: if all of them do not fit they all wait, and a smaller newcomer who fits goes in", async () => {
@@ -178,7 +182,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       expect(afterDee.promoted.map((p) => p.memberId)).toEqual([f.m.Cy]);
       expect(afterDee.promoted[0]).toMatchObject({ status: "going", promotedAt: NOW.toISOString() });
       expect((await statuses(f, e.id))[f.m.Ben]).toBe("waitlisted");
-      expect(eventView(await f.store.read(), e, { kind: "member", memberId: f.m.Ben }).yours).toMatchObject({ place: 1 });
+      expect(viewOf(await f.store.read(), e, { kind: "member", memberId: f.m.Ben }).yours).toMatchObject({ place: 1 });
 
       expect((await leave(f, "Eli", eli.rsvp.id)).promoted).toEqual([]); // 2 free (Cy has 2): Ben still needs 4
       const cyLine = (await linesOf(f, "Cy", e.id))[0];
@@ -202,7 +206,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const e = await mkEvent(f, { capacity: null });
       const people = await addMembers(f, 20);
       for (const id of people) expect((await go(f, id, e.id, 1)).outcome).toBe("going");
-      const view = eventView(await f.store.read(), e, { kind: "staff" });
+      const view = viewOf(await f.store.read(), e, { kind: "staff" });
       expect(view).toMatchObject({ going: 40, left: null, full: false, waiting: 0 });
       expect(placesText(view)).toBe("40 going");
     });
@@ -223,9 +227,9 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
     it("refuses too many guests, and anything that is not a whole number", async () => {
       const f = await fixture();
       const e = await mkEvent(f);
-      expect(await refusedWords(go(f, "Ada", e.id, 5))).toEqual(["You can bring up to 4 guests."]);
-      expect(await refusedWords(go(f, "Ada", e.id, 2, NOW, rulesWith({ maxGuests: 1 })))).toEqual(["You can bring up to 1 guest."]);
-      expect(await refusedWords(go(f, "Ada", e.id, 1, NOW, rulesWith({ maxGuests: 0 })))).toEqual(["Guests cannot be added to an RSVP for this event."]);
+      expect(await refusedWords(go(f, "Ada", e.id, 5))).toEqual(["A party can have up to 5 people, counting you."]);
+      expect(await refusedWords(go(f, "Ada", e.id, 2, NOW, rulesWith({ maxGuests: 1 })))).toEqual(["A party can have up to 2 people, counting you."]);
+      expect(await refusedWords(go(f, "Ada", e.id, 1, NOW, rulesWith({ maxGuests: 0 })))).toEqual(["Only one person can RSVP at a time for this event."]);
       await expect(go(f, "Ada", e.id, -1)).rejects.toThrow("The number of guests must be a whole number, 0 or more.");
       await expect(go(f, "Ada", e.id, 1.5)).rejects.toThrow(ClubError);
       expect((await go(f, "Ada", e.id, 4)).outcome).toBe("going");
@@ -238,7 +242,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       await go(f, "Dee", e.id, 0);
       await go(f, "Ben", e.id, 1);
       expect(await refusedWords(go(f, "Ada", e.id))).toEqual(["You are already going."]);
-      expect(await refusedWords(go(f, "Ben", e.id))).toEqual(["You are already on the waiting list with 1 guest, 1st in line."]);
+      expect(await refusedWords(go(f, "Ben", e.id))).toEqual(["You are already on the waitlist for a party of 2, 1st in line."]);
       expect(await linesOf(f, "Ben", e.id)).toHaveLength(1);
     });
 
@@ -278,23 +282,23 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       await go(f, "Ada", full.id);
       await go(f, "Ben", full.id, 0, NOW, rulesWith({ waitlistMax: 2 }));
       await go(f, "Cy", full.id, 0, NOW, rulesWith({ waitlistMax: 2 }));
-      expect(await refusedWords(go(f, "Dee", full.id, 0, NOW, rulesWith({ waitlistMax: 2 })))).toEqual(["Dinner is full, and its waiting list is full too (2 people)."]);
+      expect(await refusedWords(go(f, "Dee", full.id, 0, NOW, rulesWith({ waitlistMax: 2 })))).toEqual(["Dinner is full, and its waitlist is full too (2 parties)."]);
 
       const partial = await mkEvent(f, { title: "Brunch", startsAt: at(4, 10), endsAt: at(4, 12), capacity: 3 });
       await go(f, "Ada", partial.id);
       await go(f, "Ben", partial.id, 2, NOW, rulesWith({ waitlistMax: 1 })); // needs 3, 2 left: waits
-      expect(await refusedWords(go(f, "Cy", partial.id, 2, NOW, rulesWith({ waitlistMax: 1 })))).toEqual(["Brunch has only 2 places left and this RSVP needs 3, and its waiting list is full too (1 person)."]);
+      expect(await refusedWords(go(f, "Cy", partial.id, 2, NOW, rulesWith({ waitlistMax: 1 })))).toEqual(["Brunch has only 2 spots left and this party needs 3, and its waitlist is full too (1 party)."]);
 
       const none = await mkEvent(f, { title: "Lunch", startsAt: at(5, 10), endsAt: at(5, 12), capacity: 1 });
       await go(f, "Ada", none.id);
-      expect(await refusedWords(go(f, "Ben", none.id, 0, NOW, rulesWith({ waitlistMax: 0 })))).toEqual(["Lunch is full, and it has no waiting list."]);
+      expect(await refusedWords(go(f, "Ben", none.id, 0, NOW, rulesWith({ waitlistMax: 0 })))).toEqual(["Lunch is full, and it has no waitlist."]);
     });
 
     it("checkRsvp lists every reason at once without RSVPing anyone", async () => {
       const f = await fixture();
       const e = await mkEvent(f);
       const state = await f.store.read();
-      const reasons = checkRsvp(state, EVENT_RULES, memberCtx(f.m.Ada, "Ada", at(3, 17, 30)), { eventId: e.id, memberId: f.m.Ada, guests: 9 });
+      const reasons = checkRsvp(state, QUIET, memberCtx(f.m.Ada, "Ada", at(3, 17, 30)), { eventId: e.id, memberId: f.m.Ada, guests: 9 });
       expect(reasons.map((r) => r.code)).toEqual(["closed", "too_many_guests"]);
       expect((await f.store.read()).rsvps).toHaveLength(0);
     });
@@ -316,7 +320,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       expect((await statuses(g, e2.id))[g.m.Ben]).toBe("waitlisted");
       // A newcomer takes the free place ahead of Ben.
       expect((await go(g, "Cy", e2.id, 0, at(3, 16, 5))).outcome).toBe("going");
-      expect(await refusedWords(go(g, "Ben", e2.id, 0, at(3, 16, 6)))).toEqual(["You are already on the waiting list, 1st in line."]);
+      expect(await refusedWords(go(g, "Ben", e2.id, 0, at(3, 16, 6)))).toEqual(["You are already on the waitlist, 1st in line."]);
     });
 
     it("lets someone already waiting take free places after that, if their whole group fits", async () => {
@@ -336,7 +340,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       await go(g, "Dee", e2.id);
       await go(g, "Ben", e2.id, 2); // needs 3, 1 left: waits
       await leave(g, "Ada", a.rsvp.id, at(3, 16, 30)); // 2 left: still not enough for 3
-      expect(await refusedWords(go(g, "Ben", e2.id, 0, at(3, 16, 31)))).toEqual(["You are already on the waiting list with 2 guests, 1st in line."]);
+      expect(await refusedWords(go(g, "Ben", e2.id, 0, at(3, 16, 31)))).toEqual(["You are already on the waitlist for a party of 3, 1st in line."]);
     });
   });
 
@@ -346,10 +350,10 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const e = await mkEvent(f, { capacity: 4 });
       const ada = await go(f, "Ada", e.id);
       await go(f, "Dee", e.id, 1); // 3 of 4
-      await expect(guestsOf(f, "Ada", ada.rsvp.id, 3)).rejects.toThrow("Only 1 place is left, so you can add up to 1 more guest.");
+      await expect(guestsOf(f, "Ada", ada.rsvp.id, 3)).rejects.toThrow("Only 1 spot is left, so your party can grow by 1 at most.");
       expect((await guestsOf(f, "Ada", ada.rsvp.id, 1)).rsvp.guests).toBe(1);
-      await expect(guestsOf(f, "Ada", ada.rsvp.id, 2)).rejects.toThrow("Dinner is full, so no more guests can be added.");
-      await expect(guestsOf(f, "Ada", ada.rsvp.id, 5)).rejects.toThrow("You can bring up to 4 guests.");
+      await expect(guestsOf(f, "Ada", ada.rsvp.id, 2)).rejects.toThrow("Dinner is full, so the party cannot get bigger.");
+      await expect(guestsOf(f, "Ada", ada.rsvp.id, 5)).rejects.toThrow("A party can have up to 5 people, counting you.");
       expect((await linesOf(f, "Ada", e.id))[0].guests).toBe(1);
     });
 
@@ -362,7 +366,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const result = await guestsOf(f, "Ada", ada.rsvp.id, 0); // 3 places freed
       expect(result.promoted.map((p) => p.memberId)).toEqual([f.m.Ben]);
       expect(await statuses(f, e.id)).toEqual({ [f.m.Ada]: "going", [f.m.Dee]: "going", [f.m.Ben]: "going" });
-      expect(eventView(await f.store.read(), e, { kind: "staff" })).toMatchObject({ going: 6, left: 0 });
+      expect(viewOf(await f.store.read(), e, { kind: "staff" })).toMatchObject({ going: 6, left: 0 });
     });
 
     it("lets someone waiting change their group size, and checks it only when places free up", async () => {
@@ -378,7 +382,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const f = await fixture();
       const e = await mkEvent(f);
       const ada = await go(f, "Ada", e.id, 1);
-      await expect(guestsOf(f, "Ada", ada.rsvp.id, 2, at(3, 17))).rejects.toThrow("RSVPs have closed, so guests can no longer be added.");
+      await expect(guestsOf(f, "Ada", ada.rsvp.id, 2, at(3, 17))).rejects.toThrow("RSVPs have closed, so the party can no longer get bigger.");
       expect((await guestsOf(f, "Ada", ada.rsvp.id, 0, at(3, 17, 30))).rsvp.guests).toBe(0);
     });
 
@@ -413,7 +417,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const ben = await go(f, "Ben", e.id);
       expect((await leave(f, "Ben", ben.rsvp.id, at(3, 12))).late).toBe(false);
       const adaLine = (await linesOf(f, "Ada", e.id))[0];
-      const byStaff = await cancelRsvp(f.store, EVENT_RULES, staffCtx(at(3, 12)), adaLine.id, { reason: "Asked at the desk" });
+      const byStaff = await cancelRsvp(f.store, QUIET, staffCtx(at(3, 12)), adaLine.id, { reason: "Asked at the desk" });
       expect(byStaff).toMatchObject({ late: false, rsvp: { status: "cancelled", cancelReason: "Asked at the desk" } });
     });
 
@@ -433,10 +437,10 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const f = await fixture();
       const e = await mkEvent(f, { capacity: 2 });
       for (const who of ["Ada", "Ben", "Cy", "Dee", "Eli"]) await go(f, who, e.id);
-      const raised = await updateEvent(f.store, EVENT_RULES, staffCtx(), e.id, { capacity: 4 });
+      const raised = await updateEvent(f.store, QUIET, staffCtx(), e.id, { capacity: 4 });
       expect(raised.promoted.map((p) => p.memberId)).toEqual([f.m.Cy, f.m.Dee]);
       expect((await statuses(f, e.id))[f.m.Eli]).toBe("waitlisted");
-      const removed = await updateEvent(f.store, EVENT_RULES, staffCtx(), e.id, { capacity: null });
+      const removed = await updateEvent(f.store, QUIET, staffCtx(), e.id, { capacity: null });
       expect(removed.promoted.map((p) => p.memberId)).toEqual([f.m.Eli]);
       expect((await eventOf(f, e.id)).capacity).toBeNull();
     });
@@ -446,12 +450,12 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const e = await mkEvent(f, { capacity: 10 });
       await go(f, "Ada", e.id, 2);
       await go(f, "Dee", e.id, 1);
-      await expect(updateEvent(f.store, EVENT_RULES, staffCtx(), e.id, { capacity: 4 })).rejects.toThrow("5 people are already going, so the limit cannot go below 5. Cancel some RSVPs first.");
-      await expect(updateEvent(f.store, EVENT_RULES, staffCtx(), e.id, { capacity: 4 })).rejects.toBeInstanceOf(LimitTooLow);
-      expect((await updateEvent(f.store, EVENT_RULES, staffCtx(), e.id, { capacity: 5 })).event.capacity).toBe(5);
+      await expect(updateEvent(f.store, QUIET, staffCtx(), e.id, { capacity: 4 })).rejects.toThrow("5 people are already going, so the limit cannot go below 5. Cancel some RSVPs first.");
+      await expect(updateEvent(f.store, QUIET, staffCtx(), e.id, { capacity: 4 })).rejects.toBeInstanceOf(LimitTooLow);
+      expect((await updateEvent(f.store, QUIET, staffCtx(), e.id, { capacity: 5 })).event.capacity).toBe(5);
       const open = await mkEvent(f, { title: "Open house", startsAt: at(5, 10), endsAt: at(5, 12), capacity: null });
       for (const who of await addMembers(f, 20)) await go(f, who, open.id);
-      await expect(updateEvent(f.store, EVENT_RULES, staffCtx(), open.id, { capacity: 3 })).rejects.toThrow("20 people are already going");
+      await expect(updateEvent(f.store, QUIET, staffCtx(), open.id, { capacity: 3 })).rejects.toThrow("20 people are already going");
     });
   });
 
@@ -487,7 +491,7 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       const ben = await go(f, "Ben", e.id);
       await expect(markRsvpAttendance(f.store, staffCtx(at(3, 17)), ada.rsvp.id, "attended")).rejects.toThrow("That event has not started yet.");
       await expect(markRsvpAttendance(f.store, memberCtx(f.m.Ada, "Ada", at(3, 19)), ada.rsvp.id, "attended")).rejects.toMatchObject({ code: "forbidden" });
-      await expect(markRsvpAttendance(f.store, staffCtx(at(3, 19)), ben.rsvp.id, "attended")).rejects.toThrow(/only be recorded for someone with places/);
+      await expect(markRsvpAttendance(f.store, staffCtx(at(3, 19)), ben.rsvp.id, "attended")).rejects.toThrow(/only be recorded for someone with spots/);
       expect(await markRsvpAttendance(f.store, staffCtx(at(3, 19)), ada.rsvp.id, "attended")).toMatchObject({ status: "attended" });
       await expect(markRsvpAttendance(f.store, staffCtx(at(3, 20)), ada.rsvp.id, "no_show")).rejects.toThrow(/is attended/);
     });
@@ -559,10 +563,10 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
       expect(results.every((r) => r.status === "fulfilled")).toBe(true);
       const state = await f.store.read();
       expect(placesLeftOf(state, e.id)).toBeGreaterThanOrEqual(0);
-      expect(eventView(state, e, { kind: "staff" }).going).toBeLessThanOrEqual(6);
+      expect(viewOf(state, e, { kind: "staff" }).going).toBeLessThanOrEqual(6);
       expect(new Set(state.rsvps.map((r) => r.memberId)).size).toBe(state.rsvps.length);
       // Every waiting group really did not fit when it was put on the list: nobody waiting could have used the free places now.
-      const left = 6 - eventView(state, e, { kind: "staff" }).going;
+      const left = 6 - viewOf(state, e, { kind: "staff" }).going;
       for (const r of state.rsvps.filter((x) => x.status === "waitlisted")) expect(1 + r.guests).toBeGreaterThan(left);
     }, 60000);
 
@@ -574,9 +578,9 @@ describe.each(STORE_KINDS)("events on the %s store", (kind) => {
         for (const id of people) await go(f, id, e.id);
         // Everyone waiting brings a guest (always allowed on the list); the three with places are full, so they cannot.
         for (const line of (await f.store.read()).rsvps.filter((r) => r.status === "waitlisted")) await guestsOf(f, line.memberId, line.id, 1);
-        for (const line of (await f.store.read()).rsvps.filter((r) => r.status === "going")) await expect(guestsOf(f, line.memberId, line.id, 1)).rejects.toThrow("Dinner is full, so no more guests can be added.");
+        for (const line of (await f.store.read()).rsvps.filter((r) => r.status === "going")) await expect(guestsOf(f, line.memberId, line.id, 1)).rejects.toThrow("Dinner is full, so the party cannot get bigger.");
         const mid = await f.store.read();
-        expect(eventView(mid, e, { kind: "staff" }).going).toBeLessThanOrEqual(3);
+        expect(viewOf(mid, e, { kind: "staff" }).going).toBeLessThanOrEqual(3);
         for (const line of mid.rsvps.filter((r) => r.status === "going" || r.status === "waitlisted")) await leave(f, line.memberId, line.id);
         const after = await f.store.read();
         expect(after.rsvps.filter((r) => r.status === "going" || r.status === "waitlisted")).toHaveLength(0);

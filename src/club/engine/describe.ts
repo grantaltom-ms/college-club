@@ -45,12 +45,12 @@ export function describeClassRules(classRules: ClassRules, template: ClassTempla
 export function describeEventRules(eventRules: EventRules): { heading: string; lines: string[]; placeholder: boolean } {
   const r = eventRules.defaults;
   const lines = [
-    `RSVP once for yourself${r.maxGuests > 0 ? `, and add up to ${r.maxGuests} guest${r.maxGuests === 1 ? "" : "s"}` : ""}. You and each guest take one place. If the event has a limit and your whole group does not fit, your whole group joins the waiting list.`,
+    `RSVP once for yourself${r.maxGuests > 0 ? `, and choose how many people are coming, up to ${r.maxGuests + 1} counting you` : ""}. Everyone in your party takes one spot. If the event has a limit and your whole party does not fit, you can join the waitlist for the whole party, or RSVP for a smaller one.`,
     `RSVPs close ${formatMinutes(r.closeMinutesBefore)} before the start, unless the event says otherwise.`,
     r.waitlistMax > 0
-      ? `The waiting list holds up to ${r.waitlistMax} ${r.waitlistMax === 1 ? "group" : "groups"}. When places free up, the first group in line that fits gets them at once, until ${formatMinutes(r.promoteUntilMinutesBefore)} before the start. After that, free places go to whoever asks first.`
-      : "There is no waiting list: when an event is full, it is full.",
-    `Cancel at least ${formatMinutes(r.cancelCutoffMinutes)} before the start, or it counts as a late cancellation. Leaving a waiting list is never late.`,
+      ? `The waitlist holds up to ${r.waitlistMax} ${r.waitlistMax === 1 ? "party" : "parties"}.${r.waitlistHoldMinutes > 0 ? ` Your place on it is removed ${formatMinutes(r.waitlistHoldMinutes)} after the last time you pressed a button there (press Keep my place to hold it another ${formatMinutes(r.waitlistHoldMinutes)}).` : ""} When spots free up, the first party in line that fits gets them at once, until ${formatMinutes(r.promoteUntilMinutesBefore)} before the start. After that, free spots go to whoever asks first.`
+      : "There is no waitlist: when an event is full, it is full.",
+    `Cancel at least ${formatMinutes(r.cancelCutoffMinutes)} before the start, or it counts as a late cancellation. Leaving the waitlist is never late.`,
     "Events do not clash with boats or classes: you can row and go to dinner on the same night.",
   ];
   return { heading: "How RSVPs work", lines, placeholder: eventRules.placeholder };

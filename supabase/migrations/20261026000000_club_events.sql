@@ -7,6 +7,7 @@
 --   * an event with a limit never has more people going than its limit (a member and each guest count as one place);
 --   * a name is on an event's list at most once at a time;
 --   * an RSVP only moves forward: nobody with places goes back to waiting, and a finished RSVP cannot be revived;
+--   * only someone waiting has a hold on the waiting list (the app removes places whose hold ran out);
 --   * a cancelled event cannot be brought back, and its limit cannot be cut below the people already going.
 -- The softer rules (when RSVP closes, guest limits, the order the waiting list moves up) are in the app, where they
 -- can explain a refusal in words. The event rules live in a table below that staff edit as data later.
@@ -68,12 +69,15 @@ create table club.event_rsvps (
   status_changed_at timestamptz not null default now(),
   -- Set when the waiting list moved this person up to places.
   promoted_at timestamptz,
+  -- While waiting: when this place on the waiting list is removed unless the member keeps it. Null when holds never run out.
+  hold_until timestamptz,
   cancelled_by_kind text check (cancelled_by_kind in ('member', 'staff', 'system')),
   cancelled_by_id text check (char_length(cancelled_by_id) <= 64),
   cancelled_by_label text check (char_length(cancelled_by_label) between 1 and 120),
   cancel_reason text check (char_length(cancel_reason) <= 300),
   -- Creation order. The waiting list moves up in this order.
   seq bigint generated always as identity,
+  constraint event_rsvps_hold_only_while_waiting check (hold_until is null or status = 'waitlisted'),
   constraint event_rsvps_cancel_matches_status check ((status in ('cancelled', 'late_cancelled')) = (cancelled_by_kind is not null and cancelled_by_label is not null))
 );
 

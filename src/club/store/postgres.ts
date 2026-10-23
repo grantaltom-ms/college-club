@@ -89,7 +89,7 @@ interface ClassRow { id: string; name: string; description: string; instructor: 
 interface SessionRow { id: string; class_id: string; room_item_id: string | null; starts_at: Date; ends_at: Date; capacity: number; status: SessionStatus; created_at: Date; created_by_kind: string; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface SignUpRow { id: string; session_id: string; member_id: string; status: SignUpStatus; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface EventRow { id: string; title: string; description: string; location: string; starts_at: Date; ends_at: Date; capacity: number | null; price_cents: number | null; reply_by: Date | null; status: ClubEvent["status"]; created_at: Date; created_by_kind: string; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
-interface RsvpRow { id: string; event_id: string; member_id: string; guests: number; status: RsvpStatus; price_cents: number | null; via: RsvpVia; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
+interface RsvpRow { id: string; event_id: string; member_id: string; guests: number; status: RsvpStatus; price_cents: number | null; via: RsvpVia; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; hold_until: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface CrewRow { booking_id: string; member_id: string; position: number; removed_at: Date | null; removed_reason: string | null }
 
 const iso = (d: Date | string) => new Date(d).toISOString();
@@ -246,6 +246,7 @@ const toRsvp = (r: RsvpRow): Rsvp => ({
   createdBy: actorFrom(r.created_by_kind, r.created_by_id, r.created_by_label),
   statusChangedAt: iso(r.status_changed_at),
   promotedAt: r.promoted_at ? iso(r.promoted_at) : null,
+  holdUntil: r.hold_until ? iso(r.hold_until) : null,
   cancelledBy: r.cancelled_by_kind ? actorFrom(r.cancelled_by_kind, r.cancelled_by_id, r.cancelled_by_label ?? "") : null,
   cancelReason: r.cancel_reason,
 });
@@ -301,7 +302,7 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
       ? []
       : await rows<RsvpRow>(
           c,
-          `select id, event_id, member_id, guests, status, price_cents, via, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, promoted_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason
+          `select id, event_id, member_id, guests, status, price_cents, via, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, promoted_at, hold_until, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason
              from club.event_rsvps where event_id = any($1) order by seq`,
           [eventRows.map((x) => x.id)],
         );
@@ -473,16 +474,16 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
   const rr = compare("RSVPs", before.rsvps, after.rsvps);
   const earlier = new Map(before.rsvps.map((r) => [r.id, r]));
   const updateRsvp = (r: Rsvp) =>
-    run(`update club.event_rsvps set guests=$2, status=$3, status_changed_at=$4, promoted_at=$5, cancelled_by_kind=$6, cancelled_by_id=$7, cancelled_by_label=$8, cancel_reason=$9 where id=$1`, [
-      r.id, r.guests, r.status, r.statusChangedAt, r.promotedAt, r.cancelledBy?.kind ?? null, r.cancelledBy ? actorId(r.cancelledBy) : null, r.cancelledBy?.label ?? null, r.cancelReason,
+    run(`update club.event_rsvps set guests=$2, status=$3, status_changed_at=$4, promoted_at=$5, hold_until=$6, cancelled_by_kind=$7, cancelled_by_id=$8, cancelled_by_label=$9, cancel_reason=$10 where id=$1`, [
+      r.id, r.guests, r.status, r.statusChangedAt, r.promotedAt, r.holdUntil, r.cancelledBy?.kind ?? null, r.cancelledBy ? actorId(r.cancelledBy) : null, r.cancelledBy?.label ?? null, r.cancelReason,
     ]);
   const givesUpPlaces = (r: Rsvp) => r.status !== "going" || r.guests < (earlier.get(r.id)?.guests ?? r.guests);
   for (const r of rr.updated.filter(givesUpPlaces)) await updateRsvp(r);
   for (const r of rr.added) {
     await run(
-      `insert into club.event_rsvps (id, event_id, member_id, guests, status, price_cents, via, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, promoted_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
-      [r.id, r.eventId, r.memberId, r.guests, r.status, r.priceCents, r.via, r.createdAt, r.createdBy.kind, actorId(r.createdBy), r.createdBy.label, r.statusChangedAt, r.promotedAt, r.cancelledBy?.kind ?? null, r.cancelledBy ? actorId(r.cancelledBy) : null, r.cancelledBy?.label ?? null, r.cancelReason],
+      `insert into club.event_rsvps (id, event_id, member_id, guests, status, price_cents, via, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, promoted_at, hold_until, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+      [r.id, r.eventId, r.memberId, r.guests, r.status, r.priceCents, r.via, r.createdAt, r.createdBy.kind, actorId(r.createdBy), r.createdBy.label, r.statusChangedAt, r.promotedAt, r.holdUntil, r.cancelledBy?.kind ?? null, r.cancelledBy ? actorId(r.cancelledBy) : null, r.cancelledBy?.label ?? null, r.cancelReason],
     );
   }
   for (const r of rr.updated.filter((x) => !givesUpPlaces(x))) await updateRsvp(r);

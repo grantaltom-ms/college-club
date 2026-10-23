@@ -10,6 +10,7 @@ const RULES: Record<keyof EventRuleValues, string> = {
   cancelCutoffMinutes: "cancelCutoffMinutes (latest cancel without penalty)",
   promoteUntilMinutesBefore: "promoteUntilMinutesBefore (waiting list moves up until)",
   waitlistMax: "waitlistMax (longest waiting list; 0 for none)",
+  waitlistHoldMinutes: "waitlistHoldMinutes (a waiting place is removed this long after the last button press; 0 for never)",
   maxGuests: "maxGuests (most guests on one RSVP; 0 for none)",
 };
 

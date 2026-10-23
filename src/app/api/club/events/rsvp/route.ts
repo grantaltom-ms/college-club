@@ -11,7 +11,9 @@ export async function POST(request: NextRequest) {
   const { actor, ctx, form, store } = started;
   const eventId = idParam(field(form, "event"));
   const memberId = actor.kind === "member" ? actor.member.id : idParam(field(form, "for"));
-  const guests = intParam(field(form, "guests"), 0, 20, 0);
+  // The form sends the number of people in the party, counting the member; "instead" is the smaller party offered when the first did not fit.
+  const people = intParam(field(form, "instead") || field(form, "people"), 1, 21, 1);
+  const guests = people - 1;
   if (!eventId || !memberId) return see(request, "/club/events?notice=invalid");
   const page = `/club/events/${eventId}`;
   const forQuery = actor.kind === "staff" ? `&for=${memberId}` : "";
@@ -19,7 +21,7 @@ export async function POST(request: NextRequest) {
     const { rsvp: line } = await rsvp(store, EVENT_RULES, ctx, { eventId, memberId, guests });
     return see(request, `${page}?joined=${line.id}${forQuery}`);
   } catch (e) {
-    if (e instanceof RsvpRefused) return see(request, `${page}?guests=${guests}${forQuery}`);
+    if (e instanceof RsvpRefused) return see(request, `${page}?people=${people}${forQuery}`);
     return see(request, `${page}?notice=${noticeCode(e)}${forQuery}`);
   }
 }
