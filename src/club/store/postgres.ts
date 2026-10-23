@@ -27,6 +27,11 @@ import type {
   SessionStatus,
   SignUp,
   SignUpStatus,
+  ClubEvent,
+  EventRules,
+  Rsvp,
+  RsvpStatus,
+  RsvpVia,
 } from "../types";
 import type { ClubStore } from "./memory";
 
@@ -83,6 +88,8 @@ interface BookingRow { id: string; item_id: string; booker_id: string; starts_at
 interface ClassRow { id: string; name: string; description: string; instructor: string; default_capacity: number; default_minutes: number; room_item_id: string | null; rules: Partial<ClassRuleValues> }
 interface SessionRow { id: string; class_id: string; room_item_id: string | null; starts_at: Date; ends_at: Date; capacity: number; status: SessionStatus; created_at: Date; created_by_kind: string; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface SignUpRow { id: string; session_id: string; member_id: string; status: SignUpStatus; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
+interface EventRow { id: string; title: string; description: string; location: string; starts_at: Date; ends_at: Date; capacity: number | null; price_cents: number | null; reply_by: Date | null; status: ClubEvent["status"]; created_at: Date; created_by_kind: string; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
+interface RsvpRow { id: string; event_id: string; member_id: string; guests: number; status: RsvpStatus; price_cents: number | null; via: RsvpVia; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface CrewRow { booking_id: string; member_id: string; position: number; removed_at: Date | null; removed_reason: string | null }
 
 const iso = (d: Date | string) => new Date(d).toISOString();
@@ -209,6 +216,40 @@ const toSignUp = (r: SignUpRow): SignUp => ({
   cancelReason: r.cancel_reason,
 });
 
+const toEvent = (r: EventRow): ClubEvent => ({
+  id: r.id,
+  title: r.title,
+  description: r.description,
+  location: r.location,
+  startsAt: iso(r.starts_at),
+  endsAt: iso(r.ends_at),
+  capacity: r.capacity,
+  priceCents: r.price_cents,
+  replyBy: r.reply_by ? iso(r.reply_by) : null,
+  status: r.status,
+  createdAt: iso(r.created_at),
+  createdBy: actorFrom(r.created_by_kind, null, r.created_by_label),
+  statusChangedAt: iso(r.status_changed_at),
+  cancelledBy: r.cancelled_by_kind ? actorFrom(r.cancelled_by_kind, null, r.cancelled_by_label ?? "") : null,
+  cancelReason: r.cancel_reason,
+});
+
+const toRsvp = (r: RsvpRow): Rsvp => ({
+  id: r.id,
+  eventId: r.event_id,
+  memberId: r.member_id,
+  guests: r.guests,
+  status: r.status,
+  priceCents: r.price_cents,
+  via: r.via,
+  createdAt: iso(r.created_at),
+  createdBy: actorFrom(r.created_by_kind, r.created_by_id, r.created_by_label),
+  statusChangedAt: iso(r.status_changed_at),
+  promotedAt: r.promoted_at ? iso(r.promoted_at) : null,
+  cancelledBy: r.cancelled_by_kind ? actorFrom(r.cancelled_by_kind, r.cancelled_by_id, r.cancelled_by_label ?? "") : null,
+  cancelReason: r.cancel_reason,
+});
+
 /* ---------- Loading ---------- */
 
 type Queryable = Pick<PoolClient, "query">;
@@ -249,6 +290,21 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
              from club.class_signups where session_id = any($1) order by seq`,
           [sessionRows.map((x) => x.id)],
         );
+  const eventRows = await rows<EventRow>(
+    c,
+    `select id, title, description, location, starts_at, ends_at, capacity, price_cents, reply_by, status, created_at, created_by_kind, created_by_label, status_changed_at, cancelled_by_kind, cancelled_by_label, cancel_reason
+       from club.events where ends_at > $1 order by seq`,
+    [since.toISOString()],
+  );
+  const rsvpRows =
+    eventRows.length === 0
+      ? []
+      : await rows<RsvpRow>(
+          c,
+          `select id, event_id, member_id, guests, status, price_cents, via, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, promoted_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason
+             from club.event_rsvps where event_id = any($1) order by seq`,
+          [eventRows.map((x) => x.id)],
+        );
   const crew = bookingRows.length === 0 ? [] : await rows<CrewRow>(c, `select booking_id, member_id, position, removed_at, removed_reason from club.booking_crew where booking_id = any($1)`, [bookingRows.map((b) => b.id)]);
   return {
     households: households.map(toHousehold),
@@ -262,6 +318,8 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
     classes: classes.map(toClass),
     sessions: sessionRows.map(toSession),
     signups: signUpRows.map(toSignUp),
+    events: eventRows.map(toEvent),
+    rsvps: rsvpRows.map(toRsvp),
   };
 }
 
@@ -395,6 +453,39 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
     );
   }
   for (const g of gg.updated.filter((x) => x.status === "enrolled")) await updateSignUp(g);
+
+  // Events, then their RSVPs. A limit is raised before anyone moves in, and places are given up before they are taken.
+  const ee = compare("events", before.events, after.events);
+  for (const x of ee.added) {
+    await run(
+      `insert into club.events (id, title, description, location, starts_at, ends_at, capacity, price_cents, reply_by, status, created_at, created_by_kind, created_by_label, status_changed_at, cancelled_by_kind, cancelled_by_label, cancel_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+      [x.id, x.title, x.description, x.location, x.startsAt, x.endsAt, x.capacity, x.priceCents, x.replyBy, x.status, x.createdAt, x.createdBy.kind, x.createdBy.label, x.statusChangedAt, x.cancelledBy?.kind ?? null, x.cancelledBy?.label ?? null, x.cancelReason],
+    );
+  }
+  for (const x of ee.updated) {
+    await run(
+      `update club.events set title=$2, description=$3, location=$4, starts_at=$5, ends_at=$6, capacity=$7, price_cents=$8, reply_by=$9, status=$10, status_changed_at=$11, cancelled_by_kind=$12, cancelled_by_label=$13, cancel_reason=$14 where id=$1`,
+      [x.id, x.title, x.description, x.location, x.startsAt, x.endsAt, x.capacity, x.priceCents, x.replyBy, x.status, x.statusChangedAt, x.cancelledBy?.kind ?? null, x.cancelledBy?.label ?? null, x.cancelReason],
+    );
+  }
+
+  const rr = compare("RSVPs", before.rsvps, after.rsvps);
+  const earlier = new Map(before.rsvps.map((r) => [r.id, r]));
+  const updateRsvp = (r: Rsvp) =>
+    run(`update club.event_rsvps set guests=$2, status=$3, status_changed_at=$4, promoted_at=$5, cancelled_by_kind=$6, cancelled_by_id=$7, cancelled_by_label=$8, cancel_reason=$9 where id=$1`, [
+      r.id, r.guests, r.status, r.statusChangedAt, r.promotedAt, r.cancelledBy?.kind ?? null, r.cancelledBy ? actorId(r.cancelledBy) : null, r.cancelledBy?.label ?? null, r.cancelReason,
+    ]);
+  const givesUpPlaces = (r: Rsvp) => r.status !== "going" || r.guests < (earlier.get(r.id)?.guests ?? r.guests);
+  for (const r of rr.updated.filter(givesUpPlaces)) await updateRsvp(r);
+  for (const r of rr.added) {
+    await run(
+      `insert into club.event_rsvps (id, event_id, member_id, guests, status, price_cents, via, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, promoted_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+      [r.id, r.eventId, r.memberId, r.guests, r.status, r.priceCents, r.via, r.createdAt, r.createdBy.kind, actorId(r.createdBy), r.createdBy.label, r.statusChangedAt, r.promotedAt, r.cancelledBy?.kind ?? null, r.cancelledBy ? actorId(r.cancelledBy) : null, r.cancelledBy?.label ?? null, r.cancelReason],
+    );
+  }
+  for (const r of rr.updated.filter((x) => !givesUpPlaces(x))) await updateRsvp(r);
 }
 
 /** A database refusal turned into the plain sentence a member can act on. Anything else passes through. */
@@ -406,6 +497,8 @@ export function translateDatabaseError(e: unknown): unknown {
   // The class guards in the database are worded for members already; only those sentences are passed on.
   const { message, constraint } = (e ?? {}) as { message?: string; constraint?: string };
   if (code === "23514" && message && /^(That class is full|That class was cancelled|Chairs cannot go below)/.test(message)) return new ClubError("conflict", message);
+  if (code === "23514" && message && /^(That event is full|That event was cancelled|The limit cannot go below)/.test(message)) return new ClubError("conflict", message);
+  if (code === "23505" && constraint === "event_rsvps_one_live") return new ClubError("conflict", "That person is already on this event's list.");
   if (code === "23505" && constraint === "class_signups_one_live") return new ClubError("conflict", "That person is already on this class's sign-up sheet.");
   return e;
 }
@@ -470,7 +563,7 @@ export class PgClubStore implements ClubStore {
    * Makes the rule tables match the rules file (booking-rules.json), which is the source of truth until the staff
    * screen in step 5 edits them directly. Items point at these classes, so they must exist first.
    */
-  async syncRules(book: RuleBook, classRules?: ClassRules): Promise<void> {
+  async syncRules(book: RuleBook, classRules?: ClassRules, eventRules?: EventRules): Promise<void> {
     const c = await this.pool.connect();
     try {
       await c.query("begin");
@@ -485,6 +578,9 @@ export class PgClubStore implements ClubStore {
       }
       if (classRules) {
         await c.query(`insert into club.class_rule_defaults (id, placeholder, rules) values (true, $1, $2) on conflict (id) do update set placeholder = excluded.placeholder, rules = excluded.rules`, [classRules.placeholder, JSON.stringify(classRules.defaults)]);
+      }
+      if (eventRules) {
+        await c.query(`insert into club.event_rule_defaults (id, placeholder, rules) values (true, $1, $2) on conflict (id) do update set placeholder = excluded.placeholder, rules = excluded.rules`, [eventRules.placeholder, JSON.stringify(eventRules.defaults)]);
       }
       await c.query("commit");
     } catch (e) {

@@ -71,6 +71,7 @@ export const HISTORY_KINDS = [
   "qualification_granted",
   "bookings_cancelled",
   "signups_cancelled",
+  "rsvps_cancelled",
   "membership_ended",
 ] as const;
 export type HistoryKind = (typeof HISTORY_KINDS)[number];
@@ -297,6 +298,89 @@ export interface SignUp {
   cancelReason: string | null;
 }
 
+/* ---------- Events and RSVPs (step 4) ---------- */
+
+/** The house rules for event RSVPs. Every value lives in settings/event-rules.json, never in code. */
+export interface EventRuleValues {
+  /** RSVP closes this many minutes before the start, unless staff set a reply-by moment for the event. */
+  closeMinutesBefore: number;
+  /** Cancelling an RSVP (with places) later than this many minutes before the start is recorded as a late cancellation. */
+  cancelCutoffMinutes: number;
+  /** The waiting list moves up automatically until this many minutes before the start; after that, free places are first come. */
+  promoteUntilMinutesBefore: number;
+  /** The most RSVPs that can wait for one event. 0 means no waiting list. */
+  waitlistMax: number;
+  /** The most guests one member can bring on one RSVP. */
+  maxGuests: number;
+}
+
+export interface EventRules {
+  /** True while the numbers are placeholders. Shown on screen. */
+  placeholder: boolean;
+  defaults: EventRuleValues;
+}
+
+export const EVENT_STATUSES = ["scheduled", "cancelled"] as const;
+export type EventStatus = (typeof EVENT_STATUSES)[number];
+
+/** A gathering members RSVP to: a dinner, a work party. */
+export interface ClubEvent {
+  id: string;
+  title: string;
+  description: string;
+  /** Where, in words. */
+  location: string;
+  /** ISO moments. */
+  startsAt: string;
+  endsAt: string;
+  /** Places in total, adults and guests together. null means no limit. */
+  capacity: number | null;
+  /** Price of one place in cents, or null when free or not stated. Copied onto each RSVP for billing later; nothing is charged here. */
+  priceCents: number | null;
+  /** Staff-set last moment to RSVP, or null to use the rule. */
+  replyBy: string | null;
+  status: EventStatus;
+  createdAt: string;
+  createdBy: Actor;
+  statusChangedAt: string;
+  cancelledBy: Actor | null;
+  cancelReason: string | null;
+}
+
+/**
+ * Where a name stands on an event's list. "going" has places; "waitlisted" waits in order.
+ * The rest are how it ended: cancelled and late_cancelled give the places back; attended and no_show are the record.
+ */
+export const RSVP_STATUSES = ["going", "waitlisted", "cancelled", "late_cancelled", "attended", "no_show"] as const;
+export type RsvpStatus = (typeof RSVP_STATUSES)[number];
+
+/** RSVPs that still hold the member's place on the list. */
+export const LIVE_RSVP: readonly RsvpStatus[] = ["going", "waitlisted"];
+
+export const RSVP_VIA = ["page", "email_link"] as const;
+export type RsvpVia = (typeof RSVP_VIA)[number];
+
+export interface Rsvp {
+  id: string;
+  eventId: string;
+  memberId: string;
+  /** Non-member guests this member brings. Each takes a place, like the member. */
+  guests: number;
+  status: RsvpStatus;
+  /** Price of one place in cents when the RSVP was made, or null. */
+  priceCents: number | null;
+  /** How it was made: on the event page, or by a personal link in an email. */
+  via: RsvpVia;
+  /** When the name went on the list. Waiting-list order follows this. */
+  createdAt: string;
+  createdBy: Actor;
+  statusChangedAt: string;
+  /** Set when the waiting list moved this person up to places. */
+  promotedAt: string | null;
+  cancelledBy: Actor | null;
+  cancelReason: string | null;
+}
+
 export interface ClubState {
   households: Household[];
   members: Member[];
@@ -309,4 +393,6 @@ export interface ClubState {
   classes: ClassTemplate[];
   sessions: ClassSession[];
   signups: SignUp[];
+  events: ClubEvent[];
+  rsvps: Rsvp[];
 }
