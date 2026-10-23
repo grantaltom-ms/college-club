@@ -11,7 +11,9 @@ import {
   grantQualification,
   householdFieldsProblem,
   memberFieldsProblem,
+  planMemberDetails,
   removeMember,
+  updateMemberDetails,
   type BookingLedger,
   type Ctx,
 } from "./households";
@@ -143,6 +145,169 @@ describe.each(STORE_KINDS)("on the %s store", (kind) => {
       expect(membersOf(state, household.id).find((m) => m.status === "active")).toMatchObject({ firstName: "Ben", role: "primary" });
       expect(historyOf(state, household.id).map((e) => e.kind)).toContain("primary_changed");
       await expect(removeMember(store, NO_BOOKINGS_YET, ctx(), members[1].id)).rejects.toThrow("last adult in the household");
+    });
+  });
+
+  describe("correcting a person's details", () => {
+    const fix = (store: Awaited<ReturnType<typeof setup>>["store"], memberId: string, change: Partial<typeof ada>, day = "2026-10-23") => {
+      const m = store.read().then((s) => s.members.find((x) => x.id === memberId)!);
+      return m.then((cur) => updateMemberDetails(store, ctx(day), memberId, { firstName: cur.firstName, lastName: cur.lastName, email: cur.email, phone: cur.phone, ...change }));
+    };
+
+    it("changes name, email and phone together, and writes one line saying what each was and what it is now", async () => {
+      const { store, household, members } = await setup();
+      const result = await fix(store, members[0].id, { firstName: "Adaline", lastName: "Quill-Reed", email: "adaline@example.com", phone: "206-555-0199" });
+      expect(result.changed).toEqual(["firstName", "lastName", "email", "phone"]);
+      expect(result.signInChanged).toBe(true);
+      const state = await store.read();
+      expect(state.members.find((m) => m.id === members[0].id)).toMatchObject({ firstName: "Adaline", lastName: "Quill-Reed", email: "adaline@example.com", phone: "206-555-0199" });
+      const lines = historyOf(state, household.id).filter((e) => e.kind === "member_updated");
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({ actor: staff, at: at("2026-10-23").toISOString() });
+      expect(lines[0].summary).toBe(
+        "Details changed for Ada Quill: name from Ada Quill to Adaline Quill-Reed; email from ada@example.com to adaline@example.com; phone from 206-555-0101 to 206-555-0199.",
+      );
+      expect(lines[0].details).toEqual({
+        memberId: members[0].id,
+        firstNameFrom: "Ada",
+        firstNameTo: "Adaline",
+        lastNameFrom: "Quill",
+        lastNameTo: "Quill-Reed",
+        emailFrom: "ada@example.com",
+        emailTo: "adaline@example.com",
+        phoneFrom: "206-555-0101",
+        phoneTo: "206-555-0199",
+      });
+    });
+
+    it("touches nothing else about the person: role, status, outside IDs, sign-in slot, qualifications and everyone else", async () => {
+      const { store, members } = await setup([ben, cy]);
+      await grantQualification(store, ctx(), members[1].id, "scull-2");
+      const before = await store.read();
+      await fix(store, members[1].id, { phone: "206-555-0123" });
+      const after = await store.read();
+      const was = before.members.find((m) => m.id === members[1].id)!;
+      expect(after.members.find((m) => m.id === members[1].id)).toEqual({ ...was, phone: "206-555-0123" });
+      for (const other of [members[0].id, members[2].id]) expect(after.members.find((m) => m.id === other)).toEqual(before.members.find((m) => m.id === other));
+      expect(after.memberQualifications).toEqual(before.memberQualifications);
+      expect(after.households).toEqual(before.households);
+    });
+
+    it("says a phone change is not a sign-in change, and neither is a change of capital letters or spaces in the email", async () => {
+      const { store, household, members } = await setup();
+      expect((await fix(store, members[0].id, { phone: "" })).signInChanged).toBe(false);
+      const shout = await fix(store, members[0].id, { email: "ADA@Example.com" });
+      expect(shout).toMatchObject({ changed: ["email"], signInChanged: false });
+      expect((await store.read()).members[0].email).toBe("ADA@Example.com");
+      const lines = historyOf(await store.read(), household.id).filter((e) => e.kind === "member_updated");
+      expect(lines.map((l) => l.summary)).toEqual([
+        "Details changed for Ada Quill: email from ada@example.com to ADA@Example.com.",
+        "Details changed for Ada Quill: phone from 206-555-0101 to no number.",
+      ]);
+    });
+
+    it("lets two partners keep one shared address, and changing one partner's email leaves the other's alone", async () => {
+      const { store, members } = await setup([{ ...ben, email: "ada@example.com" }]);
+      await fix(store, members[1].id, { email: "ben.new@example.com" });
+      const state = await store.read();
+      expect(state.members.map((m) => m.email)).toEqual(["ada@example.com", "ben.new@example.com"]);
+    });
+
+    it("refuses a change that changes nothing, and writes no line for it", async () => {
+      const { store, household, members } = await setup();
+      const lines = async () => historyOf(await store.read(), household.id).length;
+      const before = await lines();
+      await expect(fix(store, members[0].id, {})).rejects.toMatchObject({ code: "unchanged", message: "Nothing was changed: those are already Ada Quill's details." });
+      await expect(fix(store, members[0].id, { firstName: "  Ada  " })).rejects.toMatchObject({ code: "unchanged" });
+      expect(await lines()).toBe(before);
+    });
+
+    it("is staff only, including a member trying to change their own details", async () => {
+      const { store, household, members } = await setup();
+      const asAda: Actor = { kind: "member", memberId: members[0].id, label: "Ada Quill" };
+      for (const target of [members[0].id, members[1].id]) {
+        await expect(updateMemberDetails(store, ctx("2026-10-23", asAda), target, { ...ada, phone: "206-555-0000" })).rejects.toMatchObject({ code: "forbidden" });
+      }
+      await expect(updateMemberDetails(store, ctx("2026-10-23", { kind: "member", memberId: members[0].id, label: "Ada Quill" }), members[0].id, { ...ada, email: "new@example.com" })).rejects.toThrow("Only club staff");
+      const state = await store.read();
+      expect(state.members[0]).toMatchObject({ email: "ada@example.com", phone: "206-555-0101" });
+      expect(historyOf(state, household.id).some((e) => e.kind === "member_updated")).toBe(false);
+    });
+
+    it("refuses missing, mistyped and unusable details in plain words, and changes nothing", async () => {
+      const { store, household, members } = await setup();
+      const before = await store.read();
+      const cases: [Partial<typeof ada>, string][] = [
+        [{ firstName: "   " }, "First name is required."],
+        [{ lastName: "" }, "Last name is required."],
+        [{ email: "" }, "Email is required."],
+        [{ email: "ada.example.com" }, `"ada.example.com" does not look like an email address.`],
+        [{ firstName: "A".repeat(81) }, "First name must be 80 characters or fewer."],
+        [{ email: `${"a".repeat(195)}@e.com` }, "Email must be 200 characters or fewer."],
+      ];
+      for (const [change, words] of cases) await expect(fix(store, members[0].id, change), words).rejects.toMatchObject({ code: "invalid", message: words });
+      expect(await store.read()).toEqual(before);
+      expect(historyOf(await store.read(), household.id)).toEqual(historyOf(before, household.id));
+    });
+
+    it("refuses an address sign-in could never use, so a typo cannot lock someone out", async () => {
+      const { store, members } = await setup();
+      for (const email of ["ada..quill@example.com", "ada quill@example.com", "ada<quill>@example.com", "ada,quill@example.com", ".ada@example.com", "ada@example"]) {
+        await expect(fix(store, members[0].id, { email }), email).rejects.toMatchObject({ code: "invalid" });
+        expect(memberFieldsProblem({ ...ada, email }), email).toContain("does not look like an email address");
+        await expect(addMember(store, ctx(), (await store.read()).households[0].id, { ...cy, email }), email).rejects.toMatchObject({ code: "invalid" });
+      }
+      expect((await store.read()).members[0].email).toBe("ada@example.com");
+    });
+
+    it("refuses someone who has left, someone whose household ended, and someone who does not exist", async () => {
+      const { store, household, members } = await setup([ben, cy]);
+      await removeMember(store, NO_BOOKINGS_YET, ctx(), members[1].id);
+      await expect(fix(store, members[1].id, { phone: "206-555-0000" })).rejects.toMatchObject({ code: "conflict", message: "Ben Quill is no longer on this household's membership, so their details cannot be changed." });
+      await endHousehold(store, NO_BOOKINGS_YET, ctx("2026-10-24"), household.id);
+      await expect(fix(store, members[0].id, { phone: "206-555-0000" })).rejects.toMatchObject({ code: "conflict", message: "That household's membership ended on Oct 24, 2026. Nothing in it can be changed." });
+      await expect(updateMemberDetails(store, ctx(), "00000000-0000-4000-8000-0000000000ff", ada)).rejects.toMatchObject({ code: "not_found" });
+      expect(historyOf(await store.read(), household.id).some((e) => e.kind === "member_updated")).toBe(false);
+    });
+
+    it("planning changes nothing, and says what saving would do", async () => {
+      const { store, household, members } = await setup();
+      const before = await store.read();
+      const plan = planMemberDetails(before, ctx(), members[0].id, { ...ada, email: "new@example.com" });
+      expect(plan).toMatchObject({ changed: ["email"], signInChanged: true, before: { email: "ada@example.com" }, after: { email: "new@example.com" } });
+      expect(() => planMemberDetails(before, ctx("2026-10-23", { kind: "member", memberId: members[0].id, label: "Ada" }), members[0].id, ada)).toThrow("Only club staff");
+      expect(await store.read()).toEqual(before);
+      expect(historyOf(await store.read(), household.id)).toEqual(historyOf(before, household.id));
+    });
+
+    it("keeps the line inside the file's length limit even when every detail is as long as it can be", async () => {
+      const { store, household, members } = await setup();
+      const long = (c: string, n: number) => c.repeat(n);
+      await fix(store, members[0].id, { firstName: long("F", 80), lastName: long("L", 80), email: `${long("e", 100)}@${long("d", 90)}.com`, phone: long("9", 40) });
+      await fix(store, members[0].id, { firstName: long("G", 80), lastName: long("M", 80), email: `${long("f", 100)}@${long("c", 90)}.com`, phone: long("8", 40) });
+      const lines = historyOf(await store.read(), household.id).filter((e) => e.kind === "member_updated");
+      expect(lines).toHaveLength(2);
+      for (const line of lines) expect(line.summary.length).toBeLessThanOrEqual(500);
+      // The full values are kept in the details even where the sentence shortens them.
+      expect(lines[0].details).toMatchObject({ emailTo: `${long("f", 100)}@${long("c", 90)}.com`, phoneTo: long("8", 40) });
+      expect(lines[0].summary).toContain("…");
+    });
+
+    it("lines up simultaneous corrections to the same person: each is written, in order, and none is lost", async () => {
+      const { store, household, members } = await setup();
+      const phones = Array.from({ length: 12 }, (_, i) => `206-555-01${String(i).padStart(2, "0")}`);
+      const outcomes = await Promise.allSettled(phones.map((p) => updateMemberDetails(store, ctx(), members[0].id, { ...ada, phone: p })));
+      const state = await store.read();
+      const lines = historyOf(state, household.id).filter((e) => e.kind === "member_updated");
+      // One of the twelve may already be the stored number when its turn comes (refused, nothing written); every other one is written.
+      const done = outcomes.filter((o) => o.status === "fulfilled").length;
+      expect(lines).toHaveLength(done);
+      expect(done).toBeGreaterThanOrEqual(11);
+      for (const o of outcomes) if (o.status === "rejected") expect(o.reason).toMatchObject({ code: "unchanged" });
+      expect(phones).toContain(state.members[0].phone);
+      // The chain of "from" and "to" is unbroken: each line starts where the one before it ended.
+      const chain = [...lines].reverse();
+      for (let i = 1; i < chain.length; i++) expect(chain[i].details.phoneFrom).toBe(chain[i - 1].details.phoneTo);
     });
   });
 

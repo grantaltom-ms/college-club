@@ -1,3 +1,4 @@
+import { normalizeEmail } from "../auth/email";
 import { ClubError } from "../errors";
 import type { ClubStore } from "../store/memory";
 import { formatDay, pacificDate } from "../time";
@@ -69,7 +70,8 @@ function text(value: string | undefined, label: string, max: number): string {
 
 function cleanMember(input: NewMember): Pick<Member, "firstName" | "lastName" | "email" | "phone"> {
   const email = text(input.email, "Email", 200);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ClubError("invalid", `"${email}" does not look like an email address.`);
+  // The same test the sign-in page uses, so an address on file is always one a person can sign in with.
+  if (!normalizeEmail(email)) throw new ClubError("invalid", `"${email}" does not look like an email address.`);
   return {
     firstName: text(input.firstName, "First name", 80),
     lastName: text(input.lastName, "Last name", 80),
@@ -179,6 +181,65 @@ export async function createHousehold(store: ClubStore, ctx: Ctx, input: NewHous
 export async function addMember(store: ClubStore, ctx: Ctx, householdId: string, input: NewMember): Promise<Member> {
   requireStaff(ctx.actor);
   return store.transaction(async (s, newId) => addAdult(s, newId, ctx, activeHousehold(s, householdId), input, "additional"));
+}
+
+/** The details staff can correct on an adult. Everything else about a person (role, status, outside IDs) has its own tool. */
+export const DETAIL_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
+export type DetailField = (typeof DETAIL_FIELDS)[number];
+
+export interface DetailsPlan {
+  /** The adult as they are now. */
+  before: Member;
+  /** The adult's details as they would be, cleaned up. */
+  after: Pick<Member, DetailField>;
+  /** Which of the four differ. Never empty: a save that changes nothing is refused. */
+  changed: DetailField[];
+  /** True when the address a person signs in with is different afterwards. */
+  signInChanged: boolean;
+}
+
+/**
+ * What saving these details would do, or the reason it cannot. Changes nothing: the edit page and the sign-out step both use
+ * it, and `updateMemberDetails` runs the same check again inside its all-or-nothing change.
+ */
+export function planMemberDetails(s: ClubState, ctx: Ctx, memberId: string, input: NewMember): DetailsPlan {
+  requireStaff(ctx.actor);
+  const member = memberById(s, memberId);
+  if (!member) throw new ClubError("not_found", "That member no longer exists.");
+  activeHousehold(s, member.householdId);
+  if (member.status !== "active") throw new ClubError("conflict", `${fullName(member)} is no longer on this household's membership, so their details cannot be changed.`);
+  const after = cleanMember(input);
+  const changed = DETAIL_FIELDS.filter((f) => after[f] !== member[f]);
+  if (changed.length === 0) throw new ClubError("unchanged", `Nothing was changed: those are already ${fullName(member)}'s details.`);
+  return { before: { ...member }, after, changed, signInChanged: normalizeEmail(after.email) !== normalizeEmail(member.email) };
+}
+
+/** A value as the file shows it: short enough that a line always fits, with a word for "nothing". */
+const shown = (value: string, empty: string) => (value === "" ? empty : value.length > 50 ? `${value.slice(0, 49)}…` : value);
+
+/**
+ * Staff correct an adult's name, email or phone. One all-or-nothing change that writes a line to the household's file
+ * saying what each detail was and what it is now. Signing the person out when their email changes is done by the caller
+ * (`editMemberDetails` in auth/), because that lives in another store; `signInChanged` says whether it is needed.
+ */
+export async function updateMemberDetails(store: ClubStore, ctx: Ctx, memberId: string, input: NewMember): Promise<{ member: Member; changed: DetailField[]; signInChanged: boolean }> {
+  requireStaff(ctx.actor);
+  return store.transaction(async (s, newId) => {
+    const { before, after, changed, signInChanged } = planMemberDetails(s, ctx, memberId, input);
+    const member = memberById(s, memberId)!;
+    Object.assign(member, after);
+    const parts: string[] = [];
+    if (changed.includes("firstName") || changed.includes("lastName")) parts.push(`name from ${shown(fullName(before), "none")} to ${shown(fullName(after), "none")}`);
+    if (changed.includes("email")) parts.push(`email from ${shown(before.email, "none")} to ${shown(after.email, "none")}`);
+    if (changed.includes("phone")) parts.push(`phone from ${shown(before.phone, "no number")} to ${shown(after.phone, "no number")}`);
+    const details: Record<string, string> = { memberId };
+    for (const f of changed) {
+      details[`${f}From`] = before[f];
+      details[`${f}To`] = after[f];
+    }
+    log(s, newId, ctx, member.householdId, "member_updated", `Details changed for ${shown(fullName(before), "none")}: ${parts.join("; ")}.`, details);
+    return { member: { ...member }, changed, signInChanged };
+  });
 }
 
 /**

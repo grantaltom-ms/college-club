@@ -106,6 +106,9 @@ export function backPath(value: string, fallback: string): string {
 export const HOUSEHOLD_CHANGES: Record<string, string> = {
   created: "Household added.",
   added: "Adult added.",
+  updated: "Details saved. The change is in the household's file.",
+  updated_email:
+    "Details saved, and the change is in the household's file. Because the email changed, this person was signed out of every device. They sign in again with the new address.",
   removed: "Adult removed from the household. Their future bookings, class places and event RSVPs were cancelled.",
   type: "Membership type changed.",
   granted: "Qualification granted.",
@@ -120,6 +123,7 @@ export const NOTICES: Record<string, string> = {
   conflict: "That has already changed. Reload and try again.",
   signed_out: "Choose a test member first.",
   email: "That does not look like an email address. Check it and try again.",
+  unchanged: "Nothing was changed: those are already the details on file.",
   off: "Email sign-in is not switched on yet.",
   signin_link: "That sign-in link has expired or was already used. Ask for a new one.",
   duplicate_class: "There is already a class with that name. Pick another name.",
