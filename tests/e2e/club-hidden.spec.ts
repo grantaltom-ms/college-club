@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ipadCode } from "../../src/club/engine/ipad-address";
 
 // Port 3101: a production build with the sample-data switch off, like the live site by default.
 // Port 3102: the switch is on by mistake, but the deployment says it is the live production site.
@@ -9,6 +10,8 @@ const HIDDEN = {
 };
 
 const FIRST_HOUSEHOLD = "00000000-0000-4000-8000-000000000001";
+// Both servers are given this iPad secret on purpose: even with the right secret, the front-desk iPad must not exist here.
+const IPAD_CODE = ipadCode("playwright-only-ipad-secret-0001");
 
 for (const [name, base] of Object.entries(HIDDEN)) {
   test.describe(name, () => {
@@ -40,12 +43,17 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         "/club/admin/households/new",
         `/club/admin/households/${FIRST_HOUSEHOLD}/end`,
         `/club/admin/households/${FIRST_HOUSEHOLD}/remove/${FIRST_HOUSEHOLD}`,
+        "/club/admin/ipad",
+        `/club/ipad/${IPAD_CODE}`,
+        `/club/ipad/${IPAD_CODE}?notice=forbidden`,
+        `/club/ipad/${IPAD_CODE}/${FIRST_HOUSEHOLD}`,
+        `/club/ipad/${"A".repeat(43)}`,
       ];
       for (const path of paths) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look/i);
       }
     });
 
@@ -83,6 +91,8 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         ["/api/club/events/update", { event: FIRST_HOUSEHOLD, title: "Test" }],
         ["/api/club/events/cancel", { event: FIRST_HOUSEHOLD, reason: "Test" }],
         ["/api/club/attendance", { kind: "booking", id: FIRST_HOUSEHOLD, outcome: "attended", back: "/club/admin" }],
+        ["/api/club/check-in", { kind: "booking", id: FIRST_HOUSEHOLD, back: "/club/my-bookings" }],
+        ["/api/club/ipad/check-in", { code: IPAD_CODE, member: FIRST_HOUSEHOLD, kind: "booking", id: FIRST_HOUSEHOLD }],
         ["/api/club/households/create", { name: "Test", type: "Resident", joined: "2026-10-22", firstName: "A", lastName: "B", email: "a@example.com" }],
         ["/api/club/households/add-member", { household: FIRST_HOUSEHOLD, firstName: "A", lastName: "B", email: "a@example.com" }],
         ["/api/club/households/remove-member", { household: FIRST_HOUSEHOLD, member: FIRST_HOUSEHOLD }],

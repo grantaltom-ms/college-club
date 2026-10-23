@@ -55,6 +55,20 @@ export async function seedSampleClasses(store: ClubStore, now: Date): Promise<vo
   const join = (name: string, sessionId: string) => signUp(store, RULE_BOOK, CLASS_RULES, { actor: { kind: "staff", label: SAMPLE_STAFF.label }, now }, { sessionId, memberId: member(name) });
   for (const name of ["Erik Lindqvist", "Maren Lindqvist", "Jordan Bellweather", "Sasha Bellweather", "Tomas Vandermeer", "Nora Abernathy"]) await join(name, full.id);
 
+  // Today's lunchtime class, for members checking themselves in. Camille and Julien Moreau (partners who share an email address)
+  // hold chairs; check-in opened at 12:45. Set up "yesterday" so the engine accepts it whatever the time of day is now.
+  const yesterday = { actor: SAMPLE_STAFF, now: pacificWall(addDays(today, -1), 12 * 60) };
+  const lunch = await createClass(store, RULE_BOOK, CLASS_RULES, yesterday, {
+    name: "Lunchtime Mobility",
+    description: "Forty-five minutes of easy movement at midday.",
+    instructor: "Theo Brandvold",
+    defaultCapacity: 6,
+    defaultMinutes: 45,
+    roomItemId: room("Boathouse gym"),
+  });
+  const [lunchToday] = await scheduleSessions(store, RULE_BOOK, yesterday, { classId: lunch.id, startsAt: at(0, 13, 15) });
+  for (const name of ["Camille Moreau", "Julien Moreau"]) await signUp(store, RULE_BOOK, CLASS_RULES, yesterday, { sessionId: lunchToday.id, memberId: member(name) });
+
   // A couple of people in the Yoga class too.
   const yogaSessions = (await store.read()).sessions.filter((x) => x.classId === yoga.id).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   for (const name of ["Ines Castellanos", "Britta Eriksen"]) await join(name, yogaSessions[0].id);

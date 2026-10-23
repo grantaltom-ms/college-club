@@ -1,5 +1,5 @@
 import { clubNow } from "@/club/clock";
-import { checkInNeeded, rowFor } from "@/club/engine/attendance";
+import { checkInNeeded, rowFor, selfCheckInPhase } from "@/club/engine/attendance";
 import { fullName, memberById } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
@@ -11,6 +11,7 @@ import type { Booking, ClubState } from "@/club/types";
 import { idParam, NOTICES } from "@/club/web";
 import { AttendanceButtons } from "../AttendanceButtons";
 import { PlaceholderNote } from "../PlaceholderNote";
+import { SelfCheckIn } from "../SelfCheckIn";
 import { SignedOut } from "../SignedOut";
 
 const STATUS: Record<Booking["status"], string> = {
@@ -29,9 +30,17 @@ function Row({ state, booking, viewerId, now, staff }: { state: ClubState; booki
   const crew = booking.crew.map((id) => fullName(memberById(state, id)!));
   const mine = booking.bookerId === viewerId;
   const finished = Date.parse(booking.endsAt) <= now.getTime();
-  const status = booking.status === "upcoming" && finished ? (checkInNeeded(state, booking, ATTENDANCE_RULES) ? "Awaiting check-in" : "Finished") : STATUS[booking.status];
+  const status =
+    booking.status === "upcoming" && finished
+      ? checkInNeeded(state, booking, ATTENDANCE_RULES)
+        ? "Awaiting check-in"
+        : "Finished"
+      : booking.status === "completed" && !finished
+        ? "Checked in"
+        : STATUS[booking.status];
   const cancellable = booking.status === "upcoming" && Date.parse(booking.startsAt) > now.getTime() && (mine || staff);
   const attendance = staff ? rowFor(state, "booking", booking.id, now, ATTENDANCE_RULES) : null;
+  const checkIn = viewerId ? selfCheckInPhase(state, "booking", booking.id, viewerId, now, ATTENDANCE_RULES) : null;
   const cutoff = rulesFor(RULE_BOOK, item).rules.cancelCutoffMinutes;
   const late = mine && Date.parse(booking.startsAt) - now.getTime() < cutoff * 60000;
   return (
@@ -49,6 +58,7 @@ function Row({ state, booking, viewerId, now, staff }: { state: ClubState; booki
         {booking.cancelReason ? ` · ${booking.cancelReason}` : ""}
       </p>
       {staff && attendance && <AttendanceButtons row={attendance} who={fullName(booker)} back="/club/my-bookings" />}
+      <SelfCheckIn kind="booking" id={booking.id} title={item.name} phase={checkIn} now={now} back="/club/my-bookings" />
       {cancellable && (
         <form method="post" action="/api/club/bookings/cancel">
           <input type="hidden" name="id" value={booking.id} />
@@ -73,13 +83,16 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
   const staff = actor.kind === "staff";
   const viewerId = actor.kind === "member" ? actor.member.id : null;
   const all = state.bookings.filter((b) => staff || b.bookerId === viewerId || b.crew.includes(viewerId!));
-  const upcoming = all.filter((b) => b.status === "upcoming" && Date.parse(b.endsAt) > now.getTime()).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  // An outing that is under way and already checked in stays in "Upcoming" until it ends, so it is easy to find on the water.
+  const upcoming = all.filter((b) => (b.status === "upcoming" || b.status === "completed") && Date.parse(b.endsAt) > now.getTime()).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const past = all.filter((b) => !upcoming.includes(b)).sort((a, b) => b.startsAt.localeCompare(a.startsAt));
 
   const bookedId = idParam(params.booked);
   const cancelledId = idParam(params.cancelled);
+  const checkedInId = idParam(params.checkedin);
   const booked = bookedId ? state.bookings.find((b) => b.id === bookedId) : undefined;
   const cancelled = cancelledId ? state.bookings.find((b) => b.id === cancelledId) : undefined;
+  const checkedIn = checkedInId ? state.bookings.find((b) => b.id === checkedInId && b.status === "completed" && viewerId && (b.bookerId === viewerId || b.crew.includes(viewerId))) : undefined;
   const nameOf = (b: Booking) => state.items.find((i) => i.id === b.itemId)!.name;
   const notice = NOTICES[one(params.notice) ?? ""];
 
@@ -90,6 +103,11 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
       {booked && (
         <p className="club-success" role="status" data-testid="booked-note">
           Booked: {nameOf(booked)}, {formatDayLong(pacificDate(new Date(booked.startsAt)))}, {formatRange(booked.startsAt, booked.endsAt)}.
+        </p>
+      )}
+      {checkedIn && (
+        <p className="club-success" role="status" data-testid="checkedin-note">
+          You are checked in for {nameOf(checkedIn)}. Have a good one.
         </p>
       )}
       {cancelled && (

@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { clubNow } from "./clock";
 import { clubEnabled } from "./enabled";
 import { ClubError } from "./errors";
-import { fullName } from "./engine/queries";
-import { getCurrentActor, getRsvpLinkActor, toEngineActor, type CurrentActor } from "./identity";
+import { fullName, memberById } from "./engine/queries";
+import { getCurrentActor, getRsvpLinkActor, ipadCodeIsGenuine, toEngineActor, type CurrentActor } from "./identity";
 import { getClubStore } from "./store/instance";
 import type { Ctx } from "./engine/households";
 
@@ -66,4 +66,27 @@ export async function startLinkPost(request: NextRequest): Promise<{ response: N
   const owner = await getRsvpLinkActor(link);
   if (!owner) return notFound;
   return { ctx: { actor: { kind: "member", memberId: owner.member.id, label: fullName(owner.member) }, now: clubNow() }, form, store: await getClubStore(), link };
+}
+
+/**
+ * What every front-desk iPad form handler starts with. The member area must be on, the form must be readable, and the
+ * private iPad code must be genuine; the person is whoever was picked on the iPad. Anything else answers "not found" and
+ * does nothing: the same answer for every wrong address. The iPad signs nobody in and sets no cookie.
+ */
+export async function startIpadPost(request: NextRequest): Promise<{ response: NextResponse } | { ctx: Ctx; form: FormData; store: Awaited<ReturnType<typeof getClubStore>>; code: string; memberId: string }> {
+  const notFound = { response: new NextResponse(null, { status: 404 }) };
+  if (!clubEnabled()) return notFound;
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return notFound;
+  }
+  const code = field(form, "code", 100);
+  const memberId = /^[0-9a-f-]{36}$/.test(field(form, "member")) ? field(form, "member") : "";
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(code) || !memberId || !ipadCodeIsGenuine(code)) return notFound;
+  const store = await getClubStore();
+  const member = memberById(await store.read(), memberId);
+  if (!member) return notFound;
+  return { ctx: { actor: { kind: "member", memberId, label: fullName(member) }, now: clubNow() }, form, store, code, memberId };
 }

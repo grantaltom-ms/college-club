@@ -61,6 +61,7 @@ describe.skipIf(!ADMIN_URL)("the check-in record", () => {
     outcome: "attended",
     previous_outcome: null as string | null,
     by_kind: "staff",
+    by_id: null as string | null,
     by_label: "Test staff",
     via: "staff",
     note: null as string | null,
@@ -68,8 +69,8 @@ describe.skipIf(!ADMIN_URL)("the check-in record", () => {
   });
   const insertLine = (l: ReturnType<typeof line>) =>
     q(
-      `insert into club.attendance_log (kind, booking_id, signup_id, rsvp_id, member_id, at, outcome, previous_outcome, by_kind, by_label, via, note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`,
-      [l.kind, l.booking_id, l.signup_id, l.rsvp_id, l.member_id, l.at, l.outcome, l.previous_outcome, l.by_kind, l.by_label, l.via, l.note],
+      `insert into club.attendance_log (kind, booking_id, signup_id, rsvp_id, member_id, at, outcome, previous_outcome, by_kind, by_id, by_label, via, note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning id`,
+      [l.kind, l.booking_id, l.signup_id, l.rsvp_id, l.member_id, l.at, l.outcome, l.previous_outcome, l.by_kind, l.by_id, l.by_label, l.via, l.note],
     );
 
   describe("what a line is", () => {
@@ -85,15 +86,21 @@ describe.skipIf(!ADMIN_URL)("the check-in record", () => {
       expect(await code(insertLine(line({ kind: "booking", rsvp_id: r.rsvp })))).toBe(CHECK_VIOLATION);
     });
 
-    it("must agree on who did it and how: the system for automatic, staff for the front desk, a member for the iPad", async () => {
+    it("must agree on who did it and how: the system for automatic, staff for the front desk, a member for the iPad and the phone", async () => {
       const r = await fresh();
       const b = { booking_id: r.booking };
+      const own = { by_kind: "member", by_id: member, by_label: "Ada Test" };
       expect(await code(insertLine(line({ ...b, via: "automatic", by_kind: "system", by_label: "Automatic no-show", outcome: "no_show" })))).toBeNull();
-      expect(await code(insertLine(line({ ...b, via: "ipad", by_kind: "member", by_label: "Ada Test" })))).toBeNull();
+      expect(await code(insertLine(line({ ...b, via: "ipad", ...own })))).toBeNull();
+      expect(await code(insertLine(line({ ...b, via: "phone", ...own })))).toBeNull();
       expect(await code(insertLine(line({ ...b, via: "automatic", by_kind: "staff" })))).toBe(CHECK_VIOLATION);
       expect(await code(insertLine(line({ ...b, via: "staff", by_kind: "system" })))).toBe(CHECK_VIOLATION);
       expect(await code(insertLine(line({ ...b, via: "staff", by_kind: "member" })))).toBe(CHECK_VIOLATION);
       expect(await code(insertLine(line({ ...b, via: "ipad", by_kind: "staff" })))).toBe(CHECK_VIOLATION);
+      // A phone or iPad line that is otherwise a perfect member tap, but signed by someone who is not a member.
+      expect(await code(insertLine(line({ ...b, via: "phone", by_kind: "staff", by_id: member })))).toBe(CHECK_VIOLATION);
+      expect(await code(insertLine(line({ ...b, via: "ipad", by_kind: "system", by_id: member, by_label: "Automatic no-show" })))).toBe(CHECK_VIOLATION);
+      expect(await code(insertLine(line({ ...b, via: "tablet", ...own })))).toBe(CHECK_VIOLATION);
     });
 
     it("lets only staff write a confirmation, a line that says nothing changed", async () => {
@@ -101,7 +108,8 @@ describe.skipIf(!ADMIN_URL)("the check-in record", () => {
       const b = { booking_id: r.booking, outcome: "no_show", previous_outcome: "no_show" };
       expect(await code(insertLine(line(b)))).toBeNull();
       expect(await code(insertLine(line({ ...b, via: "automatic", by_kind: "system" })))).toBe(CHECK_VIOLATION);
-      expect(await code(insertLine(line({ ...b, via: "ipad", by_kind: "member" })))).toBe(CHECK_VIOLATION);
+      expect(await code(insertLine(line({ ...b, via: "ipad", by_kind: "member", by_id: member })))).toBe(CHECK_VIOLATION);
+      expect(await code(insertLine(line({ ...b, via: "phone", by_kind: "member", by_id: member })))).toBe(CHECK_VIOLATION);
     });
 
     it("only knows two outcomes, and keeps notes short", async () => {
@@ -109,6 +117,51 @@ describe.skipIf(!ADMIN_URL)("the check-in record", () => {
       expect(await code(insertLine(line({ booking_id: r.booking, outcome: "completed" })))).toBe(CHECK_VIOLATION);
       expect(await code(insertLine(line({ booking_id: r.booking, note: "x".repeat(301) })))).toBe(CHECK_VIOLATION);
       expect(await code(insertLine(line({ booking_id: r.booking, note: "x".repeat(300) })))).toBeNull();
+    });
+  });
+
+  describe("a member checking themselves in", () => {
+    const tapLine = (overrides: Record<string, unknown> = {}) => line({ via: "phone", by_kind: "member", by_id: member, by_label: "Ada Test", ...overrides });
+
+    for (const via of ["phone", "ipad"]) {
+      it(`on the ${via === "ipad" ? "iPad" : "phone"} is only ever "I came": about themselves, the first line, for an outing or a class chair`, async () => {
+        const r = await fresh();
+        expect(await code(insertLine(tapLine({ via, booking_id: r.booking })))).toBeNull();
+        // Not a no-show, and not a correction of something already recorded.
+        expect(await code(insertLine(tapLine({ via, booking_id: r.booking, outcome: "no_show" })))).toBe(CHECK_VIOLATION);
+        expect(await code(insertLine(tapLine({ via, booking_id: r.booking, previous_outcome: "no_show" })))).toBe(CHECK_VIOLATION);
+        expect(await code(insertLine(tapLine({ via, booking_id: r.booking, previous_outcome: "attended" })))).toBe(CHECK_VIOLATION);
+        // About themselves: the line's person is the one who tapped.
+        expect(await code(insertLine(tapLine({ via, booking_id: r.booking, by_id: r.other })))).toBe(CHECK_VIOLATION);
+        expect(await code(insertLine(tapLine({ via, booking_id: r.booking, by_id: null })))).toBe(CHECK_VIOLATION);
+        // Events are ticked off by staff.
+        expect(await code(insertLine(tapLine({ via, kind: "event", rsvp_id: r.rsvp, member_id: r.other, by_id: r.other })))).toBe(CHECK_VIOLATION);
+        expect(await code(insertLine(tapLine({ via, kind: "class", signup_id: r.signup, member_id: r.other, by_id: r.other })))).toBeNull();
+      });
+    }
+
+    it("must be for an outing the person is on: the booker, or crew still aboard", async () => {
+      const r = await fresh();
+      const tapByOther = () => insertLine(tapLine({ booking_id: r.booking, member_id: r.other, by_id: r.other, by_label: "Crew Test" }));
+      expect(await code(tapByOther())).toBe(CHECK_VIOLATION); // not on the booking at all
+      await q(`insert into club.booking_crew (booking_id, member_id) values ($1, $2)`, [r.booking, r.other]);
+      expect(await code(tapByOther())).toBeNull();
+
+      const gone = await fresh();
+      await q(`insert into club.booking_crew (booking_id, member_id, removed_at, removed_reason) values ($1, $2, $3, 'Left the club')`, [gone.booking, gone.other, T(11)]);
+      expect(await code(insertLine(tapLine({ booking_id: gone.booking, member_id: gone.other, by_id: gone.other })))).toBe(CHECK_VIOLATION); // left the boat
+    });
+
+    it("must be for a class chair the person holds", async () => {
+      const r = await fresh();
+      expect(await code(insertLine(tapLine({ kind: "class", signup_id: r.signup })))).toBe(CHECK_VIOLATION); // someone else's chair
+      expect(await code(insertLine(tapLine({ kind: "class", signup_id: r.signup, member_id: r.other, by_id: r.other })))).toBeNull();
+    });
+
+    it("leaves staff free to record anything, as before", async () => {
+      const r = await fresh();
+      expect(await code(insertLine(line({ booking_id: r.booking, outcome: "no_show", previous_outcome: "attended" })))).toBeNull();
+      expect(await code(insertLine(line({ kind: "event", rsvp_id: r.rsvp, member_id: r.other })))).toBeNull();
     });
   });
 

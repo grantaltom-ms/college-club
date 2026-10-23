@@ -92,6 +92,13 @@ export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<
   // The club room needs no check-in, so this one that is over this morning is simply finished, never a no-show.
   await bookToday("Clubhouse room", "Yuki Nakamura", 9, 0, 60);
 
+  // For members checking themselves in (the front-desk iPad and their own phone), all open for check-in at 1 pm. Amara Okonkwo
+  // is the iPad's single-boat example and Chidi Okonkwo the phone's. Walter Pemberton's club room is under way but needs no
+  // check-in, so he must never appear on the iPad or be offered a button. They use people and boats the other tests do not.
+  await bookToday("Otter", "Amara Okonkwo", 12, 30, 60);
+  await bookToday("Skimmer", "Chidi Okonkwo", 12, 0, 90);
+  await bookToday("Clubhouse room", "Walter Pemberton", 12, 30, 60);
+
   // Merganser is being repaired, from now until staff return it.
   await takeOutOfService(store, ctx, item("Merganser"), { reason: "Rigger being repaired", expectedReturn: addDays(today, 5) });
 }

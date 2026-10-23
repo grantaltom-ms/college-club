@@ -1,6 +1,8 @@
 import { clubEnabled } from "./enabled";
 import { fullName, householdOf, memberById } from "./engine/queries";
+import { verifyIpadCode } from "./engine/ipad-address";
 import { verifyRsvpLinkToken } from "./engine/rsvp-links";
+import { getIpadSecret } from "./ipad-secret";
 import { getLinkSecret } from "./link-secret";
 import type { ClubStore } from "./store/memory";
 import { getClubStore } from "./store/instance";
@@ -79,4 +81,14 @@ export async function getRsvpLinkActor(link: { eventId: string; memberId: string
   const secret = clubEnabled() ? getLinkSecret() : null;
   if (!secret) return null;
   return resolveRsvpLink(await getClubStore(), secret, link);
+}
+
+/**
+ * Whether the code in a front-desk iPad address is genuine. Opening the iPad signs nobody in and sets no cookie: the iPad
+ * screens are open to whoever holds the private address, and they show only the names of people with something to check in
+ * for right now. (Step 6 may replace this when members have real logins; the iPad then keeps its own address.)
+ */
+export function ipadCodeIsGenuine(code: string): boolean {
+  const secret = clubEnabled() ? getIpadSecret() : null;
+  return secret !== null && verifyIpadCode(secret, code);
 }
