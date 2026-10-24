@@ -73,6 +73,7 @@ export const HISTORY_KINDS = [
   "bookings_cancelled",
   "signups_cancelled",
   "rsvps_cancelled",
+  "quickbooks_linked",
   "membership_ended",
 ] as const;
 export type HistoryKind = (typeof HISTORY_KINDS)[number];
@@ -435,6 +436,117 @@ export interface AttendanceEntry {
   note: string | null;
 }
 
+/* ---------- Billing (step 9) ---------- */
+
+/** The kinds of line on a household's monthly invoice. Each one can go to its own income account in QuickBooks. */
+export const BILLING_KINDS = ["dues", "event_tickets", "visitor_fees", "bar", "snack_bar"] as const;
+export type BillingKind = (typeof BILLING_KINDS)[number];
+
+/** The billing numbers and names. Every value lives in settings/billing-rules.json, never in code. */
+export interface BillingRuleValues {
+  /** Monthly dues in cents for each membership type. */
+  duesCents: Record<MembershipType, number>;
+  /** A member can bring this many visitors in one day without a fee. More than this and every visitor that day is charged. */
+  visitorFreePerDay: number;
+  /** The fee for each visitor, in cents, once a member is over the free number in a day. */
+  visitorFeeCents: number;
+  /** The most visitors one entry (one press of the button) can record. */
+  visitorsPerEntryMax: number;
+  /** The most visitors one member can have recorded in one day. */
+  visitorsPerDayMax: number;
+  /** Days from the invoice date to the due date. */
+  invoiceDueDays: number;
+  /** The product or service name each kind of line goes under in QuickBooks. Must match the names in QuickBooks exactly. */
+  items: Record<BillingKind, string>;
+  /** Kinds of line that carry sales tax (bar and snack bar). QuickBooks' own invoice import cannot take tax, so this is shown in the plain charges file. */
+  taxable: BillingKind[];
+}
+
+export interface BillingRules {
+  /** True while the numbers are placeholders. Shown on screen. */
+  placeholder: boolean;
+  defaults: BillingRuleValues;
+}
+
+export const CHARGE_STATUSES = ["open", "voided"] as const;
+export type ChargeStatus = (typeof CHARGE_STATUSES)[number];
+
+/**
+ * One charge staff typed in: a bar or snack-bar sale, or an adjustment (a credit or an extra charge, often to put right a
+ * month that was already exported). Charges are never deleted; a wrong one is voided with a reason.
+ */
+export interface Charge {
+  id: string;
+  householdId: string;
+  /** Whose tab it was, when staff said. Always someone in the household. */
+  memberId: string | null;
+  /** The day it happened, Pacific, YYYY-MM-DD. It is billed in that day's month. */
+  day: string;
+  /** Which line of the invoice it goes under. */
+  category: BillingKind;
+  /** An adjustment may be negative (a credit). A bar or snack-bar charge never is. */
+  adjustment: boolean;
+  amountCents: number;
+  description: string;
+  createdAt: string;
+  createdBy: Actor;
+  status: ChargeStatus;
+  voidedAt: string | null;
+  voidedBy: Actor | null;
+  voidReason: string | null;
+}
+
+export const VISIT_VIA = ["ipad", "staff"] as const;
+export type VisitVia = (typeof VISIT_VIA)[number];
+
+export const VISIT_STATUSES = ["recorded", "voided"] as const;
+export type VisitStatus = (typeof VISIT_STATUSES)[number];
+
+/** Visitors a member brought to the clubhouse, signed in on the front-desk iPad or entered by staff. Only a count: no visitor names are kept. */
+export interface VisitorEntry {
+  id: string;
+  /** The member who brought them. */
+  memberId: string;
+  /** The day, Pacific, YYYY-MM-DD. */
+  day: string;
+  visitors: number;
+  createdAt: string;
+  createdBy: Actor;
+  via: VisitVia;
+  status: VisitStatus;
+  voidedAt: string | null;
+  voidedBy: Actor | null;
+  voidReason: string | null;
+}
+
+/** A month that was exported and locked. Its lines are frozen: later corrections go in as adjustments in a later month. */
+export interface BillingRun {
+  id: string;
+  /** YYYY-MM, Pacific. */
+  month: string;
+  createdAt: string;
+  createdBy: Actor;
+  invoiceCount: number;
+  totalCents: number;
+}
+
+/** One line on one household's invoice for a locked month. quantity x unit = amount. Never changed once saved. */
+export interface BillingLine {
+  id: string;
+  runId: string;
+  householdId: string;
+  /** Shared by every line of one household's invoice in one run. */
+  invoiceNo: string;
+  kind: BillingKind;
+  description: string;
+  quantity: number;
+  unitCents: number;
+  /** Negative for a credit. */
+  amountCents: number;
+  taxable: boolean;
+  adjustment: boolean;
+}
+
 export interface ClubState {
   households: Household[];
   members: Member[];
@@ -450,4 +562,13 @@ export interface ClubState {
   events: ClubEvent[];
   rsvps: Rsvp[];
   attendance: AttendanceEntry[];
+  charges: Charge[];
+  visitors: VisitorEntry[];
+  billingRuns: BillingRun[];
+  billingLines: BillingLine[];
+  /**
+   * How far back events, charges and visitor entries were loaded, as an ISO instant, or null when everything is here (the
+   * in-memory store). A month that begins before this cannot be billed from this copy, because records may be missing.
+   */
+  dataSince: string | null;
 }

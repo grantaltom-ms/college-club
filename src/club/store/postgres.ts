@@ -7,8 +7,13 @@ import type {
   AttendanceKind,
   AttendanceOutcome,
   AttendanceVia,
+  BillingKind,
+  BillingLine,
+  BillingRun,
   Booking,
   BookingStatus,
+  Charge,
+  ChargeStatus,
   ClassRules,
   ClassRuleValues,
   ClassSession,
@@ -31,12 +36,16 @@ import type {
   SessionStatus,
   SignUp,
   SignUpStatus,
+  VisitorEntry,
+  VisitStatus,
+  VisitVia,
   ClubEvent,
   EventRules,
   Rsvp,
   RsvpStatus,
   RsvpVia,
 } from "../types";
+import { addDays, pacificDate, pacificDayStart } from "../time";
 import type { ClubStore, Settler } from "./memory";
 
 /**
@@ -57,6 +66,9 @@ const SEED_LOCK = "club:seed";
 
 /** How far back the screens and the rules look at bookings. Older ones stay in the database. */
 const DEFAULT_HISTORY_DAYS = 90;
+
+/** How many of the most recent closed months have their invoice lines loaded (so an old month's file can still be downloaded). */
+const BILLING_MONTHS_LOADED = 24;
 
 export interface PgStoreOptions {
   newId?: () => string;
@@ -97,6 +109,10 @@ interface SignUpRow { id: string; session_id: string; member_id: string; status:
 interface EventRow { id: string; title: string; description: string; location: string; starts_at: Date; ends_at: Date; capacity: number | null; price_cents: number | null; reply_by: Date | null; status: ClubEvent["status"]; created_at: Date; created_by_kind: string; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface RsvpRow { id: string; event_id: string; member_id: string; guests: number; status: RsvpStatus; price_cents: number | null; via: RsvpVia; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; hold_until: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface AttendanceRow { id: string; kind: AttendanceKind; booking_id: string | null; signup_id: string | null; rsvp_id: string | null; member_id: string; at: Date; outcome: AttendanceOutcome; previous_outcome: AttendanceOutcome | null; by_kind: string; by_id: string | null; by_label: string; via: AttendanceVia; note: string | null }
+interface ChargeRow { id: string; household_id: string; member_id: string | null; day: string; category: BillingKind; adjustment: boolean; amount_cents: number; description: string; created_at: Date; created_by_label: string; status: ChargeStatus; voided_at: Date | null; voided_by_label: string | null; void_reason: string | null }
+interface VisitorRow { id: string; member_id: string; day: string; visitors: number; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; via: VisitVia; status: VisitStatus; voided_at: Date | null; voided_by_label: string | null; void_reason: string | null }
+interface RunRow { id: string; month: string; created_at: Date; created_by_label: string; invoice_count: number; total_cents: string | number }
+interface LineRow { id: string; run_id: string; household_id: string; invoice_no: string; kind: BillingKind; description: string; quantity: number; unit_cents: number; amount_cents: number; taxable: boolean; adjustment: boolean }
 interface CrewRow { booking_id: string; member_id: string; position: number; removed_at: Date | null; removed_reason: string | null }
 
 const iso = (d: Date | string) => new Date(d).toISOString();
@@ -271,6 +287,53 @@ const toAttendance = (r: AttendanceRow): AttendanceEntry => ({
   note: r.note,
 });
 
+const toCharge = (r: ChargeRow): Charge => ({
+  id: r.id,
+  householdId: r.household_id,
+  memberId: r.member_id,
+  day: r.day,
+  category: r.category,
+  adjustment: r.adjustment,
+  amountCents: r.amount_cents,
+  description: r.description,
+  createdAt: iso(r.created_at),
+  createdBy: { kind: "staff", label: r.created_by_label },
+  status: r.status,
+  voidedAt: r.voided_at ? iso(r.voided_at) : null,
+  voidedBy: r.voided_by_label ? { kind: "staff", label: r.voided_by_label } : null,
+  voidReason: r.void_reason,
+});
+
+const toVisitor = (r: VisitorRow): VisitorEntry => ({
+  id: r.id,
+  memberId: r.member_id,
+  day: r.day,
+  visitors: r.visitors,
+  createdAt: iso(r.created_at),
+  createdBy: actorFrom(r.created_by_kind, r.created_by_id, r.created_by_label),
+  via: r.via,
+  status: r.status,
+  voidedAt: r.voided_at ? iso(r.voided_at) : null,
+  voidedBy: r.voided_by_label ? { kind: "staff", label: r.voided_by_label } : null,
+  voidReason: r.void_reason,
+});
+
+const toRun = (r: RunRow): BillingRun => ({ id: r.id, month: r.month, createdAt: iso(r.created_at), createdBy: { kind: "staff", label: r.created_by_label }, invoiceCount: r.invoice_count, totalCents: Number(r.total_cents) });
+
+const toLine = (r: LineRow): BillingLine => ({
+  id: r.id,
+  runId: r.run_id,
+  householdId: r.household_id,
+  invoiceNo: r.invoice_no,
+  kind: r.kind,
+  description: r.description,
+  quantity: r.quantity,
+  unitCents: r.unit_cents,
+  amountCents: r.amount_cents,
+  taxable: r.taxable,
+  adjustment: r.adjustment,
+});
+
 /* ---------- Loading ---------- */
 
 type Queryable = Pick<PoolClient, "query">;
@@ -279,7 +342,17 @@ async function rows<T>(c: Queryable, text: string, params: unknown[] = []): Prom
   return (await c.query(text, params)).rows as T[];
 }
 
-async function loadState(c: Queryable, since: Date): Promise<ClubState> {
+async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
+  // Months that have not been billed yet must always be fully loaded, however long ago they were, so a late billing run
+  // never misses an old event ticket or charge. A month is "unbilled" if it comes after the last closed one.
+  const [{ month: lastBilled }] = await rows<{ month: string | null }>(c, `select max(month) as month from club.billing_runs`);
+  let since = historyStart;
+  if (lastBilled) {
+    const unbilledFrom = addDays(`${lastBilled}-01`, 32).slice(0, 7) + "-01";
+    const floor = new Date(pacificDayStart(unbilledFrom).getTime() - 86400000);
+    if (floor < since) since = floor;
+  }
+  const sinceDay = pacificDate(since);
   // One query at a time: a single connection runs them in order anyway.
   const households = await rows<HouseholdRow>(c, `select id, display_name, membership_type, status, joined_on, ended_on, quickbooks_id, notes from club.households order by seq`);
   const members = await rows<MemberRow>(c, `select id, household_id, first_name, last_name, email, phone, role, status, brivo_credential_id, mailchimp_contact_id, login_id from club.members order by seq`);
@@ -335,6 +408,25 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
              from club.attendance_log where booking_id = any($1) or signup_id = any($2) or rsvp_id = any($3) order by seq`,
           [bookingRows.map((x) => x.id), signUpRows.map((x) => x.id), rsvpRows.map((x) => x.id)],
         );
+  const chargeRows = await rows<ChargeRow>(
+    c,
+    `select id, household_id, member_id, day, category, adjustment, amount_cents, description, created_at, created_by_label, status, voided_at, voided_by_label, void_reason
+       from club.charges where day >= $1 order by seq`,
+    [sinceDay],
+  );
+  const visitorRows = await rows<VisitorRow>(
+    c,
+    `select id, member_id, day, visitors, created_at, created_by_kind, created_by_id, created_by_label, via, status, voided_at, voided_by_label, void_reason
+       from club.visitor_entries where day >= $1 order by seq`,
+    [sinceDay],
+  );
+  const runRows = await rows<RunRow>(c, `select id, month, created_at, created_by_label, invoice_count, total_cents from club.billing_runs order by month`);
+  const lineRows = await rows<LineRow>(
+    c,
+    `select id, run_id, household_id, invoice_no, kind, description, quantity, unit_cents, amount_cents, taxable, adjustment
+       from club.billing_lines where run_id in (select id from club.billing_runs order by month desc limit $1) order by seq`,
+    [BILLING_MONTHS_LOADED],
+  );
   const crew = bookingRows.length === 0 ? [] : await rows<CrewRow>(c, `select booking_id, member_id, position, removed_at, removed_reason from club.booking_crew where booking_id = any($1)`, [bookingRows.map((b) => b.id)]);
   return {
     households: households.map(toHousehold),
@@ -351,6 +443,11 @@ async function loadState(c: Queryable, since: Date): Promise<ClubState> {
     events: eventRows.map(toEvent),
     rsvps: rsvpRows.map(toRsvp),
     attendance: attendanceRows.map(toAttendance),
+    charges: chargeRows.map(toCharge),
+    visitors: visitorRows.map(toVisitor),
+    billingRuns: runRows.map(toRun),
+    billingLines: lineRows.map(toLine),
+    dataSince: since.toISOString(),
   };
 }
 
@@ -525,6 +622,42 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
     await run(
       `insert into club.attendance_log (id, kind, booking_id, signup_id, rsvp_id, member_id, at, outcome, previous_outcome, by_kind, by_id, by_label, via, note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [l.id, l.kind, l.kind === "booking" ? l.recordId : null, l.kind === "class" ? l.recordId : null, l.kind === "event" ? l.recordId : null, l.memberId, l.at, l.outcome, l.previous, l.by.kind, actorId(l.by), l.by.label, l.via, l.note],
+    );
+  }
+
+  // Charges and visitor entries: new ones are added, and a wrong one is voided (never changed or removed).
+  const ch = compare("charges", before.charges, after.charges);
+  for (const x of ch.added) {
+    await run(
+      `insert into club.charges (id, household_id, member_id, day, category, adjustment, amount_cents, description, created_at, created_by_kind, created_by_label, status, voided_at, voided_by_label, void_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'staff',$10,$11,$12,$13,$14)`,
+      [x.id, x.householdId, x.memberId, x.day, x.category, x.adjustment, x.amountCents, x.description, x.createdAt, x.createdBy.label, x.status, x.voidedAt, x.voidedBy?.label ?? null, x.voidReason],
+    );
+  }
+  for (const x of ch.updated) await run(`update club.charges set status=$2, voided_at=$3, voided_by_label=$4, void_reason=$5 where id=$1`, [x.id, x.status, x.voidedAt, x.voidedBy?.label ?? null, x.voidReason]);
+
+  const vv = compare("visitor entries", before.visitors, after.visitors);
+  for (const x of vv.added) {
+    await run(
+      `insert into club.visitor_entries (id, member_id, day, visitors, created_at, created_by_kind, created_by_id, created_by_label, via, status, voided_at, voided_by_label, void_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [x.id, x.memberId, x.day, x.visitors, x.createdAt, x.createdBy.kind, actorId(x.createdBy), x.createdBy.label, x.via, x.status, x.voidedAt, x.voidedBy?.label ?? null, x.voidReason],
+    );
+  }
+  for (const x of vv.updated) await run(`update club.visitor_entries set status=$2, voided_at=$3, voided_by_label=$4, void_reason=$5 where id=$1`, [x.id, x.status, x.voidedAt, x.voidedBy?.label ?? null, x.voidReason]);
+
+  // A closed month and its invoice lines are only ever added, the run first.
+  const runs = compare("closed months", before.billingRuns, after.billingRuns);
+  if (runs.updated.length > 0) throw new Error("A closed month can only be added to, never changed.");
+  for (const r of runs.added) {
+    await run(`insert into club.billing_runs (id, month, created_at, created_by_kind, created_by_label, invoice_count, total_cents) values ($1,$2,$3,'staff',$4,$5,$6)`, [r.id, r.month, r.createdAt, r.createdBy.label, r.invoiceCount, r.totalCents]);
+  }
+  const lines = compare("invoice lines", before.billingLines, after.billingLines);
+  if (lines.updated.length > 0) throw new Error("An invoice line can only be added, never changed.");
+  for (const l of lines.added) {
+    await run(
+      `insert into club.billing_lines (id, run_id, household_id, invoice_no, kind, description, quantity, unit_cents, amount_cents, taxable, adjustment) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [l.id, l.runId, l.householdId, l.invoiceNo, l.kind, l.description, l.quantity, l.unitCents, l.amountCents, l.taxable, l.adjustment],
     );
   }
 }

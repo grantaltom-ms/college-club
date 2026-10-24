@@ -4,6 +4,7 @@ import { MemoryClubStore, sequentialIds, type ClubStore, type MemoryStoreOptions
 import { clubNow } from "../clock";
 import { addDays, middayPacific, pacificDate } from "../time";
 import type { Actor, MembershipType } from "../types";
+import { seedSampleBilling } from "./billing";
 import { seedSampleClasses } from "./classes";
 import { seedSampleEvents } from "./events";
 import { seedSampleEquipment } from "./equipment";
@@ -26,6 +27,8 @@ interface SampleHousehold {
   /** A fixed date, "THIS_MONTH" (the 1st of the current month) or a number of days before today for the end date. */
   joined: string;
   endedDaysAgo?: number;
+  /** True for the one household still waiting for its QuickBooks ID, so billing's "no QuickBooks ID" refusal can be seen. */
+  noQuickbooksId?: boolean;
   adults: SampleAdult[];
 }
 
@@ -60,7 +63,7 @@ const HOUSEHOLDS: SampleHousehold[] = [
   // Membership ended three weeks ago.
   { name: "Fitzgerald", type: "Resident", joined: "2018-03-12", endedDaysAgo: 21, adults: [person("Colm", "Fitzgerald", ["scull-2"]), person("Aoife", "Fitzgerald")] },
   // Joined this month, no qualifications yet.
-  { name: "Nakamura", type: "Intermediate", joined: "THIS_MONTH", adults: [person("Yuki", "Nakamura")] },
+  { name: "Nakamura", type: "Intermediate", joined: "THIS_MONTH", noQuickbooksId: true, adults: [person("Yuki", "Nakamura")] },
   // Couple, both top level: a strong crew for any boat.
   { name: "Bellweather", type: "Resident", joined: "2015-04-18", adults: [person("Sasha", "Bellweather", ["scull-3"]), person("Jordan", "Bellweather", ["scull-3"])] },
   // Intermediate couple, one qualified and one not.
@@ -74,7 +77,7 @@ const HOUSEHOLDS: SampleHousehold[] = [
  * household's file reads the way a real one would. "Today" is a parameter so tests are exact.
  */
 export async function seedSampleClub(store: ClubStore, today: string): Promise<void> {
-  for (const h of HOUSEHOLDS) {
+  for (const [index, h] of HOUSEHOLDS.entries()) {
     const joinedOn = h.joined === "THIS_MONTH" ? `${today.slice(0, 7)}-01` : h.joined;
     const joinedAt = middayPacific(joinedOn);
     const [primary, ...additional] = h.adults;
@@ -82,6 +85,8 @@ export async function seedSampleClub(store: ClubStore, today: string): Promise<v
       displayName: `The ${h.name} household`,
       membershipType: h.type,
       joinedOn,
+      // Invented IDs, in the shape staff will see; QuickBooks's real ones come with the roster file.
+      quickbooksId: h.noQuickbooksId ? undefined : `SAMPLE-${1001 + index}`,
       primary,
       additional,
     });
@@ -107,6 +112,7 @@ export async function seedSample(store: ClubStore, today: string = pacificDate(c
   await seedSampleEquipment(store, now);
   await seedSampleClasses(store, now);
   await seedSampleEvents(store, now);
+  await seedSampleBilling(store, today);
 }
 
 /** A fresh in-memory store holding the sample club. IDs are fixed, so addresses and test links stay the same between runs. */

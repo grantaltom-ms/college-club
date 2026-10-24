@@ -60,9 +60,12 @@ describe.skipIf(!ADMIN_URL)("the club database", () => {
     expect(new Set(rows.map((r) => r.table_schema))).toEqual(new Set(["club"]));
     expect(rows.map((r) => r.table_name)).toEqual([
       "attendance_log",
+      "billing_lines",
+      "billing_runs",
       "booking_crew",
       "booking_rule_defaults",
       "bookings",
+      "charges",
       "class_rule_defaults",
       "class_sessions",
       "class_signups",
@@ -80,12 +83,13 @@ describe.skipIf(!ADMIN_URL)("the club database", () => {
       "out_of_service",
       "qualifications",
       "sessions",
+      "visitor_entries",
     ]);
   });
 
   it("locks every table to the owner: row level security on, no policies", async () => {
     const { rows } = await q(`select c.relname, c.relrowsecurity from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'club' and c.relkind = 'r'`);
-    expect(rows).toHaveLength(21);
+    expect(rows).toHaveLength(25);
     expect(rows.every((r) => r.relrowsecurity)).toBe(true);
     expect((await q(`select count(*)::int as n from pg_policies where schemaname = 'club'`)).rows[0].n).toBe(0);
   });
@@ -115,11 +119,12 @@ describe.skipIf(!ADMIN_URL)("the club database", () => {
     });
 
     it("allows many households without a QuickBooks ID but never two with the same one", async () => {
-      const a = await household();
-      const b = await household();
       await household();
-      await q(`update club.households set quickbooks_id = 'QB-1' where id = $1`, [a]);
-      await expect(q(`update club.households set quickbooks_id = 'QB-1' where id = $1`, [b])).rejects.toThrow(/quickbooks_id/);
+      await household();
+      await household();
+      const withId = (name: string) => q(`insert into club.households (display_name, membership_type, joined_on, quickbooks_id) values ($1, 'Resident', '2020-01-01', 'QB-1')`, [name]);
+      await withId("First with the ID");
+      await expect(withId("Second with the same ID")).rejects.toThrow(/quickbooks_id/);
     });
 
     it("cannot be deleted while it has people in it", async () => {

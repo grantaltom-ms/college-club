@@ -323,6 +323,26 @@ export async function changeMembershipType(store: ClubStore, ctx: Ctx, household
   });
 }
 
+/**
+ * Staff set or correct a household's QuickBooks ID, the link the monthly billing file needs. It is the one change allowed on a
+ * household whose membership ended, because that household's last month is still billed. Never cleared; always a line in its file.
+ */
+export async function setQuickbooksId(store: ClubStore, ctx: Ctx, householdId: string, quickbooksId: string): Promise<Household> {
+  requireStaff(ctx.actor);
+  return store.transaction(async (s, newId) => {
+    const household = householdOf(s, householdId);
+    if (!household) throw new ClubError("not_found", "That household no longer exists.");
+    const id = text(quickbooksId, "The QuickBooks ID", 100);
+    if (id === household.quickbooksId) throw new ClubError("unchanged", `${household.displayName} already has QuickBooks ID ${id}.`);
+    const taken = s.households.find((h) => h.quickbooksId === id && h.id !== household.id);
+    if (taken) throw new ClubError("conflict", `QuickBooks ID ${id} already belongs to ${taken.displayName}.`);
+    const before = household.quickbooksId;
+    household.quickbooksId = id;
+    log(s, newId, ctx, household.id, "quickbooks_linked", before === null ? `QuickBooks ID set to ${id}.` : `QuickBooks ID changed from ${before} to ${id}.`, { from: before, to: id });
+    return { ...household };
+  });
+}
+
 /** Staff only: a member can never give themselves a qualification. */
 export async function grantQualification(store: ClubStore, ctx: Ctx, memberId: string, code: string): Promise<void> {
   if (ctx.actor.kind !== "staff") throw new ClubError("forbidden", "Only club staff can grant a qualification.");

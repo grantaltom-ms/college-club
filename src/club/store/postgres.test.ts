@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { BookingRefused, cancelBooking, createBooking } from "../engine/bookings";
 import { SignUpRefused, createClass, leaveClass, scheduleSessions, signUp } from "../engine/classes";
+import { recordCharge, runBilling } from "../engine/billing";
+import { linesComplete } from "../engine/billing-views";
 import { RsvpRefused, cancelRsvp, createEvent, placesTaken, rsvp } from "../engine/events";
-import { createHousehold, endHousehold } from "../engine/households";
+import { createHousehold, endHousehold, setQuickbooksId } from "../engine/households";
 import { clubLedger } from "../engine/ledger";
 import { waitlistPlace } from "../engine/queries";
 import { addMembers, at, makeStore, NOW, openAnother, databaseUrls, memberCtx, staffCtx, request, bookAs, refusedFor, STORE_KINDS, fixtureFor } from "../engine/testkit";
 import { ClubError } from "../errors";
 import { seedSample } from "../sample/club";
+import { BILLING_RULES } from "../settings/billing-rules";
 import { CLASS_RULES } from "../settings/class-rules";
 import { EVENT_RULES } from "../settings/event-rules";
 import { RULE_BOOK } from "../settings/rulebook";
@@ -73,13 +76,83 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
     expect(fromDatabase.items).toEqual(fromMemory.items);
     expect(fromDatabase.outOfService).toEqual(fromMemory.outOfService);
     expect(fromDatabase.bookings).toEqual(fromMemory.bookings);
-    expect(fromDatabase).toEqual(fromMemory);
+    // The one difference is how far back each copy looked: the in-memory club holds everything, the database copy a window.
+    expect(fromMemory.dataSince).toBeNull();
+    expect(Date.parse(fromDatabase.dataSince!)).toBeLessThan(now.getTime());
+    expect({ ...fromDatabase, dataSince: null }).toEqual(fromMemory);
     // Dates stay plain dates, not moments in somebody's time zone.
     expect(fromDatabase.households[0].joinedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(fromDatabase.outOfService[0].expectedReturn).toBe(addDays(today, 5));
     // And it is a real sample: 14 households, boats, bookings, one boat out of service, a crew booking.
     expect(fromDatabase.households).toHaveLength(14);
     expect(fromDatabase.bookings.some((b) => b.crew.length > 0)).toBe(true);
+  });
+
+  it("loads every month that has not been billed however old, closed months always, and only the latest 24 months' lines, and says what it can no longer see", async () => {
+    const f = await fixture();
+    await setQuickbooksId(f.store, staffCtx(), f.h.Quill, "QB-100");
+    await setQuickbooksId(f.store, staffCtx(), f.h.Reed, "QB-200");
+    const url = databaseUrls.get(f.store)!;
+    const pool = createClubPool(url, 4);
+    try {
+      // The club as it was in early May: April is billed with a bar charge in it, and a June charge comes later.
+      const may = new Date("2026-05-02T20:00:00Z");
+      await recordCharge(f.store, staffCtx(new Date("2026-04-11T19:00:00Z")), { householdId: f.h.Quill, day: "2026-04-10", category: "bar", adjustment: false, amountCents: 1250, description: "April drinks" });
+      const early = new PgClubStore(pool, { now: () => may });
+      await runBilling(early, staffCtx(may), BILLING_RULES, "2026-04");
+      await recordCharge(early, staffCtx(new Date("2026-06-16T19:00:00Z")), { householdId: f.h.Quill, day: "2026-06-15", category: "bar", adjustment: false, amountCents: 800, description: "June drinks" });
+
+      // Looked at on Oct 28 with the usual 90 days, the June charge is older than that, but its month has not been billed:
+      // it must still be loaded, or a late close would miss it.
+      const late = new PgClubStore(pool, { now: () => NOW });
+      const state = await late.read();
+      expect(state.charges.some((c) => c.description === "June drinks")).toBe(true);
+      expect(Date.parse(state.dataSince!)).toBeLessThan(Date.parse("2026-05-01T00:00:00-07:00"));
+      expect(state.billingRuns.map((r) => r.month)).toEqual(["2026-04"]);
+      expect(state.billingLines.length).toBeGreaterThan(0);
+      expect(linesComplete(state, state.billingRuns[0])).toBe(true);
+
+      // Twenty-four more closed months push April's lines out of the latest 24; the run is still known, the lines are not, and the screens can tell.
+      const months = Array.from({ length: 24 }, (_, i) => {
+        const n = 4 + i;
+        return `${2026 + Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, "0")}`;
+      });
+      for (const month of months) {
+        await pool.query(`insert into club.billing_runs (month, created_at, created_by_kind, created_by_label, invoice_count, total_cents) values ($1, '2026-10-02T20:00:00Z', 'staff', 'Test staff', 0, 0)`, [month]);
+      }
+      const later = await new PgClubStore(pool, { now: () => NOW }).read();
+      expect(later.billingRuns).toHaveLength(25);
+      const april = later.billingRuns.find((r) => r.month === "2026-04")!;
+      expect(later.billingLines.filter((l) => l.runId === april.id)).toEqual([]);
+      expect(linesComplete(later, april)).toBe(false);
+      expect(linesComplete(later, later.billingRuns.find((r) => r.month === months[23])!)).toBe(true);
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it("refuses to change a closed month or its invoice lines, however the change is made", async () => {
+    const f = await fixture();
+    await setQuickbooksId(f.store, staffCtx(), f.h.Quill, "QB-100");
+    await setQuickbooksId(f.store, staffCtx(), f.h.Reed, "QB-200");
+    await runBilling(f.store, staffCtx(), BILLING_RULES, "2026-09");
+    const before = await f.store.read();
+    await expect(
+      f.store.transaction(async (s) => {
+        s.billingLines[0].amountCents += 100;
+      }),
+    ).rejects.toThrow("An invoice line can only be added, never changed.");
+    await expect(
+      f.store.transaction(async (s) => {
+        s.billingRuns[0].totalCents += 100;
+      }),
+    ).rejects.toThrow("A closed month can only be added to, never changed.");
+    await expect(
+      f.store.transaction(async (s) => {
+        s.billingLines.pop();
+      }),
+    ).rejects.toThrow(/never|removed|delete/i);
+    expect(await f.store.read()).toEqual(before);
   });
 
   it("keeps who did what, including which member, through a round trip", async () => {

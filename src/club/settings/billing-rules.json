@@ -1,0 +1,24 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER AND NAME IN THIS FILE IS A PLACEHOLDER until club staff and the bookkeeper confirm the real ones (see CLAUDE.md). Money is in cents (15450 is $154.50). duesCents: monthly dues for each membership type; the Resident and Intermediate amounts are the ones on the public Membership page, and the Non-Resident amount is invented because the public page only says to ask. visitorFreePerDay and visitorFeeCents: a member can bring that many visitors in one day for free; with more than that, every visitor that day costs the fee. visitorsPerEntryMax and visitorsPerDayMax: the most visitors one entry, and one member in one day, can record. invoiceDueDays: days from the invoice date to the due date. items: the product or service name each kind of line goes under in QuickBooks; these must match the names in QuickBooks exactly. taxable: kinds of line that carry sales tax. QuickBooks' own invoice import cannot take tax, so this shows in the plain charges file only.",
+  "defaults": {
+    "duesCents": {
+      "Resident": 15450,
+      "Intermediate": 10300,
+      "Non-Resident": 7725
+    },
+    "visitorFreePerDay": 4,
+    "visitorFeeCents": 1000,
+    "visitorsPerEntryMax": 12,
+    "visitorsPerDayMax": 30,
+    "invoiceDueDays": 15,
+    "items": {
+      "dues": "Membership Dues",
+      "event_tickets": "Event Tickets",
+      "visitor_fees": "Guest Fees",
+      "bar": "Bar Sales",
+      "snack_bar": "Snack Bar Sales"
+    },
+    "taxable": ["bar", "snack_bar"]
+  }
+}
