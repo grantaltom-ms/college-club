@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { ipadCode } from "../../src/club/engine/ipad-address";
 
@@ -123,6 +125,25 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         });
         expect(res.status, path).toBe(404);
         expect(res.headers.get("location"), path).toBeNull();
+      }
+    });
+
+    test("the roster import's server action, called with its real ID as the browser would, answers 'page not found' and does nothing", async () => {
+      // The import screen is the one place that uses a Next.js server action instead of a form handler, so it is called here with the ID the build gave it.
+      const manifest = JSON.parse(readFileSync(join(process.cwd(), ".next/server/server-reference-manifest.json"), "utf8")) as { node: Record<string, { exportedName?: string }> };
+      const ids = Object.entries(manifest.node)
+        .filter(([, action]) => action.exportedName === "importRoster")
+        .map(([id]) => id);
+      expect(ids, "the build has exactly one importRoster action").toHaveLength(1);
+      for (const extra of [{}, { Cookie: "ccs_test_actor=staff" }] as Record<string, string>[]) {
+        const res = await fetch(`${base}/club/admin/import`, {
+          method: "POST",
+          redirect: "manual",
+          headers: { "Next-Action": ids[0], "Content-Type": "text/plain;charset=UTF-8", ...extra },
+          body: "[]",
+        });
+        expect(res.status, JSON.stringify(extra)).toBe(404);
+        expect(await res.text(), JSON.stringify(extra)).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build/i);
       }
     });
 
