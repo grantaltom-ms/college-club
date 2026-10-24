@@ -49,7 +49,17 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         "/club/admin/ipad",
         "/club/admin/import",
         "/api/club/import/template",
+        "/club/admin/charges",
+        "/club/admin/visitors",
+        "/club/admin/billing",
+        "/club/admin/billing?month=2026-09",
+        "/api/club/billing/2026-09/qbo/1",
+        "/api/club/billing/2026-09/charges",
         `/club/ipad/${IPAD_CODE}`,
+        `/club/ipad/${IPAD_CODE}/visitors`,
+        `/club/ipad/${IPAD_CODE}/visitors?q=smith`,
+        `/club/ipad/${IPAD_CODE}/visitors/${FIRST_HOUSEHOLD}`,
+        `/club/ipad/${"A".repeat(43)}/visitors`,
         `/club/ipad/${IPAD_CODE}?notice=forbidden`,
         `/club/ipad/${IPAD_CODE}/${FIRST_HOUSEHOLD}`,
         `/club/ipad/${"A".repeat(43)}`,
@@ -64,7 +74,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales/i);
       }
     });
 
@@ -107,6 +117,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         ["/api/club/sign-in/confirm", { token: "A".repeat(43), identity: "staff:alex.staffer@example.org" }],
         ["/api/club/sign-out", {}],
         ["/api/club/ipad/check-in", { code: IPAD_CODE, member: FIRST_HOUSEHOLD, kind: "booking", id: FIRST_HOUSEHOLD }],
+        ["/api/club/ipad/visitors", { code: IPAD_CODE, member: FIRST_HOUSEHOLD, visitors: "2" }],
         ["/api/club/households/create", { name: "Test", type: "Resident", joined: "2026-10-22", firstName: "A", lastName: "B", email: "a@example.com" }],
         ["/api/club/households/add-member", { household: FIRST_HOUSEHOLD, firstName: "A", lastName: "B", email: "a@example.com" }],
         ["/api/club/households/remove-member", { household: FIRST_HOUSEHOLD, member: FIRST_HOUSEHOLD }],
@@ -128,22 +139,32 @@ for (const [name, base] of Object.entries(HIDDEN)) {
       }
     });
 
-    test("the roster import's server action, called with its real ID as the browser would, answers 'page not found' and does nothing", async () => {
-      // The import screen is the one place that uses a Next.js server action instead of a form handler, so it is called here with the ID the build gave it.
+    test("every staff screen button that is a Next.js server action, called with its real ID as the browser would, answers 'page not found' and does nothing", async () => {
+      // The staff screens use server actions instead of form handlers, so each is called here with the ID the build gave it. The list is
+      // checked against the build, so an action added later cannot be left out of this test without it failing.
+      const ACTIONS: Record<string, string> = {
+        importRoster: "/club/admin/import",
+        addCharge: "/club/admin/charges",
+        voidChargeAction: "/club/admin/charges",
+        addVisitors: "/club/admin/visitors",
+        voidVisitorsAction: "/club/admin/visitors",
+        closeMonth: "/club/admin/billing",
+        saveQuickbooksId: `/club/household/${FIRST_HOUSEHOLD}`,
+      };
       const manifest = JSON.parse(readFileSync(join(process.cwd(), ".next/server/server-reference-manifest.json"), "utf8")) as { node: Record<string, { exportedName?: string }> };
-      const ids = Object.entries(manifest.node)
-        .filter(([, action]) => action.exportedName === "importRoster")
-        .map(([id]) => id);
-      expect(ids, "the build has exactly one importRoster action").toHaveLength(1);
-      for (const extra of [{}, { Cookie: "ccs_test_actor=staff" }] as Record<string, string>[]) {
-        const res = await fetch(`${base}/club/admin/import`, {
-          method: "POST",
-          redirect: "manual",
-          headers: { "Next-Action": ids[0], "Content-Type": "text/plain;charset=UTF-8", ...extra },
-          body: "[]",
-        });
-        expect(res.status, JSON.stringify(extra)).toBe(404);
-        expect(await res.text(), JSON.stringify(extra)).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build/i);
+      const built = Object.entries(manifest.node).map(([id, action]) => ({ id, name: action.exportedName ?? "" }));
+      expect(built.map((a) => a.name).sort(), "the build has exactly these server actions, each once").toEqual(Object.keys(ACTIONS).sort());
+      for (const { id, name } of built) {
+        for (const extra of [{}, { Cookie: "ccs_test_actor=staff" }] as Record<string, string>[]) {
+          const res = await fetch(`${base}${ACTIONS[name]}`, {
+            method: "POST",
+            redirect: "manual",
+            headers: { "Next-Action": id, "Content-Type": "text/plain;charset=UTF-8", ...extra },
+            body: "[]",
+          });
+          expect(res.status, `${name} ${JSON.stringify(extra)}`).toBe(404);
+          expect(await res.text(), `${name} ${JSON.stringify(extra)}`).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build|Monthly billing|Recent charges|Add a charge|Record visitors|QuickBooks|added to|recorded for|is closed/i);
+        }
       }
     });
 
