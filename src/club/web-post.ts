@@ -92,6 +92,18 @@ export async function startIpadPost(request: NextRequest): Promise<{ response: N
 }
 
 /**
+ * What every staff-only download starts with: the member area must be on and the person must be club staff. Anyone else, and
+ * the live site, gets "not found": the same answer as for a file that does not exist.
+ */
+export async function startStaffGet(): Promise<{ response: NextResponse } | { ctx: Ctx; store: Awaited<ReturnType<typeof getClubStore>> }> {
+  const notFound = { response: new NextResponse(null, { status: 404 }) };
+  if (!clubEnabled()) return notFound;
+  const actor = await getCurrentActor();
+  if (actor?.kind !== "staff") return notFound;
+  return { ctx: { actor: toEngineActor(actor), now: clubNow() }, store: await getClubStore() };
+}
+
+/**
  * Whether a form post comes from this site's own pages. Browsers say where a post came from; a post from another site is
  * refused. (A post with no such information at all, such as a plain command-line request, is let through: it carries none of the
  * visitor's cookies either way unless they were sent on purpose.)

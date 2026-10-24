@@ -1,0 +1,36 @@
+import { notFound } from "next/navigation";
+import { clubNow } from "./clock";
+import { clubEnabled } from "./enabled";
+import { ClubError } from "./errors";
+import type { Ctx } from "./engine/households";
+import { getCurrentActor, toEngineActor } from "./identity";
+import { getClubStore } from "./store/instance";
+
+/** What a staff screen's button comes back with: nothing yet, it worked, or it was refused (in the engine's own words). */
+export type ActionResult = { kind: "idle" } | { kind: "ok"; message: string } | { kind: "error"; message: string };
+
+/**
+ * What every staff server action starts with, before it reads anything from the form: the member area must be on and the
+ * person must be club staff. Anyone else, and the live site, gets the same "page not found" as every other member-area page.
+ */
+export async function startStaffAction(): Promise<{ ctx: Ctx; store: Awaited<ReturnType<typeof getClubStore>> }> {
+  if (!clubEnabled()) notFound();
+  const actor = await getCurrentActor();
+  if (actor?.kind !== "staff") notFound();
+  return { ctx: { actor: toEngineActor(actor), now: clubNow() }, store: await getClubStore() };
+}
+
+/** A refusal turned into the screen's message. Anything that is not a refusal (the database is down) is passed on, not hidden. */
+export function refusal(e: unknown): ActionResult {
+  if (e instanceof ClubError) return { kind: "error", message: e.message };
+  throw e;
+}
+
+export const ok = (message: string): ActionResult => ({ kind: "ok", message });
+export const error = (message: string): ActionResult => ({ kind: "error", message });
+
+/** A text field from a form, trimmed and capped. Anything that is not text reads as empty. */
+export function textOf(form: FormData, name: string, max = 300): string {
+  const v = form.get(name);
+  return typeof v === "string" ? v.trim().slice(0, max) : "";
+}

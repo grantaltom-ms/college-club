@@ -2,6 +2,7 @@ import Link from "next/link";
 import { fullName, membersOf, qualificationsOf } from "@/club/engine/queries";
 import { memberFieldsProblem } from "@/club/engine/households";
 import { MEMBERSHIP_TYPES, type ClubState, type Household } from "@/club/types";
+import { QuickbooksForm } from "./households/QuickbooksForm";
 
 type Typed = { firstName: string; lastName: string; email: string; phone: string };
 
@@ -15,7 +16,14 @@ export function HouseholdDesk({ state, household, typed, problem }: { state: Clu
     return (
       <section aria-label="Staff tools" data-testid="desk">
         <h2>Staff tools</h2>
-        <p className="club-meta">This membership has ended, so nothing in it can be changed. A household that comes back is added as a new household.</p>
+        <p className="club-meta">This membership has ended, so nothing in it can be changed except its QuickBooks ID, which the last month&apos;s bill still needs. A household that comes back is added as a new household.</p>
+        <div className="club-tools">
+        <div className="club-card" id="quickbooks">
+          <h3>QuickBooks ID</h3>
+          <p className="club-meta">The ID this household has in QuickBooks. Monthly billing needs it, and it can only be changed here, with the change written in the household&apos;s file.</p>
+          <QuickbooksForm householdId={household.id} current={household.quickbooksId} />
+        </div>
+        </div>
       </section>
     );
   }
@@ -43,6 +51,12 @@ export function HouseholdDesk({ state, household, typed, problem }: { state: Clu
               </button>
             </p>
           </form>
+        </div>
+
+        <div className="club-card" id="quickbooks">
+          <h3>QuickBooks ID</h3>
+          <p className="club-meta">The ID this household has in QuickBooks. Monthly billing needs it, and it can only be changed here, with the change written in the household&apos;s file.</p>
+          <QuickbooksForm householdId={household.id} current={household.quickbooksId} />
         </div>
 
         <div className="club-card" id="add-adult">

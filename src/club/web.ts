@@ -131,5 +131,6 @@ export const NOTICES: Record<string, string> = {
   not_open: "Check-in is not open yet for that. The page shows when it opens.",
   already_recorded: "That is already checked in.",
   too_late: "The time for that has passed, so it counts as a no-show. Ask club staff to put it right.",
+  visitors: "Those visitors could not be signed in. Check the number, or ask club staff for help.",
   limit: "The limit cannot go below the number of people already going. Cancel some RSVPs first, or choose a bigger number.",
 };

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
 import { checkInPeople } from "@/club/engine/attendance";
-import { ipadMemberPath } from "@/club/engine/ipad-address";
+import { ipadMemberPath, ipadVisitorsPath } from "@/club/engine/ipad-address";
 import { requireClub } from "@/club/guard";
 import { ipadCodeIsGenuine } from "@/club/identity";
 import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
@@ -35,6 +35,9 @@ export default async function IpadStart({ params }: { params: Promise<{ code: st
           hrefs={Object.fromEntries(people.map((p) => [p.memberId, ipadMemberPath(code, p.memberId)]))}
         />
       )}
+      <a className="ipad-link" href={ipadVisitorsPath(code)} data-testid="ipad-visitors-link">
+        I&apos;m bringing visitors
+      </a>
     </section>
   );
 }

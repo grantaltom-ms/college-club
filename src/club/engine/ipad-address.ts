@@ -33,3 +33,9 @@ export const ipadPath = (code: string) => `/club/ipad/${code}`;
 
 /** One member's check-in screen on the iPad, relative to the site. */
 export const ipadMemberPath = (code: string, memberId: string) => `/club/ipad/${code}/${memberId}`;
+
+/** The visitors screen on the iPad: where a member finds their own name before signing visitors in. */
+export const ipadVisitorsPath = (code: string) => `/club/ipad/${code}/visitors`;
+
+/** One member's visitor sign-in on the iPad, relative to the site. */
+export const ipadVisitorsMemberPath = (code: string, memberId: string) => `/club/ipad/${code}/visitors/${memberId}`;

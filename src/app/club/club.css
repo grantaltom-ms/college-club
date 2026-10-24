@@ -642,3 +642,108 @@ details summary {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Step 9: signing visitors in on the iPad, and the staff billing screens. */
+.ipad-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  margin: 24px 0 8px;
+  padding: 12px 20px;
+  font-size: 1.4rem;
+  text-align: center;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--card);
+  border: 2px dashed var(--hairline);
+  border-radius: 8px;
+}
+
+.ipad-link:active,
+.ipad-link:focus-visible {
+  border-color: var(--ink);
+}
+
+.ipad-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 0;
+  border: 0;
+}
+
+.ipad-counts legend {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--slate);
+}
+
+.ipad-count {
+  position: relative;
+}
+
+.ipad-count input {
+  position: absolute;
+  opacity: 0;
+}
+
+.ipad-count span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  font-size: 1.8rem;
+  background: var(--card);
+  border: 2px solid var(--hairline);
+  border-radius: 8px;
+}
+
+.ipad-count input:checked + span {
+  color: var(--card);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.ipad-count input:focus-visible + span {
+  outline: 3px solid var(--slate);
+  outline-offset: 2px;
+}
+
+.club-void {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-left: 8px;
+}
+
+.club-void input[type="text"] {
+  width: 12rem;
+  max-width: 100%;
+}
+
+.club-void .club-button {
+  margin: 0;
+}
+
+.club-money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.club-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 4px 0 8px;
+  padding: 0;
+  border: 0;
+}
+
+.club-radios legend {
+  padding: 0;
+}
