@@ -42,8 +42,8 @@ test.describe("the staff office board", () => {
     await expect(page.getByTestId("out-of-service")).toContainText("Merganser");
     await expect(page.getByTestId("out-of-service")).toContainText("Rigger being repaired");
     // Tools and the rules in words, with the placeholder warning.
-    for (const name of ["Households", "Add a household", "Check someone in", "All bookings", "Equipment", "Add an event"]) {
-      await expect(page.getByTestId("tools").getByRole("link", { name })).toBeVisible();
+    for (const name of ["Households", "Add a household", "Import households", "Check someone in", "All bookings", "Equipment", "Add an event"]) {
+      await expect(page.getByTestId("tools").getByRole("link", { name, exact: true })).toBeVisible();
     }
     await expect(page.getByTestId("placeholder-note")).toBeVisible();
     await expect(page.getByTestId("attendance-rules")).toContainText("Check-in opens 30 minutes before the start.");
