@@ -507,7 +507,7 @@ test.describe("closing a month", () => {
       await expect(lines.nth(1)).toContainText("credit");
       await expect(lines.nth(2)).toContainText("Bar: 1 charge in September 2026");
       await expect(lines.nth(2)).toContainText("$31.00");
-      await expect(lines.nth(2)).toContainText("taxable");
+      await expect(lines.nth(2)).not.toContainText("taxable");
       await expect(invoice).toContainText("$165.50");
       await expect(invoiceFor(page, "The Bellweather household")).toContainText("Snack bar: 1 charge in September 2026");
     }
@@ -542,6 +542,7 @@ test.describe("closing a month", () => {
     await expect(page.getByTestId("credits-note")).toContainText("not in the QuickBooks files, because QuickBooks does not import negative amounts");
     await expect(page.getByTestId("qbo-steps")).toContainText("MM/DD/YYYY");
     await expect(page.getByTestId("qbo-steps")).toContainText("Membership Dues, Event Tickets, Guest Fees, Bar Sales, Snack Bar Sales");
+    await expect(page.getByTestId("billing-tax-note")).toContainText("These files charge no sales tax on any line.");
     await expect(invoiceFor(page, NEW).getByTestId("invoice-line")).toHaveCount(3);
     const closed = page.getByTestId("closed-month");
     await expect(closed).toHaveCount(1);
@@ -603,7 +604,7 @@ test.describe("closing a month", () => {
     const mineRows = text.split("\r\n").filter((r) => r.includes(NEW));
     expect(mineRows).toHaveLength(3);
     expect(mineRows.find((r) => r.includes("-20.00"))).toContain(`${ID}`);
-    expect(mineRows.find((r) => r.includes("Bar Sales"))).toMatch(/,31\.00,31\.00,Yes,No$/);
+    expect(mineRows.find((r) => r.includes("Bar Sales"))).toMatch(/,31\.00,31\.00,No,No$/);
     expect(mineRows.find((r) => r.includes("Membership Dues"))).toMatch(/,154\.50,154\.50,No,No$/);
     expect(mineRows.find((r) => r.includes("-20.00"))).toMatch(/,No,Yes$/);
 
