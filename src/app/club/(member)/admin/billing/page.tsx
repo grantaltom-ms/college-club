@@ -212,7 +212,13 @@ function ClosedMonth({ state, runMonth }: { state: Awaited<ReturnType<Awaited<Re
             .join(", ")}
           .
         </li>
-        <li>QuickBooks cannot take sales tax in an import, and cannot import invoices at all if sales tax is turned on in the account. The plain charges file has every line, with a Taxable column, for entering another way.</li>
+        {BILLING_RULES.defaults.taxable.length === 0 ? (
+          <li data-testid="billing-tax-note">
+            These files charge no sales tax on any line. QuickBooks refuses invoice imports if sales tax is turned on in the account, so if an import is refused, ask the bookkeeper. The plain charges file has every line, for entering another way.
+          </li>
+        ) : (
+          <li data-testid="billing-tax-note">QuickBooks cannot take sales tax in an import, and cannot import invoices at all if sales tax is turned on in the account. The plain charges file has every line, with a Taxable column, for entering another way.</li>
+        )}
       </ol>
 
       <h3>Invoices</h3>

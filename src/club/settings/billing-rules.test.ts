@@ -10,13 +10,13 @@ describe("the billing rules file", () => {
     expect(Object.keys(BILLING_RULES.defaults).sort()).toEqual(["duesCents", "invoiceDueDays", "items", "taxable", "visitorFeeCents", "visitorFreePerDay", "visitorsPerDayMax", "visitorsPerEntryMax"]);
   });
 
-  it("carries the public prices, the visitor rule Grant described, and the bar and snack bar as taxable", () => {
+  it("carries the public prices, the visitor rule Grant described, and taxes nothing", () => {
     const d = BILLING_RULES.defaults;
     expect(d.duesCents.Resident).toBe(15450);
     expect(d.duesCents.Intermediate).toBe(10300);
     expect(d.visitorFreePerDay).toBe(4);
     expect(d.visitorFeeCents).toBe(1000);
-    expect(d.taxable).toEqual(["bar", "snack_bar"]);
+    expect(d.taxable).toEqual([]);
     expect(Object.keys(d.items).sort()).toEqual(["bar", "dues", "event_tickets", "snack_bar", "visitor_fees"]);
   });
 

@@ -32,7 +32,9 @@ import { NOW, STORE_KINDS, fixtureFor, mark, memberCtx, staff, staffCtx, type Fi
 const SEP = "2026-09";
 const OCT = "2026-10";
 const RULES = BILLING_RULES;
-const at = (iso: string) => new Date(iso);
+/** The club's own rules tax nothing (Grant, Oct 25). These keep the tax mechanism itself under test. */
+const TAXED: BillingRules = { ...RULES, defaults: { ...RULES.defaults, taxable: ["bar", "snack_bar"] } };
+const at =(iso: string) => new Date(iso);
 const SEP_10 = at("2026-09-10T19:00:00Z");
 const SEP_12 = at("2026-09-12T19:00:00Z");
 const NOV_2 = at("2026-11-02T20:00:00Z");
@@ -326,10 +328,24 @@ describe.each(STORE_KINDS)("billing on the %s store", (kind) => {
       await sale(f, { householdId: f.h.Reed, amountCents: 700, day: "2026-09-30" }, day(30));
       const p = await plan(f);
       expect(linesOf(p, f, "Quill").filter((l) => l.kind !== "dues")).toEqual([
-        { kind: "bar", description: "Bar: 2 charges in September 2026", quantity: 1, unitCents: 2050, amountCents: 2050, taxable: true, adjustment: false },
-        { kind: "snack_bar", description: "Snack bar: 1 charge in September 2026", quantity: 1, unitCents: 400, amountCents: 400, taxable: true, adjustment: false },
+        { kind: "bar", description: "Bar: 2 charges in September 2026", quantity: 1, unitCents: 2050, amountCents: 2050, taxable: false, adjustment: false },
+        { kind: "snack_bar", description: "Snack bar: 1 charge in September 2026", quantity: 1, unitCents: 400, amountCents: 400, taxable: false, adjustment: false },
       ]);
       expect(linesOf(p, f, "Reed").filter((l) => l.kind === "bar").map((l) => l.description)).toEqual(["Bar: 1 charge in September 2026"]);
+    });
+
+    it("puts no sales tax on any line with the club's own rules, and marks the kinds a rule names when one is added", async () => {
+      const f = await fixture();
+      await linkBoth(f);
+      await sale(f, { amountCents: 850, day: "2026-09-04" });
+      await sale(f, { category: "snack_bar", amountCents: 400, day: "2026-09-04" });
+      await sale(f, { adjustment: true, category: "bar", amountCents: -500, description: "Refund one drink", day: "2026-09-11" });
+      const none = await plan(f);
+      expect(none.invoices.flatMap((i) => i.lines).filter((l) => l.taxable)).toEqual([]);
+      expect(RULES.defaults.taxable).toEqual([]);
+      const taxed = await plan(f, SEP, NOW, TAXED);
+      expect(linesOf(taxed, f, "Quill").filter((l) => l.taxable).map((l) => `${l.kind}${l.adjustment ? " (adjustment)" : ""}`)).toEqual(["bar", "bar (adjustment)", "snack_bar"]);
+      expect(taxed.totalCents).toBe(none.totalCents);
     });
 
     it("bills a sale in the month of the day it happened, so the 30th and the 1st land in different months", async () => {
@@ -355,7 +371,8 @@ describe.each(STORE_KINDS)("billing on the %s store", (kind) => {
         ["event_tickets", "Adjustment: Missed ticket for the Regatta", 4500],
         ["bar", "Adjustment: Refund one drink", -500],
       ]);
-      expect(extras.find((l) => l.kind === "bar")).toMatchObject({ taxable: true });
+      expect(extras.find((l) => l.kind === "bar")).toMatchObject({ taxable: false });
+      expect(linesOf(await plan(f, SEP, NOW, TAXED), f, "Quill").find((l) => l.kind === "bar" && l.adjustment)).toMatchObject({ taxable: true });
       expect(p.creditCents).toBe(-2500);
       expect(p.creditLines).toBe(2);
       expect(invoiceOf(p, f, "Quill")!.totalCents).toBe(15450 - 2000 + 4500 - 500);
@@ -532,8 +549,8 @@ describe.each(STORE_KINDS)("billing on the %s store", (kind) => {
       await sale(f, { day: "2026-09-10", description: "Drinks" });
       await sale(f, { day: "2026-09-12", category: "snack_bar", amountCents: 450 });
       await sale(f, { day: "2026-09-14", category: "dues", adjustment: true, amountCents: -2000, description: "Credit" });
-      const preview = await plan(f);
-      await runBilling(f.store, staffCtx(), RULES, SEP, { fingerprint: preview.fingerprint });
+      const preview = await plan(f, SEP, NOW, TAXED);
+      await runBilling(f.store, staffCtx(), TAXED, SEP, { fingerprint: preview.fingerprint });
       const saved = (await f.store.read()).billingLines;
       const shape = (l: { invoiceNo: string; kind: string; description: string; quantity: number; unitCents: number; amountCents: number; taxable: boolean; adjustment: boolean }) => ({ invoiceNo: l.invoiceNo, kind: l.kind, description: l.description, quantity: l.quantity, unitCents: l.unitCents, amountCents: l.amountCents, taxable: l.taxable, adjustment: l.adjustment });
       expect(saved.map(shape)).toEqual(preview.invoices.flatMap((i) => i.lines.map((l) => shape({ ...l, invoiceNo: i.invoiceNo }))));
@@ -612,11 +629,10 @@ describe.each(STORE_KINDS)("billing on the %s store", (kind) => {
       await linkBoth(f);
       await sale(f, { day: "2026-09-10" });
       const preview = await plan(f);
-      const untaxed: BillingRules = { ...RULES, defaults: { ...RULES.defaults, taxable: [] } };
-      const other = await plan(f, SEP, NOW, untaxed);
+      const other = await plan(f, SEP, NOW, TAXED);
       expect(other.totalCents).toBe(preview.totalCents);
       expect(other.fingerprint).not.toBe(preview.fingerprint);
-      const stale = await rejection(runBilling(f.store, staffCtx(), untaxed, SEP, { fingerprint: preview.fingerprint }));
+      const stale = await rejection(runBilling(f.store, staffCtx(), TAXED, SEP, { fingerprint: preview.fingerprint }));
       expect(stale.code).toBe("conflict");
       expect((await f.store.read()).billingRuns).toEqual([]);
     });
