@@ -54,8 +54,11 @@ test("the work-from-the-club card leads with the count and keeps its method one 
     await expect(how).toBeHidden();
   }
   for (let i = 0; i < 4; i++) {
-    await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Timing" }).click();
-    await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Visits" }).click();
+    const nav = page.getByRole("navigation", { name: "Dashboard sections" });
+    await nav.getByRole("button", { name: "Usage" }).click();
+    await nav.getByRole("menuitem", { name: "Timing" }).click();
+    await nav.getByRole("button", { name: "Usage" }).click();
+    await nav.getByRole("menuitem", { name: "Visits" }).click();
     await expect(page.getByTestId("multi-share")).toHaveText(first);
   }
 });
