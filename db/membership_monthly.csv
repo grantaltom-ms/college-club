@@ -9,7 +9,7 @@ year,month,previous_total,resignations,applicants_for_approval,transferred,with_
 2026,2,503,6,6,0,503,,
 2026,3,503,6,6,0,503,33,
 2026,4,499,4,6,0,501,29,
-2026,5,501,3,5,,502,20,Total transferred cell blank in source; category transfers: 2 Resident, 2 Non-Res. Not counted in the total.
+2026,5,501,3,5,,502,20,"Total transferred cell blank in source; category transfers: 2 Resident, 2 Non-Res. Not counted in the total."
 2026,6,502,4,5,0,502,23,
 2026,7,502,2,4,0,504,23,
 2026,8,504,3,4,0,505,37,
