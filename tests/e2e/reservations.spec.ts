@@ -31,7 +31,10 @@ test("the reservations page shows the headline, the type table and every breakdo
   await expect(group(page, "Reservation types")).toHaveCount(0);
   await expect(group(page, "Reservations by type, by day of the week")).toBeVisible();
   await expect(group(page, "Reservations by type, by start hour")).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Reservations" })).toHaveAttribute("aria-current", "page");
+  const nav = page.getByRole("navigation", { name: "Dashboard sections" });
+  await expect(nav.getByRole("button", { name: "Usage" })).toHaveAttribute("aria-current", "page");
+  await nav.getByRole("button", { name: "Usage" }).click();
+  await expect(nav.getByRole("menuitem", { name: "Reservations" })).toHaveAttribute("aria-current", "page");
 });
 
 test("choosing types changes the headline and the table, and All brings everything back, again and again", async ({ page }) => {
