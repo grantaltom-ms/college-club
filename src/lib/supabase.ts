@@ -9,6 +9,8 @@ import {
   type DoorMonth,
   type DoorPeriod,
   type Member,
+  type MembershipData,
+  type MembershipMonth,
   type Measure,
 } from "./types";
 
@@ -195,6 +197,40 @@ export async function loadLiveData(cfg: { url: string; key: string }): Promise<D
       months: monthRows.map(toDoorMonth),
     },
   };
+}
+
+/* ---------- Membership counts ---------- */
+
+export interface MembershipRow {
+  year: number;
+  month: number;
+  previous_total: number | null;
+  resignations: number | null;
+  applicants_for_approval: number | null;
+  transferred: number | null;
+  with_months_approvals: number | null;
+  waitlist: number | null;
+  note: string | null;
+}
+
+/** A membership_monthly row as the browser sees it: counts only, no names. */
+export function toMembershipMonth(r: MembershipRow): MembershipMonth {
+  return {
+    year: r.year,
+    month: r.month,
+    previousTotal: r.previous_total ?? 0,
+    resignations: r.resignations ?? 0,
+    applicants: r.applicants_for_approval ?? 0,
+    transferred: r.transferred,
+    withApprovals: r.with_months_approvals ?? 0,
+    waitlist: r.waitlist,
+    note: r.note,
+  };
+}
+
+export async function loadMembership(cfg: { url: string; key: string }): Promise<MembershipData> {
+  const rows = await fetchAll<MembershipRow>(cfg, "membership_monthly", "year.asc,month.asc");
+  return { source: "live", months: rows.map(toMembershipMonth) };
 }
 
 /* ---------- Shell outings ---------- */

@@ -2,7 +2,7 @@
 
 A web page for College Club Seattle that shows how members use the club: how often they visit, which days and hours are busy, boat and shell use, reservations by type, email results, and a shared goals list. It shows counts only, never member names.
 
-It reads these tables in the CCS Supabase project: `members`, `qb_members`, `club_totals` and (later) `door_visits` / `reservations`.
+It reads these tables in the CCS Supabase project: `members`, `qb_members`, `club_totals`, `membership_monthly` and (later) `door_visits` / `reservations`.
 
 **The roster is the QuickBooks member list** (`qb_members`, one row per QuickBooks record, which is one household). Each row says which `members` usage record its visits come from; members with a door fob but no reservation record use door entries as visit days, and members with no record count as no visits. New members who joined this year with no visit yet are shown as "Not started yet" and left out of the "rarely visit" counts. First time: run `db/qb_members.sql` in the Supabase SQL editor, then load the rows (the file has the steps). The member list holds names, so it is never committed. Until `qb_members` has rows, the dashboard shows an error rather than quietly falling back to the iCrew list.
 
@@ -32,6 +32,18 @@ These two tabs read their own tables, filled from iCrew exports. Neither table h
 First time: run `db/shell_outings.sql` and `db/reservation_counts.sql` in the Supabase SQL editor. To load or refresh a tab: run its prepare command, `truncate` the table, then import the output CSV with the Supabase Table Editor. Until a table is loaded, its tab shows a plain "could not be loaded" message and the rest of the site is unaffected.
 
 The prepare step runs on your own computer: shell rower names are swapped for scrambled codes (used only on the server to count different people), and reservations are reduced to counts per day, start hour and type.
+
+## Loading the Membership tab
+
+The Membership tab reads its own table, filled from the Membership Committee's "Membership Count" workbooks in the Board Shared File (OneDrive). The table holds counts only — one row per month, Total Dues Paying row — never member names.
+
+| Tab | Table | Source | Load it with |
+|---|---|---|---|
+| Membership | `membership_monthly` | Membership Count 2025-26 and 2026-27 workbooks | `db/membership_monthly.csv` |
+
+First time: run `db/membership_monthly.sql` in the Supabase SQL editor. To load or refresh: `truncate` the table, then import `db/membership_monthly.csv` with the Supabase Table Editor (an empty transferred or waitlist cell loads as null). Until the table is loaded, the Membership tab shows a plain "could not be loaded" message, the home page shows the same in its Membership card, and the rest of the site is unaffected.
+
+The figures are copied exactly as shown in the workbooks, even where a sheet does not add up. The Membership page lists those flags (for example, May and June 2025-26 and Oct 2026-27) instead of correcting them. To fix a figure, fix the workbook and reload the table.
 
 ## The Goals page
 

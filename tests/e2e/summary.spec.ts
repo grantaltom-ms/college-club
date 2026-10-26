@@ -6,12 +6,12 @@ const shells = sampleShells();
 const ytd = yearToDate(shells.outings, shells.through);
 const shellChange = changePct(ytd[ytd.length - 1].outings, ytd[ytd.length - 2].outings)!;
 
-test("the summary leads with one sentence and six headline cards, each linking to its page", async ({ page }) => {
+test("the summary leads with one sentence and seven headline cards, each linking to its page", async ({ page }) => {
   await mockAll(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "How the club is doing." })).toBeVisible();
   await expect(page.getByTestId("story")).toContainText(`club shell outings are down ${Math.abs(shellChange)}%`);
-  await expect(page.locator(".stat-card")).toHaveCount(6);
+  await expect(page.locator(".stat-card")).toHaveCount(7);
   await expect(page.getByTestId("card-quiet").locator(".stat-value")).toHaveText("133");
   await expect(page.getByTestId("card-quiet")).toContainText("of 497 members came in less than once a month this year (27%).");
   await expect(page.getByTestId("card-quiet-note")).toHaveText("11 new members haven't started yet (off the waitlist).");
@@ -22,6 +22,9 @@ test("the summary leads with one sentence and six headline cards, each linking t
   await expect(page.getByTestId("card-shells").locator(".stat-value")).toHaveText(`−${Math.abs(shellChange)}%`);
   await expect(page.getByTestId("card-door").locator(".stat-value")).toHaveText(/^[+−]\d+%$/);
   await expect(page.getByTestId("card-email")).toContainText("The list jumped from");
+  await expect(page.getByTestId("card-membership").locator(".stat-value")).toHaveText("403");
+  await expect(page.getByTestId("card-membership")).toContainText("3 left and 3 applied in Mar 2024.");
+  await expect(page.getByTestId("card-membership-note")).toHaveCount(0);
   await expect(page.locator(".stat-target").first()).toHaveText("Board target: not set yet");
   await expect(page.getByTestId("data-dates")).toContainText("Data through: member visits Sep 27, 2026");
   await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Summary" })).toHaveAttribute("aria-current", "page");
@@ -36,13 +39,14 @@ test("each card opens its page, and back again, repeatedly", async ({ page }) =>
     ["card-door", /\/timing$/],
     ["card-bookings", /\/reservations$/],
     ["card-email", /\/email$/],
+    ["card-membership", /\/membership$/],
   ];
   for (let round = 0; round < 2; round++) {
     for (const [id, url] of cards) {
       await page.getByTestId(id).getByRole("link").click();
       await expect(page).toHaveURL(url);
       await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Summary" }).click();
-      await expect(page.locator(".stat-card")).toHaveCount(6);
+      await expect(page.locator(".stat-card")).toHaveCount(7);
     }
   }
 });
@@ -61,7 +65,7 @@ test("the cards stack on a phone without sideways scrolling", async ({ page }) =
   await mockAll(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.locator(".stat-card")).toHaveCount(6);
+  await expect(page.locator(".stat-card")).toHaveCount(7);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(390);
 });

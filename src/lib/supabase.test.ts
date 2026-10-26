@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isHouseholdName, loadLiveData, toCell, toDoorMonth, toMember, toPeriod, toTotal } from "./supabase";
+import { isHouseholdName, loadLiveData, toCell, toDoorMonth, toMember, toMembershipMonth, toPeriod, toTotal } from "./supabase";
 
 describe("database rows to dashboard data", () => {
   it("maps a members row, turning blanks into zeros and keeping dates", () => {
@@ -162,5 +162,33 @@ describe("loading the live roster", () => {
   it("fails rather than quietly showing the iCrew list when the QuickBooks list is empty", async () => {
     serve({ members: [usageRow("Ann Lee")], qb_members: [] });
     await expect(loadLiveData(cfg)).rejects.toThrow(/qb_members is empty/);
+  });
+});
+
+describe("membership_monthly rows", () => {
+  it("maps a row, keeping blank transferred and waitlist cells as null", () => {
+    expect(
+      toMembershipMonth({
+        year: 2026,
+        month: 5,
+        previous_total: 501,
+        resignations: 3,
+        applicants_for_approval: 5,
+        transferred: null,
+        with_months_approvals: 502,
+        waitlist: 20,
+        note: "Total transferred cell blank in source.",
+      }),
+    ).toEqual({
+      year: 2026,
+      month: 5,
+      previousTotal: 501,
+      resignations: 3,
+      applicants: 5,
+      transferred: null,
+      withApprovals: 502,
+      waitlist: 20,
+      note: "Total transferred cell blank in source.",
+    });
   });
 });
