@@ -57,7 +57,7 @@ Answers Grant gave to the Phase 1 plan (Oct 22, 2026):
 
 The repo also holds the CCS member usage dashboard. The board uses it. Its pages are open to anyone with the link (no login, marked noindex), and member names are stripped on the server before anything reaches the browser. It reads the **live** Supabase project `hgjcnuwxhemynnvsnmou`, which holds real member data (`members`, `qb_members`, `club_totals`, `shell_outings`, `reservation_counts`, `roadmap`).
 
-- Don't change any dashboard page or URL: `/`, `/visits`, `/timing`, `/shells`, `/reservations`, `/email`, `/goals`. Board members have these links.
+- Don't change any dashboard page or URL: `/`, `/visits`, `/timing`, `/shells`, `/reservations`, `/email`, `/goals`, and `/financials` and `/membership` (added to the dashboard by Grant's own pull request 31 on Oct 27; they live in `src/app/(dashboard)/` like the rest, and the navigation bar in `src/components/Nav.tsx` is the dashboard's). Board members have these links.
 - Don't change or reuse its tables. `reservation_counts` is dashboard data, not bookings.
 - The dashboard tests must keep passing untouched.
 - Never connect reservation-system work to the live Supabase project.
