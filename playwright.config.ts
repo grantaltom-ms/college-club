@@ -51,6 +51,8 @@ export default defineConfig({
         CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001",
         // Test-only; invented staff who can sign in by email link on this server.
         CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer; sam.deskwell@example.org=Sam Deskwell",
+        // Test-only; the board's shared password for the Financials page.
+        DASHBOARD_FINANCIALS_PASSWORD: "playwright-only-financials-0001",
       },
     },
     {

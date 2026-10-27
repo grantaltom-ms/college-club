@@ -1385,3 +1385,33 @@ main.frame {
   background: var(--oyster-50);
   border-top: 2px solid var(--oyster);
 }
+
+/* The Financials password box. */
+.finance-lock {
+  display: grid;
+  gap: 10px;
+  max-width: 420px;
+}
+
+.finance-lock label {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.finance-lock .search {
+  max-width: none;
+  width: 100%;
+}
+
+.finance-lock .link-button {
+  justify-self: start;
+}
+
+.finance-lock-note {
+  font-size: 15px;
+  color: var(--slate);
+}
+
+.finance-lock-out {
+  margin-top: 32px;
+}
