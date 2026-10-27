@@ -197,6 +197,8 @@ test.describe("checking and ending", () => {
     await check(page, csv(`QB-${t}-1,${nameOf(t, 1, ["Una"])},`));
     await page.getByTestId("resign-end").click();
     await expect(page.getByTestId("resign-done")).toContainText("Ended 1 membership and blocked 1 adult.");
+    // Nothing was booked for them, and the page says so instead of listing zeros.
+    await expect(page.getByTestId("resign-done")).toContainText("Nothing was booked, signed up for or RSVPed to from now on, so nothing was cancelled.");
 
     await page.goto("/club/admin/resignations");
     await check(page, csv(`QB-${t}-1,${nameOf(t, 1, ["Una"])},`));
