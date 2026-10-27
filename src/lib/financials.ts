@@ -71,6 +71,73 @@ export function periodTotals(months: FinanceMonth[]): PeriodTotals | null {
   };
 }
 
+/** Every P&L line summed across a set of months, plus both year-to-date figures and their gaps, for a club-year subtotal row. */
+export interface SubtotalSums {
+  months: number;
+  sumIncome: number;
+  sumCogs: number;
+  sumGrossProfit: number;
+  sumExpenses: number;
+  sumNetOperatingIncome: number;
+  sumOtherIncome: number;
+  sumOtherExpenses: number;
+  sumNetOtherIncome: number;
+  sumNet: number;
+  sumDepreciation: number;
+  labeledYtdIncome: number;
+  labeledYtdNetIncome: number;
+  gapIncome: number;
+  gapNet: number;
+}
+
+/**
+ * Sums for a club-year subtotal row. Income, net, labeled figures, and gaps
+ * come from periodTotals so that helper's exact shape stays unchanged;
+ * the other lines are summed the same way.
+ */
+export function subtotalSums(months: FinanceMonth[]): SubtotalSums | null {
+  const totals = periodTotals(months);
+  if (!totals) return null;
+  const sorted = sortMonths(months);
+  const sum = (pick: (m: FinanceMonth) => number) => roundCents(sorted.reduce((total, m) => total + pick(m), 0));
+  return {
+    months: totals.months,
+    sumIncome: totals.sumIncome,
+    sumCogs: sum((m) => m.cogs),
+    sumGrossProfit: sum((m) => m.grossProfit),
+    sumExpenses: sum((m) => m.expenses),
+    sumNetOperatingIncome: sum((m) => m.netOperatingIncome),
+    sumOtherIncome: sum((m) => m.otherIncome),
+    sumOtherExpenses: sum((m) => m.otherExpenses),
+    sumNetOtherIncome: sum((m) => m.netOtherIncome),
+    sumNet: totals.sumNet,
+    sumDepreciation: sum((m) => m.depreciation),
+    labeledYtdIncome: totals.labeledYtdIncome,
+    labeledYtdNetIncome: totals.labeledYtdNetIncome,
+    gapIncome: totals.gapIncome,
+    gapNet: totals.gapNet,
+  };
+}
+
+/** Months that lost money, oldest first. */
+export function lossMonths(months: FinanceMonth[]): FinanceMonth[] {
+  return sortMonths(months).filter((m) => m.netIncome < 0);
+}
+
+/** The label of the most recent club year with a full 12 months, or null when there is none. */
+export function lastFullClubYear(months: FinanceMonth[]): string | null {
+  const groups = new Map<string, FinanceMonth[]>();
+  for (const m of sortMonths(months)) {
+    const label = clubYear(m);
+    groups.set(label, [...(groups.get(label) ?? []), m]);
+  }
+  let found: string | null = null;
+  for (const [label, rows] of groups) {
+    if (rows.length === 12) found = label;
+  }
+  return found;
+}
+
 /**
  * Where a club year's monthly sheets do not add up to its labeled
  * year-to-date figures, in plain words. The figures are reported exactly
@@ -139,9 +206,9 @@ export function metricValue(m: FinanceMonth, metric: FinanceMetric): number {
 }
 
 /**
- * Cumulative sum of a metric from the start of its club year to each month,
- * for the fiscal-YTD view. Net income's cumulative sum is deliberately not
- * the labeled year-to-date: where the two differ, the flags section says so.
+ * Cumulative sum of a metric from the start of its club year to each month.
+ * Net income's cumulative sum is deliberately not the labeled year-to-date:
+ * where the two differ, the club-year subtotal rows show both.
  */
 export function cumulativeByClubYear(months: FinanceMonth[], metric: FinanceMetric): Map<string, number> {
   const out = new Map<string, number>();
@@ -242,7 +309,7 @@ export function answerAsk(question: AskQuestionId, months: FinanceMonth[], opts:
     const gapText =
       Math.abs(totals.gapIncome) < 0.01 && Math.abs(totals.gapNet) < 0.01
         ? "The monthly sheets and the labeled year-to-date figures agree."
-        : `The labeled year-to-date figures differ from the sum of the months by ${fmtMoney(totals.gapIncome)} income and ${fmtMoney(totals.gapNet)} net — see the flags section; neither figure has been corrected.`;
+        : `The labeled year-to-date figures differ from the sum of the months by ${fmtMoney(totals.gapIncome)} income and ${fmtMoney(totals.gapNet)} net — see the club-year subtotal row in the table above; neither figure has been corrected.`;
     return {
       text: `${opts.clubYear} (${totals.months} months): the monthly sheets add up to ${fmtMoney(totals.sumIncome)} income and ${fmtMoney(totals.sumNet)} net. The labeled fiscal year-to-date figures are ${fmtMoney(totals.labeledYtdIncome)} income and ${fmtMoney(totals.labeledYtdNetIncome)} net. ${gapText}`,
       highlightKeys: rows.map(monthKey),
