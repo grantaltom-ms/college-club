@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { clubNow } from "@/club/clock";
 import { checkInNeeded, rowFor, selfCheckInPhase } from "@/club/engine/attendance";
 import { fullName, memberById } from "@/club/engine/queries";
@@ -143,6 +144,13 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
             <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} />
           ))}
         </ul>
+      )}
+      {!staff && (
+        <p className="club-meta">
+          <Link href="/club/my-history" data-testid="old-bookings-link">
+            Older outings from the club&apos;s previous reservation system
+          </Link>
+        </p>
       )}
     </section>
   );

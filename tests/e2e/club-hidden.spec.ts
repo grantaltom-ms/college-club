@@ -49,6 +49,11 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         "/club/admin/ipad",
         "/club/admin/import",
         "/api/club/import/template",
+        "/club/admin/history",
+        "/club/admin/history?name=pat+example",
+        "/api/club/history/template",
+        "/club/my-history",
+        "/club/my-history?page=2",
         "/club/admin/charges",
         "/club/admin/visitors",
         "/club/admin/billing",
@@ -74,7 +79,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report/i);
       }
     });
 
@@ -144,6 +149,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
       // checked against the build, so an action added later cannot be left out of this test without it failing.
       const ACTIONS: Record<string, string> = {
         importRoster: "/club/admin/import",
+        importHistory: "/club/admin/history",
         addCharge: "/club/admin/charges",
         voidChargeAction: "/club/admin/charges",
         addVisitors: "/club/admin/visitors",
@@ -163,7 +169,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
             body: "[]",
           });
           expect(res.status, `${name} ${JSON.stringify(extra)}`).toBe(404);
-          expect(await res.text(), `${name} ${JSON.stringify(extra)}`).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build|Monthly billing|Recent charges|Add a charge|Record visitors|QuickBooks|added to|recorded for|is closed/i);
+          expect(await res.text(), `${name} ${JSON.stringify(extra)}`).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build|Monthly billing|Recent charges|Add a charge|Record visitors|QuickBooks|added to|recorded for|is closed|old booking|iCrew/i);
         }
       }
     });

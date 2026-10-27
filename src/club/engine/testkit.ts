@@ -5,6 +5,8 @@ import { CLASS_RULES } from "../settings/class-rules";
 import { EVENT_RULES } from "../settings/event-rules";
 import { RULE_BOOK, parseRuleBook } from "../settings/rulebook";
 import raw from "../settings/booking-rules.json";
+import { MemoryHistoryStore, type HistoryStore } from "../store/history";
+import { PgHistoryStore } from "../store/history-postgres";
 import { MemoryClubStore, sequentialIds, type ClubStore, type Settler } from "../store/memory";
 import { PgClubStore, createClubPool } from "../store/postgres";
 import { addDays, pacificWall } from "../time";
@@ -74,6 +76,29 @@ export async function makeStore(kind: StoreKind, book: RuleBook = RULE_BOOK, new
     await db.drop();
   });
   return store;
+}
+
+/** A new, empty archive of old bookings of the given kind. A Postgres one gets its own throwaway database, removed after the test. */
+export const historyUrls = new WeakMap<HistoryStore, string>();
+
+export async function makeHistoryStore(kind: StoreKind): Promise<HistoryStore> {
+  if (kind === "memory") return new MemoryHistoryStore();
+  const db = await cloneScratchDb(POSTGRES_URL!);
+  const pool = createClubPool(db.url, 8);
+  const store = new PgHistoryStore(pool);
+  historyUrls.set(store, db.url);
+  cleanups.push(async () => {
+    await pool.end();
+    await db.drop();
+  });
+  return store;
+}
+
+/** A second app server's view of a Postgres archive: its own connections, the same data. */
+export function openAnotherHistory(url: string): PgHistoryStore {
+  const pool = createClubPool(url, 8);
+  cleanups.push(() => pool.end());
+  return new PgHistoryStore(pool);
 }
 
 export interface Fixture {
