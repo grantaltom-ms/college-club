@@ -23,14 +23,14 @@ test.describe("what the public site shows", () => {
     const nav = page.getByRole("navigation", { name: "Dashboard sections" });
     await expect(nav.getByRole("link", { name: "Members", exact: true })).toHaveCount(0);
     // Visits, Timing and Reservations live under the Usage menu, not as top-level links.
-    await expect(nav.getByRole("link")).toHaveText(["Summary", "Shells", "Email", "Membership", "Goals"]);
+    await expect(nav.getByRole("link")).toHaveText(["Summary", "Shells", "Email", "Membership", "Financials", "Goals"]);
     await expect(nav.getByRole("button", { name: "Usage" })).toBeVisible();
     await nav.getByRole("button", { name: "Usage" }).click();
     await expect(nav.getByRole("menu", { name: "Usage" }).getByRole("menuitem")).toHaveText(["Visits", "Timing", "Reservations"]);
   });
 
   test("every page opens without a password", async ({ page }) => {
-    for (const path of ["/", "/visits", "/timing", "/shells", "/reservations", "/email", "/membership", "/goals"]) {
+    for (const path of ["/", "/visits", "/timing", "/shells", "/reservations", "/email", "/membership", "/financials", "/goals"]) {
       const res = await page.goto(path);
       expect(res?.status(), path).toBe(200);
       await expect(page.getByLabel("Password")).toHaveCount(0);

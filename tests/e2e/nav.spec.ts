@@ -9,7 +9,7 @@ const usageMenu = (page: Page) => nav(page).getByRole("menu", { name: "Usage" })
 test.describe("the Usage nav menu", () => {
   test("shows one Usage menu instead of three top-level links, in order", async ({ page }) => {
     await page.goto("/");
-    await expect(nav(page).getByRole("link")).toHaveText(["Summary", "Shells", "Email", "Membership", "Goals"]);
+    await expect(nav(page).getByRole("link")).toHaveText(["Summary", "Shells", "Email", "Membership", "Financials", "Goals"]);
     const button = usageButton(page);
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute("aria-haspopup", "menu");
@@ -49,7 +49,10 @@ test.describe("the Usage nav menu", () => {
 
     await usageButton(page).click();
     await expect(usageMenu(page)).toBeVisible();
-    await page.getByRole("heading", { level: 1 }).click();
+    // Click the heading near its left edge, not its centre: the wider nav
+    // (with the Financials link) puts the open Usage menu over the centre
+    // of the heading, so a centre click would hit the menu itself.
+    await page.getByRole("heading", { level: 1 }).click({ position: { x: 10, y: 10 } });
     await expect(usageMenu(page)).toHaveCount(0);
   });
 
