@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isHouseholdName, loadLiveData, toCell, toDoorMonth, toMember, toPeriod, toTotal } from "./supabase";
+import { isHouseholdName, loadLiveData, toCell, toDoorMonth, toFinanceMonth, toMember, toMembershipMonth, toPeriod, toTotal } from "./supabase";
 
 describe("database rows to dashboard data", () => {
   it("maps a members row, turning blanks into zeros and keeping dates", () => {
@@ -162,5 +162,75 @@ describe("loading the live roster", () => {
   it("fails rather than quietly showing the iCrew list when the QuickBooks list is empty", async () => {
     serve({ members: [usageRow("Ann Lee")], qb_members: [] });
     await expect(loadLiveData(cfg)).rejects.toThrow(/qb_members is empty/);
+  });
+});
+
+describe("finance_monthly rows", () => {
+  it("maps a row, keeping blanks as zeros and the source file and note", () => {
+    expect(
+      toFinanceMonth({
+        year: 2024,
+        month: 1,
+        income: 50000,
+        cogs: 2000,
+        gross_profit: 48000,
+        expenses: 40000,
+        net_operating_income: 8000,
+        other_income: 100,
+        other_expenses: 2000,
+        net_other_income: -1900,
+        net_income: 6100,
+        depreciation: 3000,
+        labeled_ytd_income: 50000,
+        labeled_ytd_net_income: 6100,
+        source_file: "Sample Board Reporting Package.xlsx",
+        note: "Sample note.",
+      }),
+    ).toEqual({
+      year: 2024,
+      month: 1,
+      income: 50000,
+      cogs: 2000,
+      grossProfit: 48000,
+      expenses: 40000,
+      netOperatingIncome: 8000,
+      otherIncome: 100,
+      otherExpenses: 2000,
+      netOtherIncome: -1900,
+      netIncome: 6100,
+      depreciation: 3000,
+      labeledYtdIncome: 50000,
+      labeledYtdNetIncome: 6100,
+      sourceFile: "Sample Board Reporting Package.xlsx",
+      note: "Sample note.",
+    });
+  });
+});
+
+describe("membership_monthly rows", () => {
+  it("maps a row, keeping blank transferred and waitlist cells as null", () => {
+    expect(
+      toMembershipMonth({
+        year: 2026,
+        month: 5,
+        previous_total: 501,
+        resignations: 3,
+        applicants_for_approval: 5,
+        transferred: null,
+        with_months_approvals: 502,
+        waitlist: 20,
+        note: "Total transferred cell blank in source.",
+      }),
+    ).toEqual({
+      year: 2026,
+      month: 5,
+      previousTotal: 501,
+      resignations: 3,
+      applicants: 5,
+      transferred: null,
+      withApprovals: 502,
+      waitlist: 20,
+      note: "Total transferred cell blank in source.",
+    });
   });
 });

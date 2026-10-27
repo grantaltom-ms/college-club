@@ -84,6 +84,73 @@ export interface ClubTotal {
   memberEntries: number | null;
 }
 
+/**
+ * One month of membership counts, from the Membership Committee's
+ * "Membership Count" workbooks (Total Dues Paying row). Counts only:
+ * no member names are ever stored in this table.
+ */
+export interface MembershipMonth {
+  year: number;
+  /** 1 to 12. */
+  month: number;
+  previousTotal: number;
+  resignations: number;
+  applicants: number;
+  /** Null when the workbook's transferred total cell was blank. */
+  transferred: number | null;
+  /** The workbook's own total after that month's approvals. */
+  withApprovals: number;
+  /** Null when the workbook sheet shows no waitlist count. */
+  waitlist: number | null;
+  note: string | null;
+}
+
+export interface MembershipData {
+  /** "live" comes from Supabase; "sample" is made-up data for development and tests. */
+  source: "live" | "sample";
+  months: MembershipMonth[];
+}
+
+/**
+ * One month of profit-and-loss figures, from the Finance Committee's
+ * "CCS Board Reporting Package" workbooks. Organizational aggregates only:
+ * no member names are ever stored in this table.
+ */
+export interface FinanceMonth {
+  year: number;
+  /** 1 to 12. */
+  month: number;
+  /** Total Income for the month, as shown on the package's month P&L sheet. */
+  income: number;
+  /** Total Cost of Goods Sold. */
+  cogs: number;
+  grossProfit: number;
+  /** Total Expenses. */
+  expenses: number;
+  netOperatingIncome: number;
+  /** Total Other Income. */
+  otherIncome: number;
+  /** Total Other Expenses. */
+  otherExpenses: number;
+  netOtherIncome: number;
+  netIncome: number;
+  /** Total Depreciation Expense. */
+  depreciation: number;
+  /** The package's own fiscal year-to-date income through this month. */
+  labeledYtdIncome: number;
+  /** The package's own fiscal year-to-date net income through this month. */
+  labeledYtdNetIncome: number;
+  /** The Board Reporting Package filename this row came from. */
+  sourceFile: string;
+  note: string | null;
+}
+
+export interface FinanceData {
+  /** "live" comes from Supabase; "sample" is made-up data for development and tests. */
+  source: "live" | "sample";
+  months: FinanceMonth[];
+}
+
 export interface DashboardData {
   /** "live" comes from Supabase; "sample" is made-up data for development and tests. */
   source: "live" | "sample";

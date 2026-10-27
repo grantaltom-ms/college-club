@@ -147,6 +147,71 @@ button {
   color: var(--cyberspace);
 }
 
+/* Usage dropdown: one top-level menu holding Visits, Timing and Reservations. */
+.nav-dropdown {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.nav-usage-button {
+  padding: 22px 0 19px;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--slate);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nav-usage-button::after {
+  content: "";
+  display: inline-block;
+  margin-left: 7px;
+  border: 4px solid transparent;
+  border-top-color: currentColor;
+  vertical-align: middle;
+}
+
+.nav-usage-button:hover {
+  color: var(--cyberspace);
+}
+
+.nav-usage-button.nav-active {
+  color: var(--cyberspace);
+  border-bottom-color: var(--waterloo);
+}
+
+.nav-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 190px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 0;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.nav-menu a {
+  padding: 10px 16px;
+}
+
+.nav-menu a[aria-current="page"] {
+  color: var(--cyberspace);
+  border-bottom: none;
+  background: var(--oyster-50);
+}
+
 main.frame {
   padding-top: 40px;
   padding-bottom: 96px;
@@ -430,6 +495,16 @@ main.frame {
     font-size: 11px;
     letter-spacing: 0.1em;
     white-space: nowrap;
+  }
+  .nav-usage-button {
+    padding: 8px 0 6px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+  .nav-menu a {
+    padding: 10px 16px;
+    font-size: 13px;
+    letter-spacing: 0.18em;
   }
 }
 

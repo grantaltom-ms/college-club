@@ -6,10 +6,11 @@ import { WithData } from "@/components/DataProvider";
 import { useJson, type JsonState } from "@/components/useJson";
 import { formatDay } from "@/lib/dates";
 import { listJump, listSize, quarterVsYearAgo, weeklyByQuarter, fmtPct, type EmailData } from "@/lib/mailchimp";
+import { latestMonth, monthLabel, reconciliationFlags } from "@/lib/membership";
 import { changePct, yearToDate, type ShellData } from "@/lib/shells";
 import { bookingYearOverYear, fmtInt, headline, multiBooking, yearOverYear } from "@/lib/stats";
 import { fmtChange, storyLines } from "@/lib/summary";
-import type { DashboardData } from "@/lib/types";
+import type { DashboardData, MembershipData } from "@/lib/types";
 
 /** The iCrew-based "rarely visit" count the board saw before Oct 22, 2026, when the roster switched to QuickBooks. */
 const ICREW_QUIET_BEFORE = 185;
@@ -17,10 +18,11 @@ const ICREW_QUIET_BEFORE = 185;
 export default function SummaryPage() {
   const shells = useJson<ShellData>("/api/shells", "The shell figures could not be loaded.");
   const email = useJson<EmailData>("/api/email", "The email figures could not be loaded.");
+  const membership = useJson<MembershipData>("/api/membership", "The membership figures could not be loaded.");
   return (
     <>
       <h1 className="page-title">How the club is doing.</h1>
-      <WithData>{(data) => <Summary data={data} shells={shells.state} email={email.state} />}</WithData>
+      <WithData>{(data) => <Summary data={data} shells={shells.state} email={email.state} membership={membership.state} />}</WithData>
     </>
   );
 }
@@ -76,7 +78,7 @@ function Pending({ area, state }: { area: string; state: JsonState<unknown> }) {
   );
 }
 
-function Summary({ data, shells, email }: { data: DashboardData; shells: JsonState<ShellData>; email: JsonState<EmailData> }) {
+function Summary({ data, shells, email, membership }: { data: DashboardData; shells: JsonState<ShellData>; email: JsonState<EmailData>; membership: JsonState<MembershipData> }) {
   const h = headline(data.members);
   const mb = multiBooking(data.members);
   const door = yearOverYear(data.door);
@@ -103,6 +105,10 @@ function Summary({ data, shells, email }: { data: DashboardData; shells: JsonSta
   if (lastDoor) dates.push(`front door ${formatDay(lastDoor, true)}`);
   if (shells.status === "ready") dates.push(`shells ${formatDay(shells.data.through, true)}`);
   if (email.status === "ready" && email.data.through) dates.push(`email ${formatDay(email.data.through, true)}`);
+  if (membership.status === "ready") {
+    const latest = latestMonth(membership.data.months);
+    if (latest) dates.push(`membership ${monthLabel(latest)}`);
+  }
 
   return (
     <>
@@ -193,6 +199,8 @@ function Summary({ data, shells, email }: { data: DashboardData; shells: JsonSta
           />
 
           <EmailCard state={email} />
+
+          <MembershipCard state={membership} />
         </div>
 
         <p className="data-dates" data-testid="data-dates">
@@ -203,6 +211,25 @@ function Summary({ data, shells, email }: { data: DashboardData; shells: JsonSta
         </p>
       </div>
     </>
+  );
+}
+
+function MembershipCard({ state }: { state: JsonState<MembershipData> }) {
+  if (state.status !== "ready") return <Pending area="Membership" state={state} />;
+  const latest = latestMonth(state.data.months);
+  if (!latest) return <Pending area="Membership" state={{ status: "error", message: "No membership counts yet." }} />;
+  const flag = reconciliationFlags([latest])[0];
+  return (
+    <StatCard
+      testId="card-membership"
+      area="Membership"
+      value={fmtInt(latest.withApprovals)}
+      lead={`${fmtInt(latest.resignations)} left and ${fmtInt(latest.applicants)} applied in ${monthLabel(latest)}.`}
+      detail={`${latest.transferred !== null ? `${fmtInt(latest.transferred)} transferred. ` : ""}Waitlist ${latest.waitlist !== null ? fmtInt(latest.waitlist) : "not shown"}.`}
+      note={flag ? `Figure that doesn't add up: ${flag}` : undefined}
+      href="/membership"
+      linkText="Membership"
+    />
   );
 }
 

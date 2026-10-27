@@ -8,7 +8,11 @@ import {
   type DoorCell,
   type DoorMonth,
   type DoorPeriod,
+  type FinanceData,
+  type FinanceMonth,
   type Member,
+  type MembershipData,
+  type MembershipMonth,
   type Measure,
 } from "./types";
 
@@ -195,6 +199,88 @@ export async function loadLiveData(cfg: { url: string; key: string }): Promise<D
       months: monthRows.map(toDoorMonth),
     },
   };
+}
+
+/* ---------- Membership counts ---------- */
+
+export interface MembershipRow {
+  year: number;
+  month: number;
+  previous_total: number | null;
+  resignations: number | null;
+  applicants_for_approval: number | null;
+  transferred: number | null;
+  with_months_approvals: number | null;
+  waitlist: number | null;
+  note: string | null;
+}
+
+/** A membership_monthly row as the browser sees it: counts only, no names. */
+export function toMembershipMonth(r: MembershipRow): MembershipMonth {
+  return {
+    year: r.year,
+    month: r.month,
+    previousTotal: r.previous_total ?? 0,
+    resignations: r.resignations ?? 0,
+    applicants: r.applicants_for_approval ?? 0,
+    transferred: r.transferred,
+    withApprovals: r.with_months_approvals ?? 0,
+    waitlist: r.waitlist,
+    note: r.note,
+  };
+}
+
+export async function loadMembership(cfg: { url: string; key: string }): Promise<MembershipData> {
+  const rows = await fetchAll<MembershipRow>(cfg, "membership_monthly", "year.asc,month.asc");
+  return { source: "live", months: rows.map(toMembershipMonth) };
+}
+
+/* ---------- Financials ---------- */
+
+export interface FinanceRow {
+  year: number;
+  month: number;
+  income: number | null;
+  cogs: number | null;
+  gross_profit: number | null;
+  expenses: number | null;
+  net_operating_income: number | null;
+  other_income: number | null;
+  other_expenses: number | null;
+  net_other_income: number | null;
+  net_income: number | null;
+  depreciation: number | null;
+  labeled_ytd_income: number | null;
+  labeled_ytd_net_income: number | null;
+  source_file: string | null;
+  note: string | null;
+}
+
+/** A finance_monthly row as the browser sees it: organizational aggregates only, no names. */
+export function toFinanceMonth(r: FinanceRow): FinanceMonth {
+  return {
+    year: r.year,
+    month: r.month,
+    income: r.income ?? 0,
+    cogs: r.cogs ?? 0,
+    grossProfit: r.gross_profit ?? 0,
+    expenses: r.expenses ?? 0,
+    netOperatingIncome: r.net_operating_income ?? 0,
+    otherIncome: r.other_income ?? 0,
+    otherExpenses: r.other_expenses ?? 0,
+    netOtherIncome: r.net_other_income ?? 0,
+    netIncome: r.net_income ?? 0,
+    depreciation: r.depreciation ?? 0,
+    labeledYtdIncome: r.labeled_ytd_income ?? 0,
+    labeledYtdNetIncome: r.labeled_ytd_net_income ?? 0,
+    sourceFile: r.source_file ?? "",
+    note: r.note,
+  };
+}
+
+export async function loadFinancials(cfg: { url: string; key: string }): Promise<FinanceData> {
+  const rows = await fetchAll<FinanceRow>(cfg, "finance_monthly", "year.asc,month.asc");
+  return { source: "live", months: rows.map(toFinanceMonth) };
 }
 
 /* ---------- Shell outings ---------- */

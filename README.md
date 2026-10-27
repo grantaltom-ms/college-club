@@ -2,7 +2,7 @@
 
 A web page for College Club Seattle that shows how members use the club: how often they visit, which days and hours are busy, boat and shell use, reservations by type, email results, and a shared goals list. It shows counts only, never member names.
 
-It reads these tables in the CCS Supabase project: `members`, `qb_members`, `club_totals` and (later) `door_visits` / `reservations`.
+It reads these tables in the CCS Supabase project: `members`, `qb_members`, `club_totals`, `membership_monthly`, `finance_monthly` and (later) `door_visits` / `reservations`.
 
 **The roster is the QuickBooks member list** (`qb_members`, one row per QuickBooks record, which is one household). Each row says which `members` usage record its visits come from; members with a door fob but no reservation record use door entries as visit days, and members with no record count as no visits. New members who joined this year with no visit yet are shown as "Not started yet" and left out of the "rarely visit" counts. First time: run `db/qb_members.sql` in the Supabase SQL editor, then load the rows (the file has the steps). The member list holds names, so it is never committed. Until `qb_members` has rows, the dashboard shows an error rather than quietly falling back to the iCrew list.
 
@@ -32,6 +32,32 @@ These two tabs read their own tables, filled from iCrew exports. Neither table h
 First time: run `db/shell_outings.sql` and `db/reservation_counts.sql` in the Supabase SQL editor. To load or refresh a tab: run its prepare command, `truncate` the table, then import the output CSV with the Supabase Table Editor. Until a table is loaded, its tab shows a plain "could not be loaded" message and the rest of the site is unaffected.
 
 The prepare step runs on your own computer: shell rower names are swapped for scrambled codes (used only on the server to count different people), and reservations are reduced to counts per day, start hour and type.
+
+## Loading the Membership tab
+
+The Membership tab reads its own table, filled from the Membership Committee's "Membership Count" workbooks in the Board Shared File (OneDrive). The table holds counts only — one row per month, Total Dues Paying row — never member names.
+
+| Tab | Table | Source | Load it with |
+|---|---|---|---|
+| Membership | `membership_monthly` | Membership Count 2025-26 and 2026-27 workbooks | `db/membership_monthly.csv` |
+
+First time: run `db/membership_monthly.sql` in the Supabase SQL editor. To load or refresh: `truncate` the table, then import `db/membership_monthly.csv` with the Supabase Table Editor (an empty transferred or waitlist cell loads as null). Until the table is loaded, the Membership tab shows a plain "could not be loaded" message, the home page shows the same in its Membership card, and the rest of the site is unaffected.
+
+The figures are copied exactly as shown in the workbooks, even where a sheet does not add up. The Membership page lists those flags (for example, May and June 2025-26 and Oct 2026-27) instead of correcting them. To fix a figure, fix the workbook and reload the table.
+
+## Loading the Financials tab
+
+The Financials tab reads its own table, filled from the Finance Committee's "CCS Board Reporting Package" workbooks in the Board Shared File (OneDrive). The table holds organizational aggregates only — one row per month, every line of the month P&L sheet plus the package's labeled fiscal year-to-date figures — never member names.
+
+| Tab | Table | Source | Load it with |
+|---|---|---|---|
+| Financials | `finance_monthly` | Board Reporting Packages, Jul 2025–Jul 2026 | `db/finance_monthly.csv` |
+
+First time: run `db/finance_monthly.sql` in the Supabase SQL editor. To load or refresh: `truncate` the table, then import `db/finance_monthly.csv` with the Supabase Table Editor (an empty note cell loads as null). Until the table is loaded, the Financials tab shows a plain "could not be loaded" message and the rest of the site is unaffected.
+
+The figures are copied exactly as shown in the packages, even where a package's labeled year-to-date figures do not match the sum of its monthly sheets. The Financials page shows both figures in each club-year summary and lists the difference in its flags section (for 2025-26: the monthly sheets add up to $1,513,613.39 income and $115,615.84 net, against labeled year-to-date figures of $1,512,233.89 and $91,561.71) instead of correcting either or picking one. To fix a figure, fix the package and reload the table.
+
+The Financials page also has client-side filters (club year, start and end month, metric, monthly vs. fiscal year-to-date view) that change the headline, charts and monthly table together, and an "Ask the numbers" panel: deterministic questions computed from the loaded rows only — highest and lowest net-income month, club-year totals, month vs. previous month, month vs. club-year average, month vs. same month last year, loss months, income change over a range, and expenses vs. income over a range — each answered in a sentence with the months it rests on highlighted in the table. There is no model behind it, so an answer that cannot be computed from the data says so instead of guessing.
 
 ## The Goals page
 
