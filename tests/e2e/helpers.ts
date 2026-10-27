@@ -22,3 +22,14 @@ export async function mockAll(page: Page) {
   await page.route("**/api/email", (route) => route.fulfill({ status: 200, contentType: "application/json", body: email }));
   await page.route("**/api/membership", (route) => route.fulfill({ status: 200, contentType: "application/json", body: membership }));
 }
+
+/** The test server's Financials password (playwright.config.ts). */
+export const FINANCIALS_PASSWORD = "playwright-only-financials-0001";
+
+/** Type the Financials password, as a board member would, and land on the unlocked page. */
+export async function unlockFinancials(page: Page) {
+  await page.goto("/financials");
+  await page.getByLabel("Password").fill(FINANCIALS_PASSWORD);
+  await page.getByRole("button", { name: "Unlock" }).click();
+  await page.waitForURL("**/financials");
+}
