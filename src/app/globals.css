@@ -1322,3 +1322,66 @@ main.frame {
 .card > .card-title:not(:first-child) {
   margin-top: 1.75rem;
 }
+
+/* ---------- Financials summary strip and subtotal rows ---------- */
+
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 960px) {
+  .summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .summary-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+.summary-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 2px rgba(51, 54, 58, 0.06);
+}
+
+.summary-label {
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: var(--waterloo);
+}
+
+.summary-number {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--cyberspace);
+  margin-top: 4px;
+}
+
+.summary-support {
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--slate);
+}
+
+/* The financials filter bars scroll away with the page instead of sticking under the header. */
+.filter-bar--scroll {
+  position: static;
+}
+
+.subtotal-row td {
+  font-weight: 600;
+  background: var(--oyster-50);
+  border-top: 2px solid var(--oyster);
+}
