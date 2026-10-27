@@ -360,6 +360,61 @@ export async function grantQualification(store: ClubStore, ctx: Ctx, memberId: s
   });
 }
 
+/** What ending a household did, with the IDs of everything it cancelled. */
+export interface EndedHousehold {
+  endedOn: string;
+  blocked: string[];
+  cancelledBookings: string[];
+  cancelledSignUps: string[];
+  cancelledRsvps: string[];
+}
+
+/**
+ * Writes a household's ending into a working copy: the household is marked ended, every adult in it is blocked from new
+ * bookings, their future bookings, class places and event RSVPs are cancelled, and each change is written to the household's
+ * file. Used by `endHousehold` (one household) and by the resignations file (many households in one all-or-nothing change).
+ * `source` says where it came from when it was not done at the front desk ("a resignations file"), and `note` is the reason
+ * staff gave, if any. Past bookings are left alone as history.
+ */
+export async function endHouseholdRecords(
+  s: ClubState,
+  newId: () => string,
+  ctx: Ctx,
+  ledger: BookingLedger,
+  householdId: string,
+  how: { source?: string; note?: string } = {},
+): Promise<EndedHousehold> {
+  const household = activeHousehold(s, householdId);
+  const endedOn = pacificDate(ctx.now);
+  if (endedOn < household.joinedOn) throw new ClubError("invalid", "A membership cannot end before it began.");
+  const adults = s.members.filter((m) => m.householdId === household.id && m.status === "active");
+  household.status = "ended";
+  household.endedOn = endedOn;
+  for (const m of adults) m.status = "household_ended";
+  const from = how.source ? `, from ${how.source}` : "";
+  const noted = how.note ? ` Note: ${how.note}` : "";
+  log(s, newId, ctx, household.id, "membership_ended", `Membership ended on ${formatDay(endedOn)}${from}. ${adults.length} adult${adults.length === 1 ? "" : "s"} can no longer book.${noted}`, {
+    endedOn,
+    adults: adults.length,
+    ...(how.source ? { source: how.source } : {}),
+    ...(how.note ? { note: how.note } : {}),
+  });
+  const memberIds = adults.map((m) => m.id);
+  const cancelled = await ledger.cancelFutureBookings({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor });
+  if (cancelled.length > 0) {
+    log(s, newId, ctx, household.id, "bookings_cancelled", `${cancelled.length} future booking${cancelled.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: cancelled.length });
+  }
+  const dropped = (await ledger.cancelFutureSignUps?.({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor })) ?? [];
+  if (dropped.length > 0) {
+    log(s, newId, ctx, household.id, "signups_cancelled", `${dropped.length} future class sign-up${dropped.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: dropped.length });
+  }
+  const replies = (await ledger.cancelFutureRsvps?.({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor })) ?? [];
+  if (replies.length > 0) {
+    log(s, newId, ctx, household.id, "rsvps_cancelled", `${replies.length} future event RSVP${replies.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: replies.length });
+  }
+  return { endedOn, blocked: memberIds, cancelledBookings: cancelled, cancelledSignUps: dropped, cancelledRsvps: replies };
+}
+
 /**
  * The membership ends. In one all-or-nothing step: the household is marked ended, every adult in it is blocked from
  * new bookings, their future bookings are cancelled, and each of those changes is written to the household's file.
@@ -373,30 +428,7 @@ export async function endHousehold(
 ): Promise<{ endedOn: string; blocked: string[]; cancelledBookings: string[] }> {
   requireStaff(ctx.actor);
   return store.transaction(async (s, newId) => {
-    const household = activeHousehold(s, householdId);
-    const endedOn = pacificDate(ctx.now);
-    if (endedOn < household.joinedOn) throw new ClubError("invalid", "A membership cannot end before it began.");
-    const adults = s.members.filter((m) => m.householdId === household.id && m.status === "active");
-    household.status = "ended";
-    household.endedOn = endedOn;
-    for (const m of adults) m.status = "household_ended";
-    log(s, newId, ctx, household.id, "membership_ended", `Membership ended on ${formatDay(endedOn)}. ${adults.length} adult${adults.length === 1 ? "" : "s"} can no longer book.`, {
-      endedOn,
-      adults: adults.length,
-    });
-    const memberIds = adults.map((m) => m.id);
-    const cancelled = await ledger.cancelFutureBookings({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor });
-    if (cancelled.length > 0) {
-      log(s, newId, ctx, household.id, "bookings_cancelled", `${cancelled.length} future booking${cancelled.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: cancelled.length });
-    }
-    const dropped = (await ledger.cancelFutureSignUps?.({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor })) ?? [];
-    if (dropped.length > 0) {
-      log(s, newId, ctx, household.id, "signups_cancelled", `${dropped.length} future class sign-up${dropped.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: dropped.length });
-    }
-    const replies = (await ledger.cancelFutureRsvps?.({ state: s, memberIds, now: ctx.now, reason: "The household's membership ended", actor: ctx.actor })) ?? [];
-    if (replies.length > 0) {
-      log(s, newId, ctx, household.id, "rsvps_cancelled", `${replies.length} future event RSVP${replies.length === 1 ? "" : "s"} cancelled because the membership ended.`, { count: replies.length });
-    }
-    return { endedOn, blocked: memberIds, cancelledBookings: cancelled };
+    const { endedOn, blocked, cancelledBookings } = await endHouseholdRecords(s, newId, ctx, ledger, householdId);
+    return { endedOn, blocked, cancelledBookings };
   });
 }
