@@ -9,7 +9,7 @@ const usageMenu = (page: Page) => nav(page).getByRole("menu", { name: "Usage" })
 test.describe("the Usage nav menu", () => {
   test("shows one Usage menu instead of three top-level links, in order", async ({ page }) => {
     await page.goto("/");
-    await expect(nav(page).getByRole("link")).toHaveText(["Summary", "Shells", "Email", "Membership", "Goals"]);
+    await expect(nav(page).getByRole("link")).toHaveText(["Summary", "Shells", "Email", "Membership", "Financials", "Goals"]);
     const button = usageButton(page);
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute("aria-haspopup", "menu");
