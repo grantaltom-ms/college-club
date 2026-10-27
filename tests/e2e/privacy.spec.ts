@@ -29,8 +29,8 @@ test.describe("what the public site shows", () => {
     await expect(nav.getByRole("menu", { name: "Usage" }).getByRole("menuitem")).toHaveText(["Visits", "Timing", "Reservations"]);
   });
 
-  test("every page opens without a password", async ({ page }) => {
-    for (const path of ["/", "/visits", "/timing", "/shells", "/reservations", "/email", "/membership", "/financials", "/goals"]) {
+  test("every page but Financials opens without a password", async ({ page }) => {
+    for (const path of ["/", "/visits", "/timing", "/shells", "/reservations", "/email", "/membership", "/goals"]) {
       const res = await page.goto(path);
       expect(res?.status(), path).toBe(200);
       await expect(page.getByLabel("Password")).toHaveCount(0);

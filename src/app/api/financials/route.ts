@@ -1,10 +1,15 @@
+import type { NextRequest } from "next/server";
 import { sampleFinancials } from "@/lib/financials";
+import { FINANCIALS_COOKIE, financialsUnlocked } from "@/lib/financials-lock";
 import { liveConfig, loadFinancials } from "@/lib/supabase";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
-/** Public, aggregates only: monthly profit-and-loss figures for the club. No names. */
-export async function GET() {
+/** Aggregates only, no names: monthly profit-and-loss figures for the club, for browsers that typed the Financials password. */
+export async function GET(request: NextRequest) {
+  if (!financialsUnlocked(request.cookies.get(FINANCIALS_COOKIE)?.value)) {
+    return Response.json({ error: "Financials is locked. Type the Financials password to see these figures." }, { status: 401, headers: NO_STORE });
+  }
   const cfg = liveConfig();
   if (cfg) {
     try {

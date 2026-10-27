@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { sampleFinancials } from "../../src/lib/financials";
+import { unlockFinancials } from "./helpers";
 
 /** Serve invented finance figures from the financials endpoint, so no test touches the real database. */
 async function mockFinancials(page: Page) {
@@ -9,7 +10,7 @@ async function mockFinancials(page: Page) {
 
 test("the financials page shows the summary strip, one chart, the 5-column table, and the Ask panel", async ({ page }) => {
   await mockFinancials(page);
-  await page.goto("/financials");
+  await unlockFinancials(page);
   await expect(page.getByRole("heading", { level: 1, name: "Financials." })).toBeVisible();
   await expect(page.locator(".sample-banner")).toContainText("Sample data. These are made-up numbers for testing, not the real club.");
   // No giant hero any more: the summary strip carries the latest month instead.
@@ -48,7 +49,7 @@ test("the financials page shows the summary strip, one chart, the 5-column table
 
 test("the full P&L toggle, chart switch, and club-year filter work", async ({ page }) => {
   await mockFinancials(page);
-  await page.goto("/financials");
+  await unlockFinancials(page);
   // Full P&L lines expand the same table to all 12 columns.
   await page.locator("#finance-full").check();
   const table = page.getByTestId("finance-table");
@@ -90,7 +91,7 @@ test("Ask highlights a month outside the filtered view with a note instead of si
   };
   const body = JSON.stringify({ source: "sample", months: [...sample.months, extraMonth] });
   await page.route("**/api/financials", (route) => route.fulfill({ status: 200, contentType: "application/json", body }));
-  await page.goto("/financials");
+  await unlockFinancials(page);
   await page.selectOption("#ask-question", "loss-months");
   await expect(page.getByTestId("ask-answer")).toContainText("Mar 2024");
   await expect(page.locator('[data-month="2024-3"]')).toHaveAttribute("data-highlighted", "true");
@@ -108,7 +109,7 @@ test("a financials source that fails shows a plain message and a way to try agai
   await page.route("**/api/financials", (route) =>
     route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "The finance figures could not be loaded." }) }),
   );
-  await page.goto("/financials");
+  await unlockFinancials(page);
   await expect(page.locator(".status-error")).toContainText("The finance figures could not be loaded.");
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   // The rest of the site is unaffected: the summary page still opens.
