@@ -73,10 +73,13 @@ describe.skipIf(!ADMIN_URL)("the club database", () => {
       "event_rsvps",
       "event_rule_defaults",
       "events",
+      "history_imports",
       "household_history",
       "households",
       "item_classes",
       "items",
+      "legacy_reservation_people",
+      "legacy_reservations",
       "login_tokens",
       "member_qualifications",
       "members",
@@ -89,7 +92,7 @@ describe.skipIf(!ADMIN_URL)("the club database", () => {
 
   it("locks every table to the owner: row level security on, no policies", async () => {
     const { rows } = await q(`select c.relname, c.relrowsecurity from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'club' and c.relkind = 'r'`);
-    expect(rows).toHaveLength(25);
+    expect(rows).toHaveLength(28);
     expect(rows.every((r) => r.relrowsecurity)).toBe(true);
     expect((await q(`select count(*)::int as n from pg_policies where schemaname = 'club'`)).rows[0].n).toBe(0);
   });
