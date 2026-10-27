@@ -6,13 +6,16 @@ import {
   expenseRatio,
   fmtMoney,
   fmtPercent,
+  lastFullClubYear,
   latestMonth,
+  lossMonths,
   monthLabel,
   netMargin,
   operatingMargin,
   periodTotals,
   sampleFinancials,
   sortMonths,
+  subtotalSums,
   ytdFlags,
 } from "./financials";
 import type { FinanceMonth } from "./types";
@@ -143,6 +146,52 @@ describe("Ask the numbers", () => {
 
   it("says so instead of guessing when there is no data", () => {
     expect(answerAsk("highest-net", []).text).toContain("no finance figures");
+  });
+});
+
+describe("financial subtotal rows and summary-strip helpers", () => {
+  it("sums every P&L line for a subtotal row, with both year-to-date figures and the gap", () => {
+    const rows = [row(2024, 7, 10000, 1000, 10000, 1000), row(2024, 8, 10000, 1000, 19000, 1900)];
+    expect(subtotalSums(rows)).toEqual({
+      months: 2,
+      sumIncome: 20000,
+      sumCogs: 0,
+      sumGrossProfit: 20000,
+      sumExpenses: 18000,
+      sumNetOperatingIncome: 2000,
+      sumOtherIncome: 0,
+      sumOtherExpenses: 0,
+      sumNetOtherIncome: 0,
+      sumNet: 2000,
+      sumDepreciation: 0,
+      labeledYtdIncome: 19000,
+      labeledYtdNetIncome: 1900,
+      gapIncome: 1000,
+      gapNet: 100,
+    });
+    expect(subtotalSums([])).toBeNull();
+  });
+
+  it("finds loss months and the last full club year", () => {
+    const sample = sampleFinancials().months;
+    expect(lossMonths(sample).map(monthLabel)).toEqual(["Mar 2024"]);
+    expect(lossMonths([])).toEqual([]);
+    expect(lastFullClubYear(sample)).toBeNull();
+    const fullYear: FinanceMonth[] = [];
+    for (let i = 0; i < 12; i++) {
+      const year = 2025 + Math.floor((7 + i - 1) / 12);
+      const month = ((7 + i - 1) % 12) + 1;
+      fullYear.push(row(year, month, 10000, 1000, (i + 1) * 10000, (i + 1) * 1000));
+    }
+    fullYear.push(row(2026, 7, 10000, 1000, 10000, 1000));
+    expect(lastFullClubYear(fullYear)).toBe("2025–26");
+  });
+
+  it("points a gapped club-year totals answer at the subtotal row, not a flags section", () => {
+    const rows = [row(2024, 7, 10000, 1000, 10000, 1000), row(2024, 8, 10000, 1000, 19000, 1900)];
+    const answer = answerAsk("fy-totals", rows, { clubYear: "2024–25" });
+    expect(answer.text).toContain("subtotal row");
+    expect(answer.text).toContain("neither figure has been corrected");
   });
 });
 
