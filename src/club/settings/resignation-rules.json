@@ -1,0 +1,8 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). These two numbers only guard against uploading the wrong file; they do not decide who resigns. maxHouseholdsPerFile: one resignations file can end at most this many households; a bigger wave is uploaded in pieces. warnPercentOfActive: if a file would end this share of all the active households or more (a whole number, percent), the read-back says so loudly, because it may be the whole roster uploaded by mistake.",
+  "defaults": {
+    "maxHouseholdsPerFile": 50,
+    "warnPercentOfActive": 25
+  }
+}
