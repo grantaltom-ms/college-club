@@ -312,7 +312,8 @@ test.describe("who can do it", () => {
 
 test.describe("on a phone", () => {
   test("the edit page fits a narrow screen with big fields and no sideways scrolling", async ({ browser, baseURL, page }) => {
-    const t = tag();
+    // A long, wide surname on purpose (the tag ends up in it): a name that cannot break must not push the page sideways.
+    const t = `wmwmwm${tag()}`;
     await actAsStaff(page);
     const household = await addHousehold(page, `The Pemberley ${t} household`, [{ first: "Gwendolyn", last: `Pemberley${t}`, email: `gwendolyn.${t}@example.com` }]);
     await page.goto(household);

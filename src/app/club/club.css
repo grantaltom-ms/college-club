@@ -64,20 +64,25 @@
   padding-bottom: 48px;
 }
 
+/* Headings often hold a person's or a household's name. A very long single word (no space or hyphen to break at) must wrap
+   instead of pushing the page sideways on a phone. */
 .club h1 {
   font-size: 1.6rem;
   margin: 8px 0 8px;
+  overflow-wrap: anywhere;
 }
 
 .club h2 {
   font-size: 1.15rem;
   margin: 28px 0 10px;
+  overflow-wrap: anywhere;
 }
 
 .club h3 {
   font-family: var(--body);
   font-size: 1.1rem;
   margin: 0 0 2px;
+  overflow-wrap: anywhere;
 }
 
 .club-meta {

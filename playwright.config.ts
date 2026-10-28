@@ -53,6 +53,10 @@ export default defineConfig({
         CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer; sam.deskwell@example.org=Sam Deskwell",
         // Test-only; the board's shared password for the Financials page.
         DASHBOARD_FINANCIALS_PASSWORD: "playwright-only-financials-0001",
+        // Test-only and fake; a test build must keep using the test outbox even when the real sender's settings are present,
+        // so the sign-in tests fail if it ever tries to email through Resend instead.
+        RESEND_API_KEY: "re_playwright_only_fake_key_0001",
+        CLUB_MAIL_FROM: "Playwright Club <no-reply@example.org>",
       },
     },
     {
@@ -82,7 +86,7 @@ export default defineConfig({
             url: `http://localhost:${PORT_POSTGRES}/club/act-as`,
             reuseExistingServer: false,
             timeout: 120_000,
-            env: { CCS_ALLOW_SAMPLE_DATA: "1", CCS_CLUB_NOW: "2026-10-28T20:00:00Z", CLUB_DATABASE_URL: E2E_DB, CLUB_TEST_DATABASE_URL: ADMIN_DB!, CLUB_LINK_SECRET: "playwright-only-link-secret-0002", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0002", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer; sam.deskwell@example.org=Sam Deskwell" },
+            env: { CCS_ALLOW_SAMPLE_DATA: "1", CCS_CLUB_NOW: "2026-10-28T20:00:00Z", CLUB_DATABASE_URL: E2E_DB, CLUB_TEST_DATABASE_URL: ADMIN_DB!, CLUB_LINK_SECRET: "playwright-only-link-secret-0002", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0002", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer; sam.deskwell@example.org=Sam Deskwell", RESEND_API_KEY: "re_playwright_only_fake_key_0002", CLUB_MAIL_FROM: "Playwright Club <no-reply@example.org>" },
           },
         ]
       : []),

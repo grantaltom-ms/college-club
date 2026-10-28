@@ -8,6 +8,7 @@ import { identityKey, identityOf, identitiesForEmail } from "./identities";
 import { confirmSignIn, previewSignIn, rememberedIdentity, requestSignInLink, resolveSession, signOut, type LoginDeps } from "./login";
 import { clearOutbox, outboxMailer, outboxMessages, type Mailer } from "./mail";
 import { PgAuthStore } from "./postgres";
+import { createResendMailer } from "./resend";
 import { MemoryAuthStore } from "./store";
 import { hashSecret } from "./tokens";
 
@@ -19,6 +20,7 @@ import { hashSecret } from "./tokens";
 
 const ORIGIN = "https://club.example.org";
 const STAFF = [{ email: "alex.staffer@example.org", name: "Alex Staffer" }];
+const RESEND = { apiKey: "re_AbCdEfGh_1234567890abcdef", from: "College Club Seattle <no-reply@example.org>", replyTo: null };
 const minutes = (m: number, from: Date = NOW) => new Date(from.getTime() + m * 60000);
 const pools: { end(): Promise<void> }[] = [];
 
@@ -118,6 +120,33 @@ describe.each(STORE_KINDS)("signing in by email link on the %s store", (kind) =>
       const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
       expect(await requestSignInLink(deps, { email: "ada@example.com", origin: ORIGIN, now: NOW })).toBe("ignored");
       expect(logged).toHaveBeenCalledWith("Could not send a sign-in email:", "mail server down");
+    });
+
+    it("emails the link through the real sender, and the link in that email signs the person in", async () => {
+      const sent: { to: string[]; subject: string; text: string }[] = [];
+      const pretendResend = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+        sent.push(JSON.parse(init!.body as string));
+        return Response.json({ id: "email_1" });
+      });
+      const mailer = createResendMailer(RESEND, { fetch: pretendResend as unknown as typeof fetch });
+      const { deps } = await open(kind, { mailer });
+      expect(await requestSignInLink(deps, { email: "  Ada@Example.COM ", origin: ORIGIN, now: NOW })).toBe("sent");
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({ to: ["ada@example.com"], subject: "Your College Club Seattle sign-in link" });
+      expect(sent[0].text).toContain(`${ORIGIN}/club/sign-in/`);
+      const secret = /\/club\/sign-in\/([A-Za-z0-9_-]{43})/.exec(sent[0].text)![1];
+      expect((await previewSignIn(deps, { secret, now: minutes(1) }))?.email).toBe("ada@example.com");
+      expect(outboxMessages()).toEqual([]);
+    });
+
+    it("looks the same from outside when Resend refuses, and the log holds neither the key nor the address", async () => {
+      const refusing = vi.fn(async () => Response.json({ name: "validation_error", message: "The example.org domain is not verified." }, { status: 403 }));
+      const { deps } = await open(kind, { mailer: createResendMailer(RESEND, { fetch: refusing as unknown as typeof fetch }) });
+      const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      expect(await requestSignInLink(deps, { email: "ada@example.com", origin: ORIGIN, now: NOW })).toBe("ignored");
+      expect(logged).toHaveBeenCalledWith("Could not send a sign-in email:", "Resend refused the email (status 403: validation_error: The example.org domain is not verified.).");
+      expect(JSON.stringify(logged.mock.calls)).not.toContain(RESEND.apiKey);
+      expect(JSON.stringify(logged.mock.calls)).not.toContain("ada@example.com");
     });
   });
 
