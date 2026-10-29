@@ -4,6 +4,9 @@ import "@fontsource/cinzel/latin-600.css";
 import "@fontsource/eb-garamond/latin-400.css";
 import "@fontsource/eb-garamond/latin-500.css";
 import "@fontsource/eb-garamond/latin-600.css";
+import "@fontsource/figtree/latin-400.css";
+import "@fontsource/figtree/latin-600.css";
+import "@fontsource/figtree/latin-800.css";
 import "./globals.css";
 
 // Shared by everything in the app: the brand fonts and colors. The dashboard (app/(dashboard)) and the
