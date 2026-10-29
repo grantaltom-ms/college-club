@@ -11,11 +11,11 @@ const HIDDEN = {
 for (const [name, base] of Object.entries(HIDDEN)) {
   test.describe(name, () => {
     test("every public page answers 'page not found' and shows none of its words", async () => {
-      for (const path of ["/site", "/site/about", "/site/membership", "/site/programs", "/site/contact", "/site/anything-else", "/site/membership?x=1"]) {
+      for (const path of ["/site", "/site/about", "/site/membership", "/site/programs", "/site/request-a-tour", "/site/contact", "/site/anything-else", "/site/membership?x=1"]) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Welcome to the club|Join the club|Discover CCS|\$103|\$154\.50|206-622-0624|11 East Allison|membership@collegeclubseattle|Caitlin|Julia Gamache|Rowing and fitness|Preview of the new club website|Sign in to reserve|Intermediate|Resident/i);
+        expect(html, path).not.toMatch(/Your summer evenings|Three steps to the dock|Come see it for yourself|Request a tour|Our Programs|Member login|A Seattle institution|Photo: members on the deck|Send request|Join the club|\$103|\$154\.50|622-0624|11 East Allison|membership@collegeclubseattle|Caitlin|Julia Gamache|Rowing and fitness|Preview of the new club website|Intermediate|Resident/i);
         expect(html, path).not.toMatch(/<title>[^<]*College Club Seattle/i);
       }
     });
@@ -23,7 +23,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
     test("the dashboard's home address is still the dashboard, not the public site", async () => {
       const res = await fetch(`${base}/`);
       expect(res.status).toBe(200);
-      expect(await res.text()).not.toMatch(/Welcome to the club|Preview of the new club website/i);
+      expect(await res.text()).not.toMatch(/Your summer evenings|Preview of the new club website|Request a tour/i);
     });
   });
 }

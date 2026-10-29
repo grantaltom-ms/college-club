@@ -142,14 +142,14 @@ test.describe("checking and ending", () => {
     const g = await gone.newPage();
     const email = `una.${t}.1@example.com`;
     await g.goto("/club/sign-in");
-    await g.getByLabel("Your email address").fill(email);
+    await g.getByLabel("Email", { exact: true }).fill(email);
     await g.getByRole("button", { name: "Email me a sign-in link" }).click();
     await expect(g.getByTestId("link-sent")).toBeVisible();
     await g.goto("/club/outbox");
     await expect(g.getByTestId("outbox-message").filter({ hasText: `To ${email}` })).toHaveCount(0);
     // While the household nobody named still can.
     await g.goto("/club/sign-in");
-    await g.getByLabel("Your email address").fill(`xia.${t}.3@example.com`);
+    await g.getByLabel("Email", { exact: true }).fill(`xia.${t}.3@example.com`);
     await g.getByRole("button", { name: "Email me a sign-in link" }).click();
     await g.goto("/club/outbox");
     await expect(g.getByTestId("outbox-message").filter({ hasText: `To xia.${t}.3@example.com` })).toHaveCount(1);

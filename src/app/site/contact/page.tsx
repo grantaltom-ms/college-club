@@ -1,4 +1,4 @@
-import { SITE } from "@/site/content";
+import { SITE, phoneHref } from "@/site/content";
 import { requireSite } from "@/site/guard";
 import { pageMetadata } from "@/site/metadata";
 import { SitePage } from "../SitePage";
@@ -15,7 +15,7 @@ export default async function ContactPage() {
         <p>
           <a href={`mailto:${club.email}`}>{club.email}</a>
           <br />
-          Phone: <a href={`tel:${club.phone.replaceAll("-", "")}`}>{club.phone}</a>
+          Phone: <a href={phoneHref(club.phone)}>{club.phone}</a>
         </p>
         <h2>Club hours</h2>
         <p>

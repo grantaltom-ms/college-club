@@ -49,7 +49,7 @@ const openEdit = async (page: Page, fullName: string) => {
 /** Asks for a link, opens it from the test outbox and presses the one button: signed in as the only person that address opens. */
 async function signInByLink(page: Page, email: string, button: string) {
   await page.goto("/club/sign-in");
-  await page.getByLabel("Your email address").fill(email);
+  await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
   await expect(page.getByTestId("link-sent")).toHaveText(SENT);
   await page.goto("/club/outbox");
@@ -118,7 +118,7 @@ test.describe("correcting a mistyped email", () => {
     const sentBefore = await phone.page.getByTestId("outbox-message").filter({ hasText: `To ${oldEmail}` }).count();
     expect(sentBefore).toBe(2);
     await phone.page.goto("/club/sign-in");
-    await phone.page.getByLabel("Your email address").fill(oldEmail);
+    await phone.page.getByLabel("Email", { exact: true }).fill(oldEmail);
     await phone.page.getByRole("button", { name: "Email me a sign-in link" }).click();
     await expect(phone.page.getByTestId("link-sent")).toHaveText(SENT);
     await phone.page.goto("/club/outbox");
@@ -140,7 +140,7 @@ test.describe("correcting a mistyped email", () => {
 
     const member = await memberBrowser(browser, baseURL);
     await member.page.goto("/club/sign-in");
-    await member.page.getByLabel("Your email address").fill(oldEmail);
+    await member.page.getByLabel("Email", { exact: true }).fill(oldEmail);
     await member.page.getByRole("button", { name: "Email me a sign-in link" }).click();
     await member.page.goto("/club/outbox");
     const link = await member.page.getByTestId("outbox-message").filter({ hasText: `To ${oldEmail}` }).first().getByTestId("outbox-link").getAttribute("href");

@@ -113,7 +113,7 @@ test.describe("checking and adding", () => {
     const m = await member.newPage();
     const email = `una.${t}.1@example.com`;
     await m.goto("/club/sign-in");
-    await m.getByLabel("Your email address").fill(email);
+    await m.getByLabel("Email", { exact: true }).fill(email);
     await m.getByRole("button", { name: "Email me a sign-in link" }).click();
     await expect(m.getByTestId("link-sent")).toHaveText(SENT);
     await m.goto("/club/outbox");

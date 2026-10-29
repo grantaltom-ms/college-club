@@ -1,0 +1,9 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). These numbers only stop a flood of fake requests from the public Request a tour form; they do not decide who may tour. maxPerEmailPerDay: the same email address is saved at most this many times in 24 hours (more are quietly treated as already received, so nobody can fill the club's inbox). maxPerHour: the whole site saves at most this many requests an hour; past that the form asks people to phone instead. listLimit: how many requests the staff screen shows at once.",
+  "defaults": {
+    "maxPerEmailPerDay": 3,
+    "maxPerHour": 30,
+    "listLimit": 100
+  }
+}

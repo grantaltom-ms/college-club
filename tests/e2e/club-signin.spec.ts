@@ -19,7 +19,7 @@ const asPicker = async (page: Page, who: string) => {
 /** Types an address into the sign-in form and presses the button. */
 async function askForLink(page: Page, email: string) {
   await page.goto("/club/sign-in");
-  await page.getByLabel("Your email address").fill(email);
+  await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
 }
 
@@ -86,7 +86,9 @@ test.describe("a member signing in", () => {
     // Signing out forgets the key on the server, not just in the browser: the old cookie opens nothing.
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page.getByTestId("signed-out-note")).toHaveText("You are signed out.");
-    await expect(page.getByTestId("acting-as")).toHaveText("Not acting as anyone.");
+    // The sign-in screen has no member menu and no "acting as" line; it simply offers the form again.
+    await expect(page.getByTestId("already-signed-in")).toHaveCount(0);
+    await expect(page.getByTestId("sign-in-form")).toBeVisible();
     await page.goto("/club/my-bookings");
     await expect(page.getByRole("link", { name: "Sign in", exact: true }).first()).toBeVisible();
     await page.context().addCookies([{ name: "ccs_session", value: session!.value, url: page.url() }]);
@@ -130,7 +132,8 @@ test.describe("a member signing in", () => {
     await expect(page.getByTestId("acting-as")).toHaveText("Signed in as Declan Halloran.");
     await expect(page.getByRole("link", { name: "Staff office" })).toHaveCount(0);
     await page.getByRole("button", { name: "Sign out" }).click();
-    await expect(page.getByTestId("acting-as")).toHaveText("Not acting as anyone.");
+    await expect(page.getByTestId("signed-out-note")).toHaveText("You are signed out.");
+    await expect(page.getByTestId("sign-in-form")).toBeVisible();
   });
 
   test("staff see that a member has signed in", async ({ page }) => {
@@ -207,7 +210,7 @@ test.describe("addresses that cannot sign in", () => {
     await page.getByTestId("sign-in-form").evaluate((form: HTMLFormElement) => {
       form.noValidate = true;
     });
-    await page.getByLabel("Your email address").fill("nope");
+    await page.getByLabel("Email", { exact: true }).fill("nope");
     await page.getByRole("button", { name: "Email me a sign-in link" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "does not look like an email address" })).toBeVisible();
     await expect(page.getByTestId("link-sent")).toHaveCount(0);
@@ -298,9 +301,9 @@ test.describe("on a phone", () => {
     await page.goto("/club/sign-in");
     const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
     expect(await fits()).toBe(true);
-    await page.getByLabel("Your email address").fill("tomas.vandermeer@example.com");
+    await page.getByLabel("Email", { exact: true }).fill("tomas.vandermeer@example.com");
     const send = page.getByRole("button", { name: "Email me a sign-in link" });
-    expect((await send.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    expect((await send.boundingBox())!.height).toBeGreaterThanOrEqual(52);
     await send.click();
     await openLinkFor(page, "tomas.vandermeer@example.com");
     expect(await fits()).toBe(true);

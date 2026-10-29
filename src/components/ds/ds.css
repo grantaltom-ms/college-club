@@ -1,0 +1,915 @@
+/*
+  The refresh's shared pieces (design handoff, Oct 2026): buttons, eyebrow, the two dividers, the header, the footer, the sticky
+  "Request a tour" bar, the hero, and the form fields. Every class starts with ds- so it can never touch the dashboard's or the
+  older pages' classes (the dashboard header and the older public header both use .site-header). Colours, fonts, radii and
+  spacing come from the tokens in globals.css; nothing here invents a value.
+*/
+
+/* ---------- Shared frame ---------- */
+
+.ds-ui {
+  font-family: var(--ui);
+}
+
+.ds-container {
+  width: 100%;
+  max-width: calc(var(--container) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* On a dark band the page's usual focus ring (Waterloo) is too faint, so the ring is Sun there. */
+.ds-dark :focus-visible {
+  outline-color: var(--sun);
+}
+
+/* ---------- Buttons ---------- */
+
+/* The Sun pill: the one primary action on a screen. Ink text on Sun is 7.2:1. */
+.ds-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--sun);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+.ds-button:hover {
+  background: var(--sun-hover);
+}
+
+.ds-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.ds-button-large {
+  min-height: 52px;
+  width: 100%;
+}
+
+/* The outline pill: a quieter second action. */
+.ds-button-outline {
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid var(--waterloo);
+}
+
+.ds-button-outline:hover {
+  background: var(--oyster-50);
+}
+
+/* ---------- Eyebrow ---------- */
+
+.ds-eyebrow {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--waterloo);
+}
+
+.ds-eyebrow-sun {
+  color: var(--sun);
+}
+
+/* ---------- Dividers (decorative: aria-hidden in the markup) ---------- */
+
+/* The dividers share the content's width (the container already supplies the side padding). */
+.ds-divider {
+  width: 100%;
+}
+
+.ds-lane,
+.ds-wave {
+  height: 20px;
+  background-repeat: repeat-x;
+  background-position: left center;
+}
+
+.ds-lane {
+  background-image: url("/ds/divider-lane-line-tile.svg");
+}
+
+.ds-wave {
+  background-image: url("/ds/divider-wave-swell-tile.svg");
+}
+
+.ds-divider-wave {
+  padding-bottom: 8px;
+}
+
+/* ---------- Header ---------- */
+
+.ds-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--oyster);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ds-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 63px; /* plus the 1px border under it: 64 in all */
+  padding: 0 12px 0 16px;
+}
+
+.ds-logo-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* The stand-in for the logo until the logo files are added: the club's name in the heading font. */
+.ds-wordmark {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  max-width: 9.5em;
+}
+
+.ds-wordmark-white {
+  color: var(--white);
+}
+
+.ds-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Member login: a 40px outline pill inside a 44px tap area. */
+.ds-pill-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.ds-pill-link > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid var(--waterloo);
+  border-radius: var(--radius-pill);
+  font-family: var(--ui);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+.ds-pill-link:hover > span {
+  background: var(--oyster-50);
+}
+
+.ds-menu-button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  font-family: var(--ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cyberspace);
+  cursor: pointer;
+}
+
+/* On a phone the menu is a panel under the header, opened by the Menu button. */
+.ds-nav {
+  display: none;
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 0;
+  right: 0;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+  background: var(--oyster);
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: var(--shadow-md);
+}
+
+.ds-header[data-open] .ds-nav {
+  display: block;
+}
+
+.ds-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ds-nav li + li a {
+  border-top: 1px solid var(--hairline);
+}
+
+.ds-nav a {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 4px 0 14px;
+  font-family: var(--ui);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.ds-nav a:hover {
+  text-decoration: underline;
+}
+
+.ds-nav a[aria-current="page"] {
+  box-shadow: inset 4px 0 0 var(--sun);
+}
+
+.ds-nav .ds-nav-member a {
+  color: var(--waterloo-dark);
+}
+
+/* Behind the open menu: dims the page, and a tap on it closes the menu. */
+.ds-scrim {
+  position: absolute;
+  top: calc(100% + 1px);
+  right: 0;
+  left: 0;
+  height: 100vh;
+  z-index: -1;
+  background: rgba(51, 54, 58, 0.45);
+}
+
+/* ---------- Hero ---------- */
+
+.ds-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 460px;
+  overflow: hidden;
+  background: var(--cyberspace);
+  color: var(--white);
+}
+
+/* A plainly labelled stand-in until the real photo is supplied. */
+.ds-hero-placeholder {
+  position: absolute;
+  top: 16px;
+  left: max(var(--gutter), calc(50% - var(--container) / 2));
+  z-index: 1;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--oyster);
+  border-radius: 6px;
+  font-family: var(--ui);
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--oyster);
+}
+
+.ds-hero-image {
+  z-index: -2;
+  object-fit: cover;
+}
+
+.ds-hero-fade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to top, rgba(68, 72, 77, 0.94) 0%, rgba(68, 72, 77, 0.62) 45%, rgba(68, 72, 77, 0.12) 100%);
+}
+
+.ds-hero-content {
+  padding-top: 24px;
+  padding-bottom: 28px;
+}
+
+.ds-hero-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-hero);
+}
+
+.ds-hero h1 {
+  font-size: 34px;
+  line-height: 1.08;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.ds-hero-lead {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--paper-on-dark);
+}
+
+.ds-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 6px;
+}
+
+.ds-hero-join {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-family: var(--ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+  text-decoration: none;
+}
+
+.ds-hero-join:hover {
+  text-decoration: underline;
+}
+
+/* ---------- What you get ---------- */
+
+.ds-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-features);
+  padding-top: var(--section-features);
+  padding-bottom: var(--section-features);
+}
+
+.ds-features-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-features);
+}
+
+.ds-features-list h3 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.ds-features-list p {
+  margin: 0;
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--cyberspace);
+}
+
+/* ---------- How to join ---------- */
+
+.ds-join {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-steps);
+  padding-top: var(--section-steps-top);
+  padding-bottom: var(--section-steps-bottom);
+  scroll-margin-top: 72px;
+}
+
+.ds-join h2 {
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.ds-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-steps);
+}
+
+.ds-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--cyberspace);
+}
+
+.ds-step-number {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sun);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 32px;
+  text-align: center;
+}
+
+.ds-step strong {
+  color: var(--ink);
+}
+
+.ds-join .site-preview-note {
+  margin: 0;
+}
+
+/* ---------- Footer ---------- */
+
+.ds-footer {
+  background: var(--cyberspace);
+  color: var(--oyster);
+  padding-top: var(--section-footer-top);
+  padding-bottom: var(--section-footer-bottom);
+}
+
+.ds-footer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ds-footer h2 {
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.ds-footer address {
+  font-family: var(--ui);
+  font-size: 15px;
+  font-style: normal;
+  line-height: 1.5;
+  color: var(--oyster);
+}
+
+.ds-footer address a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--oyster);
+  text-decoration: underline;
+}
+
+.ds-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 20px;
+}
+
+.ds-footer-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-family: var(--ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--oyster);
+  text-decoration: none;
+}
+
+.ds-footer-links a:hover {
+  text-decoration: underline;
+}
+
+.ds-footer-links a.ds-footer-member {
+  color: var(--sun);
+}
+
+.ds-footer-fine {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--oyster);
+}
+
+/* ---------- Sticky "Request a tour" bar (phones only) ---------- */
+
+.ds-sticky-cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 25;
+  padding: 12px 16px calc(20px + env(safe-area-inset-bottom));
+  background: var(--paper);
+  border-top: 1px solid var(--hairline);
+  transition: transform var(--duration) var(--ease);
+}
+
+.ds-sticky-cta .ds-button {
+  width: 100%;
+  min-height: 48px;
+}
+
+/* Hidden while the hero's own button is on screen: slid away and taken out of the tab order. */
+.ds-sticky-cta.is-hidden {
+  transform: translateY(100%);
+  visibility: hidden;
+  transition:
+    transform var(--duration) var(--ease),
+    visibility 0s linear var(--duration);
+}
+
+/* Room under the footer so the bar never covers its last lines. */
+@media (max-width: 767px) {
+  .ds-footer {
+    padding-bottom: calc(var(--section-footer-bottom) + 92px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- Form fields (the Request a tour form and the sign-in screen) ---------- */
+
+.ds-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-form);
+}
+
+.ds-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ds-label {
+  font-family: var(--ui);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.ds-optional {
+  font-weight: 400;
+  color: var(--slate);
+}
+
+.ds-hint {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--slate);
+}
+
+/* The field's edge is Waterloo (5.6:1 on Paper). The handoff's Debonair is only 2.7:1, under the 3:1 a field's edge needs. */
+.ds-input,
+.ds-textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--waterloo);
+  border-radius: var(--radius-input);
+  background: var(--white);
+  font-family: var(--ui);
+  font-size: 16px; /* 16px keeps iPhones from zooming in on focus */
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.ds-textarea {
+  min-height: 120px;
+  padding: 12px 14px;
+  resize: vertical;
+}
+
+.ds-input::placeholder,
+.ds-textarea::placeholder {
+  color: var(--slate);
+}
+
+.ds-input:focus,
+.ds-textarea:focus {
+  outline: 2px solid var(--waterloo);
+  outline-offset: 2px;
+}
+
+.ds-error {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--error);
+}
+
+.ds-status {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-card);
+  background: var(--sun-tint);
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+/* Hidden from people, there for robots that fill in every field. */
+.ds-trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* ---------- The member sign-in screen ---------- */
+
+.ds-app {
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--cyberspace);
+}
+
+/* The dark header band, then a paper body, both in one narrow column. */
+.ds-app-band {
+  background: var(--cyberspace);
+  color: var(--white);
+  padding: 32px 0 28px;
+}
+
+.ds-app-inner {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 var(--gutter-app);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ds-app-band h1 {
+  font-size: 32px;
+  line-height: 1.08;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.ds-app-band .ds-wordmark {
+  font-size: 18px;
+  max-width: none;
+}
+
+.ds-app-lead {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--oyster);
+}
+
+.ds-app-body {
+  padding: 28px 0 40px;
+}
+
+.ds-app-body .ds-app-inner {
+  gap: var(--gap-form);
+}
+
+.ds-app-intro {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--cyberspace);
+}
+
+/* "First time here?": a plain open-and-close note, no scripts needed. */
+.ds-details summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-family: var(--ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--waterloo-dark);
+  cursor: pointer;
+}
+
+.ds-details p {
+  margin: 0 0 8px;
+  font-family: var(--ui);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--cyberspace);
+}
+
+.ds-details a {
+  color: var(--waterloo-dark);
+}
+
+.ds-card {
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+
+.ds-card-oyster {
+  background: var(--oyster);
+}
+
+.ds-card h2 {
+  margin: 0 0 4px;
+  font-family: var(--ui);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.ds-card p {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--cyberspace);
+}
+
+.ds-card .ds-button-install {
+  margin-top: 12px;
+  min-height: 44px;
+}
+
+.ds-back {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-family: var(--ui);
+  font-size: 13px;
+  color: var(--slate);
+  text-decoration: none;
+}
+
+.ds-back:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Wider screens ---------- */
+
+@media (min-width: 768px) {
+  .ds-hero {
+    min-height: 640px;
+  }
+
+  .ds-hero-content {
+    padding-top: 64px;
+    padding-bottom: 72px;
+  }
+
+  .ds-hero-column {
+    max-width: 560px;
+  }
+
+  .ds-hero h1 {
+    font-size: 46px;
+  }
+
+  .ds-hero-lead {
+    font-size: 18px;
+  }
+
+  .ds-hero-actions {
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .ds-hero-actions .ds-button-large {
+    width: auto;
+    padding: 0 36px;
+  }
+
+  .ds-hero-join {
+    align-self: auto;
+  }
+
+  .ds-features-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+  }
+
+  .ds-features {
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .ds-steps {
+    flex-direction: row;
+    gap: 32px;
+  }
+
+  .ds-step {
+    flex: 1;
+  }
+
+  .ds-join {
+    padding-bottom: 56px;
+  }
+
+  .ds-footer-inner {
+    gap: 16px;
+  }
+
+  .ds-sticky-cta {
+    display: none;
+  }
+}
+
+/* Inline menu from 900px: below that, six links and the Member login pill do not fit on one line. */
+@media (min-width: 900px) {
+  .ds-header-bar {
+    max-width: calc(var(--container) + 2 * var(--gutter));
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+    gap: 24px;
+  }
+
+  .ds-nav {
+    display: block;
+    position: static;
+    flex: 1;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .ds-nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0 18px;
+  }
+
+  .ds-nav li + li a {
+    border-top: 0;
+  }
+
+  .ds-nav a {
+    min-height: 44px;
+    padding: 0 4px;
+    font-size: 15px;
+  }
+
+  .ds-nav a[aria-current="page"] {
+    box-shadow: inset 0 -3px 0 var(--sun);
+  }
+
+  .ds-nav .ds-nav-member,
+  .ds-menu-button,
+  .ds-scrim {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-button,
+  .ds-pill-link > span,
+  .ds-sticky-cta,
+  .ds-sticky-cta.is-hidden {
+    transition: none;
+  }
+}

@@ -7,7 +7,7 @@
       "11 East Allison Street",
       "Seattle, WA 98102"
     ],
-    "phone": "206-622-0624",
+    "phone": "(206) 622-0624",
     "email": "membership@collegeclubseattle.com",
     "hours": {
       "club": "5am-8pm daily, 24/7 fob access",
@@ -24,43 +24,56 @@
       }
     ]
   },
-  "pages": {
-    "home": {
-      "title": "Home",
-      "heading": "Welcome to the club.",
-      "intro": [
-        "A member-owned waterfront club on Lake Union since 2013. A Seattle institution since 1910."
-      ],
-      "cta": {
-        "label": "Sign in to reserve a boat or class",
-        "href": "/club/sign-in"
-      },
-      "sections": [
+  "homepage": {
+    "hero": {
+      "eyebrow": "A Seattle institution since 1910",
+      "heading": "Your summer evenings, on Lake Union.",
+      "lead": "Rowing, paddling, a private gym and the best deck in town.",
+      "tourLabel": "Request a tour",
+      "joinLabel": "How to join"
+    },
+    "features": {
+      "eyebrow": "What you get",
+      "items": [
         {
-          "heading": "Discover CCS",
-          "cards": [
-            {
-              "title": "Fitness",
-              "lines": [
-                "Use of our full gym and cardio room with RP3 and Concept 2 ergs, bicycles, free weights, and more."
-              ]
-            },
-            {
-              "title": "Water sports",
-              "lines": [
-                "Rowing shells, kayaks, and paddle boards for your whole family."
-              ]
-            },
-            {
-              "title": "Member events",
-              "lines": [
-                "Access to events including dock concerts, trivia, wine tastings, game nights, paint and sip, and so much more!"
-              ]
-            }
-          ]
+          "title": "Out on the water",
+          "text": "Rowing and paddling for every level, with boats and boards ready to go."
+        },
+        {
+          "title": "A lounge with a view",
+          "text": "The Members Lounge looks right out over Lake Union."
+        },
+        {
+          "title": "People worth knowing",
+          "text": "A full calendar run by members. Come for a class, stay for the friends."
         }
       ]
     },
+    "join": {
+      "eyebrow": "How to join",
+      "heading": "Three steps to the dock.",
+      "steps": [
+        {
+          "lead": "Take a tour.",
+          "text": "Thirty minutes, no pressure."
+        },
+        {
+          "lead": "Apply.",
+          "text": "A short form and two member sponsors. We'll help you find them."
+        },
+        {
+          "lead": "Welcome aboard.",
+          "text": "Row, paddle, train, or just come for the company."
+        }
+      ],
+      "previewNote": "Placeholder. Steps 1 and 2 are the designer's draft wording, not the club's confirmed membership process (how long a tour takes, the application form and the two sponsors). Confirm the real process with the club before launch."
+    }
+  },
+  "footer": {
+    "heading": "Come see it for yourself.",
+    "copyright": "© 2026 College Club Seattle. Member-owned."
+  },
+  "pages": {
     "about": {
       "title": "About",
       "heading": "About the club",
@@ -76,9 +89,44 @@
           ],
           "bullets": [
             "Lake Union waterfront access on our oversized floating dock for picnics, sun bathing, water activities, and club events.",
-            "Members Lounge boasting panoramic views of Lake Union and the Seattle skyline, a BBQ deck, a large river rock fireplace, billiards, darts, shuffleboard, TV's and a full bar!",
-            "Toast bar with a full menu of light bites and beverages.",
+            "Members Lounge boasting panoramic views of Lake Union and the Seattle skyline, a BBQ deck, a large river rock fireplace, billiards, darts, shuffleboard and TV's.",
             "Business and personal meeting spaces."
+          ]
+        }
+      ]
+    },
+    "programs": {
+      "title": "Our Programs",
+      "heading": "Rowing and fitness",
+      "intro": [
+        "Access to quality rowing classes and equipment."
+      ],
+      "previewNote": "Placeholder. This page uses only sentences from the club's public pages for now. The current site's own Programs and Rowing pages are for members only, so their text has not been carried over.",
+      "sections": [
+        {
+          "heading": "On the water",
+          "paragraphs": [
+            "Rowing shells, kayaks, and paddle boards for your whole family."
+          ]
+        },
+        {
+          "heading": "In the gym",
+          "paragraphs": [
+            "Use of our full gym and cardio room with RP3 and Concept 2 ergs, bicycles, free weights, and more."
+          ]
+        },
+        {
+          "heading": "What members come for",
+          "bullets": [
+            "Water access",
+            "Events and concerts",
+            "Gym and workouts",
+            "Rowing (no experience)",
+            "Rowing (experienced)",
+            "Daytime workspace"
+          ],
+          "paragraphs": [
+            "Classes, programs, and boat rack rental may incur additional fees."
           ]
         }
       ]
@@ -89,12 +137,12 @@
       "intro": [
         "The College Club Seattle is located at 11 East Allison Street and offers unmatched access to Lake Union, stunning views of the city skyline and a membership experience unlike any other."
       ],
-      "previewNote": "The current site has Apply today and Request a tour forms. This preview has no forms yet (they need the club's real email sending), so the page points to the membership email and phone instead.",
+      "previewNote": "The current site has an Apply today form. This preview has no apply form yet (it needs the club's real email sending), so the page points to the membership email and phone instead. Tours can be requested on the Request a Tour page.",
       "sections": [
         {
           "heading": "A membership for you and your family",
           "paragraphs": [
-            "Questions about membership? Email membership@collegeclubseattle.com or call 206-622-0624."
+            "Questions about membership? Email membership@collegeclubseattle.com or call (206) 622-0624."
           ]
         },
         {
@@ -105,12 +153,11 @@
           "bullets": [
             "Access to quality rowing classes and equipment.",
             "Rowing shells, kayaks, and paddle boards for your whole family.",
-            "Toast bar with a full menu of light bites and beverages.",
             "Business and personal meeting spaces.",
             "Lake Union waterfront access on our oversized floating dock for picnics, sun bathing, water activities, and club events.",
-            "Members Lounge boasting panoramic views of Lake Union and the Seattle skyline, a BBQ deck, a large river rock fireplace, billiards, darts, shuffleboard, TV's and a full bar!",
+            "Members Lounge boasting panoramic views of Lake Union and the Seattle skyline, a BBQ deck, a large river rock fireplace, billiards, darts, shuffleboard and TV's.",
             "Use of our full gym and cardio room with RP3 and Concept 2 ergs, bicycles, free weights, and more.",
-            "Access to events including dock concerts, trivia, wine tastings, game nights, paint and sip, and so much more!",
+            "Access to events including dock concerts, trivia, game nights, and so much more!",
             "College Club Seattle is the proud owner of multiple sets of Seahawks season tickets as well as UW Husky Football season tickets. These are offered to our members annually with limited availability."
           ]
         },
@@ -145,41 +192,13 @@
         }
       ]
     },
-    "programs": {
-      "title": "Rowing and fitness",
-      "heading": "Rowing and fitness",
+    "tour": {
+      "title": "Request a Tour",
+      "heading": "Request a tour",
       "intro": [
-        "Access to quality rowing classes and equipment."
+        "Tell us a little about yourself and the membership team will get back to you to arrange a visit."
       ],
-      "previewNote": "Placeholder. This page uses only sentences from the club's public pages for now. The current site's own Programs and Rowing pages are for members only, so their text has not been carried over.",
-      "sections": [
-        {
-          "heading": "On the water",
-          "paragraphs": [
-            "Rowing shells, kayaks, and paddle boards for your whole family."
-          ]
-        },
-        {
-          "heading": "In the gym",
-          "paragraphs": [
-            "Use of our full gym and cardio room with RP3 and Concept 2 ergs, bicycles, free weights, and more."
-          ]
-        },
-        {
-          "heading": "What members come for",
-          "bullets": [
-            "Water access",
-            "Events and concerts",
-            "Gym and workouts",
-            "Rowing (no experience)",
-            "Rowing (experienced)",
-            "Daytime workspace"
-          ],
-          "paragraphs": [
-            "Classes, programs, and boat rack rental may incur additional fees."
-          ]
-        }
-      ]
+      "sections": []
     },
     "contact": {
       "title": "Contact",
