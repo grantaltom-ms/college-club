@@ -180,6 +180,13 @@ describe("a mistake in the content file is refused in plain words", () => {
     expect(breaks((c) => (c.homepage.hero.lead = "x".repeat(201)))).toThrow("homepage.hero.lead must be 200 characters or fewer.");
     expect(breaks((c) => (c.homepage.features.items[0].title = "x".repeat(61)))).toThrow("homepage.features.items[0].title must be 60 characters or fewer.");
     expect(breaks((c) => (c.footer.copyright = "x".repeat(121)))).toThrow("footer.copyright must be 120 characters or fewer.");
+    expect(breaks((c) => (c.homepage.join.previewNote = "x".repeat(401)))).toThrow("homepage.join.previewNote must be 400 characters or fewer.");
+    expect(breaks((c) => (c.homepage.join.steps[1].text = "x".repeat(201)))).toThrow("homepage.join.steps[1].text must be 200 characters or fewer.");
+  });
+
+  it("accepts the join note and a step's text at exactly their limits", () => {
+    expect(breaks((c) => (c.homepage.join.previewNote = "x".repeat(400)))).not.toThrow();
+    expect(breaks((c) => (c.homepage.join.steps[1].text = "x".repeat(200)))).not.toThrow();
   });
 
   it("insists on exactly three things you get and three steps, because the design is laid out for three", () => {

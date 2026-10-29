@@ -139,6 +139,7 @@ describe.skipIf(!ADMIN_URL)("the tour request cards", () => {
       ["the phone number", "phone = '555'"],
       ["the note", "note = 'edited'"],
       ["the arrival time", "created_at = '2020-01-01T00:00:00Z'"],
+      ["the id", `id = '${randomUUID()}'`],
     ])("cannot change %s while marking it followed up", async (_what, change) => {
       const id = await saved({ note: "original" });
       const failure = await attempt(`update club.tour_requests set status = 'followed_up', followed_up_at = '2026-10-28T21:00:00Z', followed_up_by = 'Alex Staffer', ${change} where id = $1`, [id]);
