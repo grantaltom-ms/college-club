@@ -334,11 +334,18 @@ test.describe("the menu on a phone", () => {
   test("sits right under the header, whatever the page has scrolled to, without dimming the header itself", async ({ page }) => {
     await page.goto("/site/membership");
     await page.mouse.wheel(0, 600);
-    await page.waitForTimeout(150);
+    // Wait for the scroll to have happened rather than for a fixed time, then read all three boxes in one go, so a page that is
+    // still settling cannot make the readings disagree.
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
     await menuButton(page).click();
-    const [header, panel] = await Promise.all([page.getByTestId("site-header").boundingBox(), nav(page).boundingBox()]);
-    expect(Math.round(panel!.y)).toBe(Math.round(header!.y + header!.height));
-    expect(await page.locator(".ds-scrim").evaluate((el) => Math.round(el.getBoundingClientRect().top))).toBe(Math.round(header!.y + header!.height));
+    await expect(nav(page)).toBeVisible();
+    const seen = await page.evaluate(() => {
+      const bottom = (selector: string) => Math.round(document.querySelector(selector)!.getBoundingClientRect().bottom);
+      const top = (selector: string) => Math.round(document.querySelector(selector)!.getBoundingClientRect().top);
+      return { headerBottom: bottom('[data-testid="site-header"]'), panelTop: top('nav[aria-label="Main"]'), scrimTop: top(".ds-scrim") };
+    });
+    expect(seen.panelTop).toBe(seen.headerBottom);
+    expect(seen.scrimTop).toBe(seen.headerBottom);
   });
 });
 
