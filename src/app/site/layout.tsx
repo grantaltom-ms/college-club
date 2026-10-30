@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { connection } from "next/server";
-import { PAGE_KEYS, PAGE_PATHS, SITE } from "@/site/content";
+import { SiteFooter } from "@/components/ds/SiteFooter";
+import { SiteHeader } from "@/components/ds/SiteHeader";
+import { StickyCta } from "@/components/ds/StickyCta";
+import { Logo } from "@/components/ds/Pieces";
+import { NAV, PAGE_PATHS, SITE } from "@/site/content";
 import { siteEnabled } from "@/site/enabled";
 import { requireSite } from "@/site/guard";
+import { MEMBER_APP_URL } from "@/site/links";
+import "@/components/ds/ds.css";
 import "./site.css";
 
 /** Nothing about the public site, not even its title, appears when it is switched off. */
@@ -17,57 +22,21 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-/** What every public page shares: the menu, the preview banner and the footer. */
+/** What every public page shares: the preview banner, the sticky header, the footer, and the phone-only "Request a tour" bar. */
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   await requireSite();
-  const { club } = SITE;
+  const { club, footer } = SITE;
   return (
     <div className="site">
-      <header className="site-header">
-        <div className="site-frame site-header-row">
-          <Link href="/site" className="site-wordmark">
-            {club.name}
-          </Link>
-          <nav aria-label="Main">
-            {PAGE_KEYS.map((key) => (
-              <Link key={key} href={PAGE_PATHS[key]}>
-                {SITE.pages[key].title}
-              </Link>
-            ))}
-            <Link href="/club/sign-in" className="site-signin" data-testid="site-signin">
-              Sign in
-            </Link>
-          </nav>
-        </div>
-      </header>
       <div className="site-banner" role="note" data-testid="site-preview-banner">
         <p className="site-frame">Preview of the new club website. It is not live yet.</p>
       </div>
-      <main className="site-frame">{children}</main>
-      <footer className="site-footer">
-        <div className="site-frame site-footer-row">
-          <p>
-            <strong>{club.name}</strong>
-            <br />
-            {club.address.map((line) => (
-              <span key={line}>
-                {line}
-                <br />
-              </span>
-            ))}
-          </p>
-          <p>
-            <a href={`tel:${club.phone.replaceAll("-", "")}`}>{club.phone}</a>
-            <br />
-            <a href={`mailto:${club.email}`}>{club.email}</a>
-          </p>
-          <p>
-            Club: {club.hours.club}
-            <br />
-            Office: {club.hours.office}
-          </p>
-        </div>
-      </footer>
+      <SiteHeader nav={NAV} memberLoginHref={MEMBER_APP_URL}>
+        <Logo tone="black" size={36} />
+      </SiteHeader>
+      <main>{children}</main>
+      <SiteFooter heading={footer.heading} address={club.address} phone={club.phone} copyright={footer.copyright} memberLoginHref={MEMBER_APP_URL} />
+      <StickyCta href={PAGE_PATHS.tour} label="Request a tour" />
     </div>
   );
 }

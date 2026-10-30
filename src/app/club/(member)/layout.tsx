@@ -1,8 +1,13 @@
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { pickerEnabled } from "@/club/enabled";
 import { fullName } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
+import { memberAppMetadata, memberAppViewport } from "@/club/pwa";
+
+export const generateMetadata = (): Promise<Metadata> => memberAppMetadata();
+export const generateViewport = (): Promise<Viewport> => memberAppViewport();
 
 /**
  * The menu bar, the test-build banner and the "acting as" line, around every member and staff page. The front-desk iPad

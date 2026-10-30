@@ -7,63 +7,18 @@
 
 .site-frame {
   width: 100%;
-  max-width: 960px;
+  max-width: calc(var(--container) + 2 * var(--gutter));
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 var(--gutter);
 }
 
 .site main {
   flex: 1;
+}
+
+/* The inner pages (About, Membership, Our Programs, Request a Tour, Contact) sit in a padded frame under the header. */
+.site-page {
   padding-bottom: 56px;
-}
-
-.site-header {
-  background: var(--card);
-  border-bottom: 1px solid var(--hairline);
-}
-
-.site-header-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 28px;
-  padding-top: 14px;
-  padding-bottom: 10px;
-}
-
-.site-wordmark {
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: 1.25rem;
-  letter-spacing: 0.05em;
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.site-header nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 22px;
-}
-
-.site-header nav a {
-  display: inline-block;
-  padding: 10px 0;
-  color: var(--waterloo);
-  text-decoration: none;
-}
-
-.site-header nav a:hover {
-  text-decoration: underline;
-}
-
-.site-header nav a.site-signin {
-  margin-left: 4px;
-  padding: 6px 16px;
-  border: 1px solid var(--waterloo);
-  border-radius: 4px;
 }
 
 .site-banner {
@@ -175,24 +130,6 @@
   padding: 0;
 }
 
-.site-footer {
-  border-top: 1px solid var(--hairline);
-  background: var(--card);
-  padding: 24px 0;
-  font-size: 0.95rem;
-  color: var(--cyberspace);
-}
-
-.site-footer-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px 32px;
-}
-
-.site-footer p {
-  margin: 0;
-}
-
 @media (max-width: 560px) {
   .site-hero {
     padding-top: 28px;
@@ -200,7 +137,21 @@
   .site-hero h1 {
     font-size: 1.8rem;
   }
-  .site-header nav {
-    gap: 0 16px;
-  }
+}
+
+/* The Request a tour page: the form sits in a narrow column so the boxes are comfortable to type in. */
+.site-tour {
+  max-width: 520px;
+}
+
+.site-tour .site-tour-talk {
+  margin-top: 28px;
+  font-family: var(--ui);
+  font-size: 15px;
+  color: var(--cyberspace);
+}
+
+.site-tour .ds-error,
+.site-tour .ds-status {
+  margin: 0;
 }

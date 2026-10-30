@@ -60,6 +60,12 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         "/club/admin/visitors",
         "/club/admin/billing",
         "/club/admin/billing?month=2026-09",
+        "/club/admin/tours",
+        "/club/manifest.webmanifest",
+        "/club/pwa-icon/180",
+        "/club/pwa-icon/192",
+        "/club/pwa-icon/512",
+        "/club/pwa-icon/999",
         "/api/club/billing/2026-09/qbo/1",
         "/api/club/billing/2026-09/charges",
         `/club/ipad/${IPAD_CODE}`,
@@ -81,7 +87,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest/i);
       }
     });
 
@@ -153,6 +159,9 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         importRoster: "/club/admin/import",
         importHistory: "/club/admin/history",
         endHouseholds: "/club/admin/resignations",
+        markFollowedUp: "/club/admin/tours",
+        // The public Request a tour form is a server action too, on the public site, which has its own switch (see site-hidden.spec.ts).
+        requestTour: "/site/request-a-tour",
         addCharge: "/club/admin/charges",
         voidChargeAction: "/club/admin/charges",
         addVisitors: "/club/admin/visitors",
@@ -172,7 +181,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
             body: "[]",
           });
           expect(res.status, `${name} ${JSON.stringify(extra)}`).toBe(404);
-          expect(await res.text(), `${name} ${JSON.stringify(extra)}`).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build|Monthly billing|Recent charges|Add a charge|Record visitors|QuickBooks|added to|recorded for|is closed|old booking|iCrew|End memberships|Yes, end|Resignations file/i);
+          expect(await res.text(), `${name} ${JSON.stringify(extra)}`).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build|Monthly billing|Recent charges|Add a charge|Record visitors|QuickBooks|added to|recorded for|is closed|old booking|iCrew|End memberships|Yes, end|Resignations file|Tour requests|followed up|Request a tour|Send request/i);
         }
       }
     });

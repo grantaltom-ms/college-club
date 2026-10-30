@@ -9,6 +9,8 @@ import { MemoryHistoryStore, type HistoryStore } from "../store/history";
 import { PgHistoryStore } from "../store/history-postgres";
 import { MemoryClubStore, sequentialIds, type ClubStore, type Settler } from "../store/memory";
 import { PgClubStore, createClubPool } from "../store/postgres";
+import { MemoryTourStore, type TourStore } from "../store/tours";
+import { PgTourStore } from "../store/tours-postgres";
 import { addDays, pacificWall } from "../time";
 import type { Actor, Item, RuleBook, RuleValues } from "../types";
 import { BookingRefused, createBooking, type BookingOptions, type BookingRequest, type ReasonCode } from "./bookings";
@@ -99,6 +101,29 @@ export function openAnotherHistory(url: string): PgHistoryStore {
   const pool = createClubPool(url, 8);
   cleanups.push(() => pool.end());
   return new PgHistoryStore(pool);
+}
+
+/** A new, empty list of tour requests of the given kind. A Postgres one gets its own throwaway database, removed after the test. */
+export const tourUrls = new WeakMap<TourStore, string>();
+
+export async function makeTourStore(kind: StoreKind): Promise<TourStore> {
+  if (kind === "memory") return new MemoryTourStore();
+  const db = await cloneScratchDb(POSTGRES_URL!);
+  const pool = createClubPool(db.url, 8);
+  const store = new PgTourStore(pool);
+  tourUrls.set(store, db.url);
+  cleanups.push(async () => {
+    await pool.end();
+    await db.drop();
+  });
+  return store;
+}
+
+/** A second app server's view of a Postgres list of tour requests: its own connections, the same data. */
+export function openAnotherTours(url: string): PgTourStore {
+  const pool = createClubPool(url, 8);
+  cleanups.push(() => pool.end());
+  return new PgTourStore(pool);
 }
 
 export interface Fixture {
