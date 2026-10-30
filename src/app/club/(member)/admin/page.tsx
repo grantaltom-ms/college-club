@@ -97,6 +97,27 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
         </ul>
       )}
 
+      <h2>Damage reports</h2>
+      {summary.damage.open === 0 ? (
+        <p data-testid="damage-board">Nothing is waiting to be fixed. <Link href="/club/admin/damage">Damage reports</Link></p>
+      ) : (
+        <>
+          <p data-testid="damage-board">
+            {summary.damage.open} waiting to be fixed{summary.damage.major > 0 ? `, ${summary.damage.major} marked major` : ""}
+            {summary.damage.majorInService > 0 ? `, ${summary.damage.majorInService} of those on a boat still in service` : ""}. <Link href="/club/admin/damage">Damage reports</Link>
+          </p>
+          <ul className="club-list" data-testid="damage-top">
+            {summary.damage.top.map((r) => (
+              <li key={r.reportId}>
+                <Link href={`/club/admin/damage/${r.reportId}`}>{r.itemName}</Link>
+                {r.major ? " (major)" : ""}: {r.description} &middot; priority {r.priority}
+                {r.outOfService ? " · out of service" : ""}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       {summary.lockedBoats.length > 0 && (
         <>
           <h2>Private boats with no owner</h2>
@@ -134,7 +155,7 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
           <Link href="/club/admin/check-in">Check someone in</Link> · <Link href="/club/admin/ipad">Front-desk iPad</Link>
         </li>
         <li>
-          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link> · <Link href="/club/admin/equipment-import">Load the equipment list</Link> · <Link href="/club/admin/boats">Private boats</Link>
+          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link> · <Link href="/club/admin/equipment-import">Load the equipment list</Link> · <Link href="/club/admin/boats">Private boats</Link> · <Link href="/club/admin/damage">Damage reports</Link>
         </li>
         <li>
           <Link href="/club/classes/manage">Add a class or schedule sessions</Link> · <Link href="/club/events/manage">Add an event</Link>

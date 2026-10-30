@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ATTENDANCE_RULES } from "../settings/attendance-rules";
 import { CLASS_RULES } from "../settings/class-rules";
+import { DAMAGE_RULES } from "../settings/damage-rules";
 import { EVENT_RULES } from "../settings/event-rules";
 import { cancelBooking, takeOutOfService } from "./bookings";
 import { createClass, scheduleSessions, signUp } from "./classes";
+import { dismissDamageReport, fileDamageReport } from "./damage";
 import { createEvent, rsvp } from "./events";
 import { officeSummary } from "./office";
 import { NOW, STORE_KINDS, at, bookAs, buildFixtureSettling, memberCtx, staffCtx } from "./testkit";
@@ -72,5 +74,16 @@ describe.each(STORE_KINDS)("the staff board on the %s store", (kind) => {
     clock.now = at(1, 9);
     const summary = officeSummary(await f.store.read(), clock.now, ATTENDANCE_RULES);
     expect(summary.needsLook.map((r) => r.id)).toEqual([booking.id]);
+  });
+  it("puts the damage board on the staff page: what is open, what is major, and the most pressing reports first", async () => {
+    const f = await buildFixtureSettling(kind, () => NOW);
+    expect(officeSummary(await f.store.read(), NOW, ATTENDANCE_RULES).damage).toEqual({ open: 0, major: 0, majorInService: 0, top: [] });
+    const minor = await fileDamageReport(f.store, memberCtx(f.m.Ada, "Ada Quill"), DAMAGE_RULES, { itemId: f.i.Heron, description: "Seat sticks.", major: false });
+    const major = await fileDamageReport(f.store, memberCtx(f.m.Ben, "Ben Quill"), DAMAGE_RULES, { itemId: f.i.Osprey, description: "Rigger bent.", major: true });
+    const closed = await fileDamageReport(f.store, memberCtx(f.m.Cy, "Cy Quill"), DAMAGE_RULES, { itemId: f.i.Loon, description: "Scratch.", major: true });
+    await dismissDamageReport(f.store, staffCtx(), DAMAGE_RULES, { reportId: closed.id, reason: "Duplicate." });
+    const damage = officeSummary(await f.store.read(), NOW, ATTENDANCE_RULES).damage;
+    expect(damage).toMatchObject({ open: 2, major: 1, majorInService: 1 });
+    expect(damage.top.map((r) => r.reportId)).toEqual([major.id, minor.id]);
   });
 });

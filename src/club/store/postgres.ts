@@ -21,6 +21,11 @@ import type {
   ClassSession,
   ClassTemplate,
   ClubState,
+  DamageLogEntry,
+  DamageLogKind,
+  DamagePriority,
+  DamageReport,
+  DamageStatus,
   HistoryEntry,
   HistoryKind,
   Household,
@@ -104,6 +109,8 @@ interface MemberQualificationRow { member_id: string; qualification_code: string
 interface HistoryRow { id: string; household_id: string; at: Date; kind: HistoryKind; summary: string; actor_kind: string; actor_id: string | null; actor_label: string; details: HistoryEntry["details"] }
 interface ItemRow { id: string; name: string; class_code: string; rule_overrides: Partial<RuleValues>; qualification_mode: "class" | "none" | "code"; required_qualification: string | null; is_private: boolean; places: number }
 interface BoatAccessRow { id: string; item_id: string; member_id: string; kind: BoatAccessKind; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null; ended_reason: string | null }
+interface DamageReportRow { id: string; item_id: string; reported_by_kind: string; reported_by_id: string | null; reported_by_label: string; reported_at: Date; description: string; location: string; how_it_happened: string; major: boolean; priority: number; status: DamageStatus; updated_at: Date; assigned_to: string | null; closed_at: Date | null; repaired_on: string | null; repaired_by: string | null; repair_minutes: number | null; cost_cents: number | null; repair_notes: string | null; dismissed_reason: string | null }
+interface DamageLogRow { id: string; report_id: string; at: Date; kind: DamageLogKind; by_kind: string; by_id: string | null; by_label: string; text: string }
 interface OutOfServiceRow { id: string; item_id: string; from_at: Date; until_at: Date | null; reason: string; expected_return: string | null; created_by_kind: string; created_by_label: string; created_at: Date }
 interface BookingRow { id: string; item_id: string; booker_id: string; starts_at: Date; ends_at: Date; status: BookingStatus; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null; override_reason: string | null; override_by_label: string | null; override_waived: string[] | null }
 interface ClassRow { id: string; name: string; description: string; instructor: string; default_capacity: number; default_minutes: number; room_item_id: string | null; rules: Partial<ClassRuleValues> }
@@ -182,6 +189,30 @@ const toBoatAccess = (r: BoatAccessRow): BoatAccess => ({
   endedBy: r.ended_by_kind ? actorFrom(r.ended_by_kind, r.ended_by_id, r.ended_by_label ?? "") : null,
   endedReason: r.ended_reason,
 });
+
+const toDamageReport = (r: DamageReportRow): DamageReport => ({
+  id: r.id,
+  itemId: r.item_id,
+  reportedBy: actorFrom(r.reported_by_kind, r.reported_by_id, r.reported_by_label),
+  reportedAt: iso(r.reported_at),
+  description: r.description,
+  location: r.location,
+  howItHappened: r.how_it_happened,
+  major: r.major,
+  priority: r.priority as DamagePriority,
+  status: r.status,
+  updatedAt: iso(r.updated_at),
+  assignedTo: r.assigned_to,
+  closedAt: r.closed_at ? iso(r.closed_at) : null,
+  repairedOn: r.repaired_on,
+  repairedBy: r.repaired_by,
+  repairMinutes: r.repair_minutes,
+  costCents: r.cost_cents,
+  repairNotes: r.repair_notes,
+  dismissedReason: r.dismissed_reason,
+});
+
+const toDamageLog = (r: DamageLogRow): DamageLogEntry => ({ id: r.id, reportId: r.report_id, at: iso(r.at), kind: r.kind, by: actorFrom(r.by_kind, r.by_id, r.by_label), text: r.text });
 
 const toOutOfService = (r: OutOfServiceRow): OutOfServicePeriod => ({
   id: r.id,
@@ -378,6 +409,13 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
   const history = await rows<HistoryRow>(c, `select id, household_id, at, kind, summary, actor_kind, actor_id, actor_label, details from club.household_history order by seq`);
   const items = await rows<ItemRow>(c, `select id, name, class_code, rule_overrides, qualification_mode, required_qualification, is_private, places from club.items order by seq`);
   const access = await rows<BoatAccessRow>(c, `select id, item_id, member_id, kind, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label, ended_reason from club.item_access order by seq`);
+  const damage = await rows<DamageReportRow>(
+    c,
+    `select id, item_id, reported_by_kind, reported_by_id, reported_by_label, reported_at, description, location, how_it_happened, major, priority, status, updated_at, assigned_to, closed_at,
+            repaired_on, repaired_by, repair_minutes, cost_cents, repair_notes, dismissed_reason
+       from club.damage_reports order by seq`,
+  );
+  const damageLog = await rows<DamageLogRow>(c, `select id, report_id, at, kind, by_kind, by_id, by_label, text from club.damage_log order by seq`);
   const oos = await rows<OutOfServiceRow>(c, `select id, item_id, from_at, until_at, reason, expected_return, created_by_kind, created_by_label, created_at from club.out_of_service order by seq`);
   const bookingRows = await rows<BookingRow>(
     c,
@@ -455,6 +493,8 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
     items: items.map(toItem),
     outOfService: oos.map(toOutOfService),
     boatAccess: access.map(toBoatAccess),
+    damageReports: damage.map(toDamageReport),
+    damageLog: damageLog.map(toDamageLog),
     bookings: bookingRows.map((b) => toBooking(b, crew)),
     classes: classes.map(toClass),
     sessions: sessionRows.map(toSession),
@@ -546,6 +586,29 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
     await run(`insert into club.out_of_service (id, item_id, from_at, until_at, reason, expected_return, created_by_kind, created_by_label, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [p.id, p.itemId, p.from, p.until, p.reason, p.expectedReturn, p.createdBy.kind, p.createdBy.label, p.createdAt]);
   }
   for (const p of oo.updated) await run(`update club.out_of_service set until_at=$2, reason=$3, expected_return=$4 where id=$1`, [p.id, p.until, p.reason, p.expectedReturn]);
+
+  // Damage reports: filed once, then triaged and closed (never removed), and a log of everything that happened, only ever added to.
+  // The log goes in after the reports, because each line points at a report; the database checks the pair at the end of the change.
+  const dr = compare("damage reports", before.damageReports, after.damageReports);
+  for (const x of dr.added) {
+    await run(
+      `insert into club.damage_reports (id, item_id, reported_by_kind, reported_by_id, reported_by_label, reported_at, description, location, how_it_happened, major, priority, status, updated_at, assigned_to, closed_at,
+                                       repaired_on, repaired_by, repair_minutes, cost_cents, repair_notes, dismissed_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+      [x.id, x.itemId, x.reportedBy.kind, actorId(x.reportedBy), x.reportedBy.label, x.reportedAt, x.description, x.location, x.howItHappened, x.major, x.priority, x.status, x.updatedAt, x.assignedTo, x.closedAt, x.repairedOn, x.repairedBy, x.repairMinutes, x.costCents, x.repairNotes, x.dismissedReason],
+    );
+  }
+  for (const x of dr.updated) {
+    await run(
+      `update club.damage_reports set priority=$2, status=$3, updated_at=$4, assigned_to=$5, closed_at=$6, repaired_on=$7, repaired_by=$8, repair_minutes=$9, cost_cents=$10, repair_notes=$11, dismissed_reason=$12 where id=$1`,
+      [x.id, x.priority, x.status, x.updatedAt, x.assignedTo, x.closedAt, x.repairedOn, x.repairedBy, x.repairMinutes, x.costCents, x.repairNotes, x.dismissedReason],
+    );
+  }
+  const dl = compare("damage report log lines", before.damageLog, after.damageLog);
+  if (dl.updated.length > 0) throw new Error("A damage report's log can only be added to, never changed.");
+  for (const l of dl.added) {
+    await run(`insert into club.damage_log (id, report_id, at, kind, by_kind, by_id, by_label, text) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [l.id, l.reportId, l.at, l.kind, l.by.kind, actorId(l.by), l.by.label, l.text]);
+  }
 
   const bb = compare("bookings", before.bookings, after.bookings);
   for (const b of bb.added) {

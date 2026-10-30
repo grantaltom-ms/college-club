@@ -423,6 +423,94 @@ export interface Rsvp {
   cancelReason: string | null;
 }
 
+/* ---------- Damage reports ---------- */
+
+/** The numbers behind damage reports. Every value lives in settings/damage-rules.json, never in code. */
+export interface DamageRuleValues {
+  /** The most reports one member can file in 24 hours (staff are not limited). 0 means no limit. */
+  filedPerMemberPerDay: number;
+  /** The priority a report starts with when it is filed as major, and when it is not (1 is the most urgent, 4 the least). */
+  majorPriority: number;
+  minorPriority: number;
+  /** Longest text, in characters, for each box. */
+  descriptionMax: number;
+  locationMax: number;
+  howMax: number;
+  noteMax: number;
+  assignedToMax: number;
+  repairedByMax: number;
+  repairNotesMax: number;
+  dismissReasonMax: number;
+}
+
+export interface DamageRules {
+  /** True while the numbers are placeholders. */
+  placeholder: boolean;
+  defaults: DamageRuleValues;
+}
+
+/** Where a damage report stands. Open and in progress are "still to fix"; repaired and dismissed are final. */
+export const DAMAGE_STATUSES = ["open", "in_progress", "repaired", "dismissed"] as const;
+export type DamageStatus = (typeof DAMAGE_STATUSES)[number];
+
+/** Reports that still need work. */
+export const OPEN_DAMAGE: readonly DamageStatus[] = ["open", "in_progress"];
+
+export const DAMAGE_PRIORITIES = [1, 2, 3, 4] as const;
+export type DamagePriority = (typeof DAMAGE_PRIORITIES)[number];
+
+/**
+ * One damage report on a boat or other item: what is wrong, where, how it happened, whether it is major, and how the fix is going.
+ * The building comparison: a maintenance work order. What the filer wrote is never changed afterwards; staff only triage it (priority,
+ * who has it) and close it, and every step is a line in the report's log.
+ */
+export interface DamageReport {
+  id: string;
+  itemId: string;
+  /** Any signed-in member, or staff. */
+  reportedBy: Actor;
+  reportedAt: string;
+  /** What is wrong. Everyone who books the item sees this, so it should not name anyone. */
+  description: string;
+  /** Where on the item. Also shown to everyone who books it. */
+  location: string;
+  /** How it happened. Only staff see this. */
+  howItHappened: string;
+  /** The filer's judgement: the item should not be used until someone has looked. */
+  major: boolean;
+  /** 1 (most urgent) to 4. Starts from the major flag; staff can change it. */
+  priority: DamagePriority;
+  status: DamageStatus;
+  /** When the report last changed in any way (status, priority or who has it). */
+  updatedAt: string;
+  /** Who is fixing it, in words. Null until staff say. */
+  assignedTo: string | null;
+  /** Set exactly when the report is closed (repaired or dismissed). */
+  closedAt: string | null;
+  /** YYYY-MM-DD, Pacific. Set exactly when repaired. */
+  repairedOn: string | null;
+  repairedBy: string | null;
+  repairMinutes: number | null;
+  costCents: number | null;
+  repairNotes: string | null;
+  /** Set exactly when dismissed. */
+  dismissedReason: string | null;
+}
+
+export const DAMAGE_LOG_KINDS = ["filed", "note", "assigned", "priority_changed", "started", "taken_out_of_service", "returned_to_service", "repaired", "dismissed"] as const;
+export type DamageLogKind = (typeof DAMAGE_LOG_KINDS)[number];
+
+/** One line in a report's log. Lines are only ever added, never changed or removed. */
+export interface DamageLogEntry {
+  id: string;
+  reportId: string;
+  at: string;
+  kind: DamageLogKind;
+  by: Actor;
+  /** The line in words ("Priority changed from 3 to 1."), or for a note, the note itself. */
+  text: string;
+}
+
 /* ---------- Check-ins and attendance (step 5) ---------- */
 
 /** The house rules for checking in. Every value lives in settings/attendance-rules.json, never in code. */
@@ -593,6 +681,9 @@ export interface ClubState {
   outOfService: OutOfServicePeriod[];
   /** Who may use each private boat. Empty lines for a club boat: it has no list. */
   boatAccess: BoatAccess[];
+  /** Every damage report ever filed, and the log of what happened to each. Reports are never removed. */
+  damageReports: DamageReport[];
+  damageLog: DamageLogEntry[];
   bookings: Booking[];
   classes: ClassTemplate[];
   sessions: ClassSession[];

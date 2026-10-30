@@ -426,6 +426,51 @@ export function affectedBookings(state: ClubState, itemId: string, from: Date, u
 }
 
 /**
+ * Puts an item out of service on the working copy of a change. `takeOutOfService` wraps it in a change of its own; a damage
+ * report's "Take out of service" button runs it inside the same change that writes the report's log line, so the two happen
+ * together or not at all.
+ */
+export function addOutOfService(
+  s: ClubState,
+  newId: () => string,
+  ctx: Ctx,
+  itemId: string,
+  input: { from?: Date; until?: Date | null; reason: string; expectedReturn?: string | null },
+): { period: OutOfServicePeriod; affected: AffectedBooking[] } {
+  if (ctx.actor.kind !== "staff") throw new ClubError("forbidden", "Only club staff can take something out of service.");
+  const reason = input.reason.trim();
+  if (!reason) throw new ClubError("invalid", "Say why it is out of service; members will see the reason.");
+  if (reason.length > 200) throw new ClubError("invalid", "The reason must be 200 characters or fewer.");
+  const from = input.from ?? ctx.now;
+  const until = input.until ?? null;
+  if (until && until.getTime() <= from.getTime()) throw new ClubError("invalid", "The return time must be after it goes out of service.");
+  if (input.expectedReturn && !/^\d{4}-\d{2}-\d{2}$/.test(input.expectedReturn)) throw new ClubError("invalid", "The expected return date must look like 2026-11-05.");
+  itemById(s, itemId);
+  const period: OutOfServicePeriod = {
+    id: newId(),
+    itemId,
+    from: from.toISOString(),
+    until: until ? until.toISOString() : null,
+    reason,
+    expectedReturn: input.expectedReturn ?? null,
+    createdBy: ctx.actor,
+    createdAt: ctx.now.toISOString(),
+  };
+  s.outOfService.push(period);
+  return { period: structuredClone(period), affected: affectedBookings(s, itemId, from, until) };
+}
+
+/** Ends an out-of-service period on the working copy of a change (the same split as `addOutOfService`). */
+export function endOutOfService(s: ClubState, ctx: Ctx, periodId: string): OutOfServicePeriod {
+  if (ctx.actor.kind !== "staff") throw new ClubError("forbidden", "Only club staff can return something to service.");
+  const period = s.outOfService.find((p) => p.id === periodId);
+  if (!period) throw new ClubError("not_found", "That out-of-service entry no longer exists.");
+  if (period.until !== null && Date.parse(period.until) <= ctx.now.getTime()) throw new ClubError("conflict", "That item is already back in service.");
+  period.until = ctx.now.toISOString();
+  return structuredClone(period);
+}
+
+/**
  * Staff take an item out of service. New bookings that overlap are refused from now on. Bookings already made
  * are kept, and the members affected are listed so staff can contact them.
  */
@@ -436,40 +481,13 @@ export async function takeOutOfService(
   input: { from?: Date; until?: Date | null; reason: string; expectedReturn?: string | null },
 ): Promise<{ period: OutOfServicePeriod; affected: AffectedBooking[] }> {
   if (ctx.actor.kind !== "staff") throw new ClubError("forbidden", "Only club staff can take something out of service.");
-  const reason = input.reason.trim();
-  if (!reason) throw new ClubError("invalid", "Say why it is out of service; members will see the reason.");
-  if (reason.length > 200) throw new ClubError("invalid", "The reason must be 200 characters or fewer.");
-  const from = input.from ?? ctx.now;
-  const until = input.until ?? null;
-  if (until && until.getTime() <= from.getTime()) throw new ClubError("invalid", "The return time must be after it goes out of service.");
-  if (input.expectedReturn && !/^\d{4}-\d{2}-\d{2}$/.test(input.expectedReturn)) throw new ClubError("invalid", "The expected return date must look like 2026-11-05.");
-  return store.transaction(async (s, newId) => {
-    itemById(s, itemId);
-    const period: OutOfServicePeriod = {
-      id: newId(),
-      itemId,
-      from: from.toISOString(),
-      until: until ? until.toISOString() : null,
-      reason,
-      expectedReturn: input.expectedReturn ?? null,
-      createdBy: ctx.actor,
-      createdAt: ctx.now.toISOString(),
-    };
-    s.outOfService.push(period);
-    return { period: structuredClone(period), affected: affectedBookings(s, itemId, from, until) };
-  });
+  return store.transaction(async (s, newId) => addOutOfService(s, newId, ctx, itemId, input));
 }
 
 /** The item is back. New bookings are allowed again from now. */
 export async function returnToService(store: ClubStore, ctx: Ctx, periodId: string): Promise<OutOfServicePeriod> {
   if (ctx.actor.kind !== "staff") throw new ClubError("forbidden", "Only club staff can return something to service.");
-  return store.transaction(async (s) => {
-    const period = s.outOfService.find((p) => p.id === periodId);
-    if (!period) throw new ClubError("not_found", "That out-of-service entry no longer exists.");
-    if (period.until !== null && Date.parse(period.until) <= ctx.now.getTime()) throw new ClubError("conflict", "That item is already back in service.");
-    period.until = ctx.now.toISOString();
-    return structuredClone(period);
-  });
+  return store.transaction(async (s) => endOutOfService(s, ctx, periodId));
 }
 
 /** The out-of-service period an item is in at a moment, if any. */

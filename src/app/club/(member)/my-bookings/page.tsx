@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { clubNow } from "@/club/clock";
 import { checkInNeeded, rowFor, selfCheckInPhase } from "@/club/engine/attendance";
+import { bookingDamageNotices, noticeWords, type DamageNotice } from "@/club/engine/damage";
 import { fullName, memberById } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
@@ -25,7 +26,7 @@ const STATUS: Record<Booking["status"], string> = {
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
-function Row({ state, booking, viewerId, now, staff }: { state: ClubState; booking: Booking; viewerId: string | null; now: Date; staff: boolean }) {
+function Row({ state, booking, viewerId, now, staff, damage }: { state: ClubState; booking: Booking; viewerId: string | null; now: Date; staff: boolean; damage: DamageNotice[] }) {
   const item = state.items.find((i) => i.id === booking.itemId)!;
   const booker = memberById(state, booking.bookerId)!;
   const crew = booking.crew.map((id) => fullName(memberById(state, id)!));
@@ -58,6 +59,13 @@ function Row({ state, booking, viewerId, now, staff }: { state: ClubState; booki
         {booking.override ? ` · staff override: ${booking.override.reason}` : ""}
         {booking.cancelReason ? ` · ${booking.cancelReason}` : ""}
       </p>
+      {damage.length > 0 && (
+        <div className={`club-damage${damage.some((n) => n.major) ? " club-damage-major" : ""}`} data-testid="booking-damage-notice">
+          {damage.map((n) => (
+            <p key={n.reportId}>{noticeWords(n)}</p>
+          ))}
+        </div>
+      )}
       {staff && attendance && <AttendanceButtons row={attendance} who={fullName(booker)} back="/club/my-bookings" />}
       <SelfCheckIn kind="booking" id={booking.id} title={item.name} phase={checkIn} now={now} back="/club/my-bookings" />
       {cancellable && (
@@ -94,6 +102,7 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
   const booked = bookedId ? state.bookings.find((b) => b.id === bookedId) : undefined;
   const cancelled = cancelledId ? state.bookings.find((b) => b.id === cancelledId) : undefined;
   const checkedIn = checkedInId ? state.bookings.find((b) => b.id === checkedInId && b.status === "completed" && viewerId && (b.bookerId === viewerId || b.crew.includes(viewerId))) : undefined;
+  const damage = viewerId ? bookingDamageNotices(state, viewerId, now) : {};
   const nameOf = (b: Booking) => state.items.find((i) => i.id === b.itemId)!.name;
   const notice = NOTICES[one(params.notice) ?? ""];
 
@@ -130,7 +139,7 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
       ) : (
         <ul className="club-cards" aria-label="Upcoming bookings">
           {upcoming.map((b) => (
-            <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} />
+            <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} damage={damage[b.id] ?? []} />
           ))}
         </ul>
       )}
@@ -141,7 +150,7 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
       ) : (
         <ul className="club-cards" aria-label="Past bookings">
           {past.map((b) => (
-            <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} />
+            <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} damage={damage[b.id] ?? []} />
           ))}
         </ul>
       )}

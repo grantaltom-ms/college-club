@@ -32,6 +32,17 @@ export async function startMemberAction(): Promise<{ ctx: Ctx; store: Awaited<Re
   return { ctx: { actor: toEngineActor(actor), now: clubNow() }, store: await getClubStore(), memberId: actor.member.id };
 }
 
+/**
+ * What a server action open to everyone signed in starts with, members and staff alike (filing a damage report): the member area
+ * must be on and somebody must be signed in. Nobody, and the live site, gets "page not found". The engine decides what each may do.
+ */
+export async function startSignedInAction(): Promise<{ ctx: Ctx; store: Awaited<ReturnType<typeof getClubStore>> }> {
+  if (!clubEnabled()) notFound();
+  const actor = await getCurrentActor();
+  if (!actor) notFound();
+  return { ctx: { actor: toEngineActor(actor), now: clubNow() }, store: await getClubStore() };
+}
+
 /** A refusal turned into the screen's message. Anything that is not a refusal (the database is down) is passed on, not hidden. */
 export function refusal(e: unknown): ActionResult {
   if (e instanceof ClubError) return { kind: "error", message: e.message };
