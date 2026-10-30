@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { requireClub } from "@/club/guard";
+import { INSTALL_CAPTURE_SCRIPT } from "@/club/install-offer";
 import { memberAppMetadata, memberAppViewport } from "@/club/pwa";
 import "@/components/ds/ds.css";
 
@@ -13,5 +14,11 @@ export const generateViewport = (): Promise<Viewport> => memberAppViewport();
  */
 export default async function EntryLayout({ children }: { children: React.ReactNode }) {
   await requireClub();
-  return <div className="ds-app ds-ui">{children}</div>;
+  return (
+    <div className="ds-app ds-ui">
+      {/* Catches the browser's one-time install offer while the page loads, before React is running (see src/club/install-offer.ts). */}
+      <script dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE_SCRIPT }} />
+      {children}
+    </div>
+  );
 }
