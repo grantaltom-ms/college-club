@@ -9,7 +9,7 @@ import type { SeatSide } from "../types";
 import { SAMPLE_STAFF } from "./club";
 
 /**
- * One invented coach, and one invented practice three days from now: a quad and a double with people seated, and a single left with
+ * One invented coach, and one invented practice eleven days from now (a Sunday, so it stays clear of the days the older booking tests use): a quad and a double with people seated, and a single left with
  * its seat empty. Sasha Bellweather had booked that single for the same hour before the practice was set up, so the sample shows how
  * an earlier booking is flagged (and not cancelled). Everyone is made up. Nothing here is real.
  */
@@ -33,18 +33,18 @@ export async function seedSamplePractices(store: ClubStore, now: Date): Promise<
   await createBooking(store, RULE_BOOK, { actor: { kind: "member", memberId: member("Sasha Bellweather").id, label: "Sasha Bellweather" }, now }, {
     itemId: item("Kingfisher"),
     bookerId: member("Sasha Bellweather").id,
-    startsAt: at(3, 8),
-    endsAt: at(3, 9),
+    startsAt: at(11, 8),
+    endsAt: at(11, 9),
   });
 
   const coach = member("Kenji Tanaka");
   await setCoach(store, staff, coach.id, true);
   const coachCtx = { actor: { kind: "member" as const, memberId: coach.id, label: fullName(coach) }, now };
   const { practice } = await createPractice(store, RULE_BOOK, PRACTICE_RULES, coachCtx, {
-    name: "Wednesday technique session",
+    name: "Sunday technique session",
     notes: "Drills first, then two pieces. Bring a water bottle.",
-    startsAt: at(3, 7),
-    endsAt: at(3, 9),
+    startsAt: at(11, 7),
+    endsAt: at(11, 9),
     itemIds: [item("Albatross"), item("Pelican")],
   });
   await addPracticeBoat(store, RULE_BOOK, PRACTICE_RULES, coachCtx, practice.id, item("Kingfisher"));

@@ -310,11 +310,11 @@ test.describe("the sample club", () => {
   test("has a coach who runs a practice with a lineup, and one earlier booking flagged", async ({ page }) => {
     await actAs(page, "Kenji Tanaka");
     await page.goto("/club/practices");
-    const card = page.locator('[data-testid="practice-card"][data-practice="Wednesday technique session"]');
-    await expect(card).toContainText("Saturday, Oct 31, 7:00 to 9:00 am");
+    const card = page.locator('[data-testid="practice-card"][data-practice="Sunday technique session"]');
+    await expect(card).toContainText("Sunday, Nov 8, 7:00 to 9:00 am");
     await expect(card).toContainText("Run by Kenji Tanaka · 3 boats · 6 of 7 seats filled");
     await expect(card.getByTestId("practice-clashes")).toHaveText("1 booking already made on its boats overlaps it.");
-    await card.getByRole("link", { name: "Wednesday technique session" }).click();
+    await card.getByRole("link", { name: "Sunday technique session" }).click();
     await expect(seatRow(page, "Albatross", 1)).toContainText("Erik Lindqvist · port");
     await expect(seatRow(page, "Albatross", 4)).toContainText("Nora Abernathy · starboard");
     await expect(seatRow(page, "Pelican", 2)).toContainText("Alex Brooks");
@@ -323,7 +323,7 @@ test.describe("the sample club", () => {
 
     await actAs(page, "Erik Lindqvist");
     await page.goto("/club/my-practices");
-    const mine = page.locator('[data-testid="my-practice"][data-practice="Wednesday technique session"]');
+    const mine = page.locator('[data-testid="my-practice"][data-practice="Sunday technique session"]');
     await expect(mine.getByTestId("my-seat")).toHaveText("Albatross, seat 1 · port");
     await expect(mine).toContainText("In the boat with Maren Lindqvist, Hollis Whitcombe, Nora Abernathy");
   });
@@ -332,7 +332,7 @@ test.describe("the sample club", () => {
     await page.setViewportSize({ width: 390, height: 800 });
     await actAs(page, "Test staff");
     await page.goto("/club/practices");
-    await page.getByRole("link", { name: "Wednesday technique session" }).click();
+    await page.getByRole("link", { name: "Sunday technique session" }).click();
     await settled(page);
     const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(wide).toBeLessThanOrEqual(0);
