@@ -13,22 +13,24 @@ const parse = (mutate: (copy: Draft) => unknown) => {
 };
 
 describe("the shipped booking rules", () => {
-  it("are the placeholder values from the kickoff prompt, and say they are placeholders", () => {
+  it("are the numbers copied from iCrew on Oct 30, 2026, and say they are placeholders until staff confirm them", () => {
     expect(RULE_BOOK.placeholder).toBe(true);
     expect(RULE_BOOK.defaults).toEqual({
-      windowDays: 7,
+      windowDays: 14,
       opensAt: "00:00",
       dayStart: "05:00",
       dayEnd: "20:00",
       slotMinutes: 30,
       minMinutes: 30,
-      maxMinutes: 120,
-      maxFuturePerType: 2,
-      maxPerDayPerType: 1,
+      defaultMinutes: 90,
+      maxMinutes: 240,
+      maxFuturePerType: 0,
+      maxPerDayPerType: 0,
       cancelCutoffMinutes: 120,
       gapMinutes: 0,
     });
     expect(raw.about).toContain("PLACEHOLDER");
+    expect(raw.about).toContain("iCrew");
   });
 
   it("describe singles, doubles and quads by seat count, with a qualification per boat class", () => {
@@ -61,8 +63,12 @@ describe("a mistake in the rules file is caught in words someone can act on", ()
   it("refuses a missing rule, a wrong kind of value, and out-of-range numbers", () => {
     expect(parse((c) => delete c.defaults!.windowDays)).toThrow('defaults is missing "windowDays"');
     expect(parse((c) => (c.defaults!.windowDays = "7"))).toThrow("windowDays (how many days ahead) must be a whole number");
+    expect(parse((c) => delete c.defaults!.defaultMinutes)).toThrow('defaults is missing "defaultMinutes"');
     expect(parse((c) => (c.defaults!.windowDays = 0))).toThrow("must be 1 or more");
     expect(parse((c) => (c.defaults!.gapMinutes = -5))).toThrow("must be 0 or more");
+    expect(parse((c) => (c.defaults!.maxFuturePerType = -1))).toThrow("maxFuturePerType (bookings held at once, 0 for no limit) must be 0 or more");
+    expect(parse((c) => (c.defaults!.maxPerDayPerType = -1))).toThrow("maxPerDayPerType (bookings per day, 0 for no limit) must be 0 or more");
+    expect(parse((c) => (c.defaults!.maxPerDayPerType = 1.5))).toThrow("must be a whole number");
     expect(parse((c) => (c.defaults!.slotMinutes = 7.5))).toThrow("must be a whole number");
     expect(parse((c) => (c.defaults!.dayStart = "5am"))).toThrow('not a time like 05:00');
     expect(parse((c) => (c.defaults!.dayEnd = "25:00"))).toThrow("not a time between 00:00 and 24:00");
@@ -73,7 +79,20 @@ describe("a mistake in the rules file is caught in words someone can act on", ()
     expect(parse((c) => (c.defaults!.maxMinutes = 15))).toThrow("maxMinutes (15) cannot be shorter than minMinutes (30)");
     expect(parse((c) => (c.defaults!.maxMinutes = 100))).toThrow("maxMinutes (100) must be a whole number of 30-minute slots");
     expect(parse((c) => (c.defaults!.dayEnd = "20:10"))).toThrow("must be a whole number of 30-minute slots");
-    expect(parse((c) => (c.defaults!.maxPerDayPerType = 3))).toThrow("day limit could never be reached");
+    expect(parse((c) => Object.assign(c.defaults!, { maxFuturePerType: 2, maxPerDayPerType: 3 }))).toThrow("day limit could never be reached");
+    expect(parse((c) => (c.defaults!.defaultMinutes = 15))).toThrow("defaultMinutes (15) must be between minMinutes (30) and maxMinutes (240)");
+    expect(parse((c) => (c.defaults!.defaultMinutes = 300))).toThrow("defaultMinutes (300) must be between minMinutes (30) and maxMinutes (240)");
+    expect(parse((c) => (c.defaults!.defaultMinutes = 100))).toThrow("defaultMinutes (100) must be a whole number of 30-minute slots");
+  });
+
+  it("reads a limit of 0 as no limit, for either limit or both, and still refuses a day limit above the held limit", () => {
+    expect(parse((c) => Object.assign(c.defaults!, { maxFuturePerType: 0, maxPerDayPerType: 0 }))).not.toThrow();
+    expect(parse((c) => Object.assign(c.defaults!, { maxFuturePerType: 2, maxPerDayPerType: 0 }))).not.toThrow();
+    expect(parse((c) => Object.assign(c.defaults!, { maxFuturePerType: 0, maxPerDayPerType: 3 }))).not.toThrow();
+    expect(parse((c) => Object.assign(c.defaults!, { maxFuturePerType: 3, maxPerDayPerType: 3 }))).not.toThrow();
+    expect(parse((c) => Object.assign(c.defaults!, { maxFuturePerType: 3, maxPerDayPerType: 4 }))).toThrow("day limit could never be reached");
+    // The other rules still need to be 1 or more.
+    expect(parse((c) => (c.defaults!.minMinutes = 0))).toThrow("must be 1 or more");
   });
 
   it("refuses a bad class: duplicate code, unknown type, bad seats, missing qualification", () => {
@@ -85,8 +104,9 @@ describe("a mistake in the rules file is caught in words someone can act on", ()
   });
 
   it("refuses a class override that breaks the rules once combined with the defaults", () => {
-    expect(parse((c) => (c.classes[0].rules = { maxMinutes: 45 }))).toThrow("maxMinutes (45) must be a whole number of 30-minute slots");
-    expect(parse((c) => (c.classes[0].rules = { minMinutes: 150 }))).toThrow("maxMinutes (120) cannot be shorter than minMinutes (150)");
+    expect(parse((c) => (c.classes[0].rules = { maxMinutes: 45, defaultMinutes: 30 }))).toThrow("maxMinutes (45) must be a whole number of 30-minute slots");
+    expect(parse((c) => (c.classes[0].rules = { minMinutes: 300 }))).toThrow("maxMinutes (240) cannot be shorter than minMinutes (300)");
+    expect(parse((c) => (c.classes[0].rules = { defaultMinutes: 300 }))).toThrow("defaultMinutes (300) must be between minMinutes (30) and maxMinutes (240)");
   });
 
   it("throws a RuleBookError, so the app can tell a rules mistake from a bug", () => {
@@ -100,7 +120,7 @@ describe("which rules apply to an item", () => {
   it("take the defaults, then the class, then the item, in that order", () => {
     const book = parse((c) => (c.classes[0].rules = { maxMinutes: 90 }))();
     expect(rulesFor(book, item()).rules.maxMinutes).toBe(90);
-    expect(rulesFor(book, item({ classCode: "shell-double" })).rules.maxMinutes).toBe(120);
+    expect(rulesFor(book, item({ classCode: "shell-double" })).rules.maxMinutes).toBe(240);
     expect(rulesFor(book, item({ ruleOverrides: { maxMinutes: 60 } })).rules.maxMinutes).toBe(60);
     expect(rulesFor(book, item({ ruleOverrides: { maxMinutes: 60 } })).rules.slotMinutes).toBe(30);
   });
@@ -113,7 +133,8 @@ describe("which rules apply to an item", () => {
 
   it("check an item's own overrides the same way", () => {
     expect(() => checkOverrides(RULE_BOOK.defaults, { maxMinutes: 90 }, "Tern")).not.toThrow();
-    expect(() => checkOverrides(RULE_BOOK.defaults, { maxMinutes: 45 }, "Tern")).toThrow("must be a whole number of 30-minute slots");
+    expect(() => checkOverrides(RULE_BOOK.defaults, { maxMinutes: 45, defaultMinutes: 30 }, "Tern")).toThrow("must be a whole number of 30-minute slots");
+    expect(() => checkOverrides(RULE_BOOK.defaults, { maxMinutes: 60 }, "Tern")).toThrow("defaultMinutes (90) must be between minMinutes (30) and maxMinutes (60)");
     expect(() => classOf(RULE_BOOK, { classCode: "nope" })).toThrow('There is no class "nope"');
   });
 });

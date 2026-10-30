@@ -63,14 +63,15 @@ test.describe("a pool of places", () => {
       const full = page.locator(`[aria-label="${DOCK}, 8:00 to 8:30 am, 0 of 4 places left"]`);
       await expect(full).toHaveAttribute("data-state", "booked");
       await expect(full).toContainText("Full");
-      // A booking is an hour by default, so the next half hour is full too, and the hour after it is free.
+      // A booking is 90 minutes by default, so the next hour is full too, and the half hour after it is free.
       await expect(slot(page, DOCK, "8:30 to 9:00 am", "0 of 4 places left")).toHaveAttribute("data-state", "booked");
+      await expect(slot(page, DOCK, "9:00 to 9:30 am", "0 of 4 places left")).toHaveAttribute("data-state", "booked");
       // The form for the full slot, reached by its address (the day view offers no link to it), says why.
-      const nextHref = (await slot(page, DOCK, "9:00 to 9:30 am", "4 of 4 places left").getAttribute("href"))!;
+      const nextHref = (await slot(page, DOCK, "9:30 to 10:00 am", "4 of 4 places left").getAttribute("href"))!;
       const form = new URL(nextHref, page.url());
       form.searchParams.set("start", new Date("2026-11-02T08:00:00-08:00").toISOString());
       await page.goto(form.toString());
-      await expect(page.getByTestId("refusal-reasons").getByRole("listitem")).toHaveText([`${DOCK} is full from 8:00 to 9:00 am: all 4 places are booked.`]);
+      await expect(page.getByTestId("refusal-reasons").getByRole("listitem")).toHaveText([`${DOCK} is full from 8:00 to 9:30 am: all 4 places are booked.`]);
       await expect(page.getByRole("button", { name: `Book ${DOCK}` })).toHaveCount(0);
 
       // When one of them gives a place back, the count goes up and the fifth member can book it.

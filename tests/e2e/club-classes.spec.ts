@@ -162,7 +162,7 @@ test("one place at a time: a class is refused when a boat is booked then, and a 
   await card(page, "Stretch & Mobility").getByRole("link", { name: "Stretch & Mobility" }).click();
   await expect(page).toHaveURL(/\/club\/classes\/[0-9a-f-]{36}$/);
   const classPage = page.url();
-  await expect(page.getByTestId("refusal")).toContainText("You have Heron booked from 12:00 to 1:00 pm.");
+  await expect(page.getByTestId("refusal")).toContainText("You have Heron booked from 12:00 to 1:30 pm.");
   await expect(page.getByRole("button", { name: "Sign up", exact: true })).toHaveCount(0);
 
   // Without the boat, the class is open; once in it, the same hour is closed for boats.

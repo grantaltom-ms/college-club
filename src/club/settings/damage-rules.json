@@ -1,0 +1,17 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). filedPerMemberPerDay: the most damage reports one member can file in 24 hours (staff are not limited; 0 means no limit). majorPriority and minorPriority: the priority a report starts with when its filer says it is major, and when not (1 is the most urgent, 4 the least; staff can change it afterwards, the way iCrew's 1 to 4 works). The rest are the longest text, in characters, each box takes: descriptionMax (what is wrong) and locationMax (where on the boat) are shown to every member who books the boat; howMax (how it happened) is for staff only.",
+  "defaults": {
+    "filedPerMemberPerDay": 10,
+    "majorPriority": 1,
+    "minorPriority": 3,
+    "descriptionMax": 300,
+    "locationMax": 120,
+    "howMax": 500,
+    "noteMax": 500,
+    "assignedToMax": 80,
+    "repairedByMax": 80,
+    "repairNotesMax": 1000,
+    "dismissReasonMax": 200
+  }
+}

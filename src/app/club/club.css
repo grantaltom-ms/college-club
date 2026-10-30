@@ -765,3 +765,30 @@ details summary {
   font-weight: 600;
   vertical-align: middle;
 }
+
+/* Damage reports: a long text box in a form, and the notice on a boat that has open reports. */
+.club-form textarea {
+  width: 100%;
+  max-width: 28rem;
+  padding: 6px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--card);
+  font: inherit;
+}
+
+.club-damage {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-left: 4px solid var(--sun);
+  background: var(--sun-tint);
+  border-radius: 4px;
+}
+
+.club-damage-major {
+  border-left-color: #8a2b1a;
+}
+
+.club-damage p {
+  margin: 4px 0;
+}

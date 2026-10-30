@@ -36,12 +36,22 @@ export const mark = (store: ClubStore, ctx: Ctx, kind: AttendanceKind, id: strin
 /** A moment on the Pacific clock: `at(1, 7)` is 7 am tomorrow; `at(1, 7, 30)` is 7:30 am. */
 export const at = (daysAhead: number, hour: number, minute = 0, today = TODAY) => pacificWall(addDays(today, daysAhead), hour * 60 + minute);
 
+/**
+ * The house rules the engine tests run on: the step 2 placeholders (7 days ahead, 1 hour to start with, up to 2 hours, 2 held at once
+ * and 1 a day). They are fixed here so that editing the club's real numbers in booking-rules.json never breaks an engine test. The
+ * real file's own numbers are tested on their own (rulebook.test.ts and club-numbers.test.ts).
+ */
+const TEST_NUMBERS: Partial<RuleValues> = { windowDays: 7, defaultMinutes: 60, maxMinutes: 120, maxFuturePerType: 2, maxPerDayPerType: 1 };
+
+/** The real rules file with the test numbers above, and then any numbers the test names, on top. */
 export function ruleBookWith(defaults: Partial<RuleValues>, classes?: (cls: Record<string, unknown>[]) => void): RuleBook {
   const copy = structuredClone(raw) as { defaults: Record<string, unknown>; classes: Record<string, unknown>[] };
-  Object.assign(copy.defaults, defaults);
+  Object.assign(copy.defaults, TEST_NUMBERS, defaults);
   classes?.(copy.classes);
   return parseRuleBook(copy, QUALIFICATIONS);
 }
+
+export const TEST_RULES: RuleBook = ruleBookWith({});
 
 /** The tests that matter run on both stores: the in-memory copy, and Postgres when CLUB_TEST_DATABASE_URL is set (CI always sets it). */
 export type StoreKind = "memory" | "postgres";
@@ -66,7 +76,7 @@ export function openAnother(url: string, newId: () => string = () => crypto.rand
 /** A new, empty store of the given kind. A Postgres one gets its own throwaway database, removed after the test. */
 export const databaseUrls = new WeakMap<ClubStore, string>();
 
-export async function makeStore(kind: StoreKind, book: RuleBook = RULE_BOOK, newId: () => string = sequentialIds(), settle?: Settler): Promise<ClubStore> {
+export async function makeStore(kind: StoreKind, book: RuleBook = TEST_RULES, newId: () => string = sequentialIds(), settle?: Settler): Promise<ClubStore> {
   if (kind === "memory") return new MemoryClubStore(newId, { settle });
   const db = await cloneScratchDb(POSTGRES_URL!);
   const pool = createClubPool(db.url, 8);
@@ -153,12 +163,12 @@ const ITEMS: [string, string, Partial<RuleValues>?][] = [
  * Two households. Quill: Ada (sculling 3), Ben (sculling 2), Cy (no qualification). Reed: Dee (sculling 1),
  * Eli (sculling 3). Singles need level 1, the double level 2, the quad level 3.
  */
-export async function buildFixture(kind: StoreKind, book: RuleBook = RULE_BOOK): Promise<Fixture> {
+export async function buildFixture(kind: StoreKind, book: RuleBook = TEST_RULES): Promise<Fixture> {
   return buildFixtureOn(await makeStore(kind, book), book);
 }
 
 /** The same invented club, built on a store the test already has (for example one of two app servers sharing a database). */
-export async function buildFixtureOn(store: ClubStore, book: RuleBook = RULE_BOOK): Promise<Fixture> {
+export async function buildFixtureOn(store: ClubStore, book: RuleBook = TEST_RULES): Promise<Fixture> {
   const ctx = staffCtx();
   const person = (first: string, last: string) => ({ firstName: first, lastName: last, email: `${first}@example.com`.toLowerCase() });
   const quill = await createHousehold(store, ctx, { displayName: "The Quill household", membershipType: "Resident", joinedOn: "2020-01-01", primary: person("Ada", "Quill"), additional: [person("Ben", "Quill"), person("Cy", "Quill")] });
@@ -177,11 +187,11 @@ export async function buildFixtureOn(store: ClubStore, book: RuleBook = RULE_BOO
  * The test moves the clock to watch bookings and chairs run out of time.
  */
 export async function buildFixtureSettling(kind: StoreKind, clock: () => Date): Promise<Fixture> {
-  return buildFixtureOn(await makeStore(kind, RULE_BOOK, sequentialIds(), attendanceSettler(ATTENDANCE_RULES, clock)), RULE_BOOK);
+  return buildFixtureOn(await makeStore(kind, TEST_RULES, sequentialIds(), attendanceSettler(ATTENDANCE_RULES, clock)), TEST_RULES);
 }
 
 /** The fixture on a chosen store: `const fixture = fixtureFor(kind)`, then `await fixture()` or `await fixture(someRuleBook)`. */
-export const fixtureFor = (kind: StoreKind) => (book: RuleBook = RULE_BOOK) => buildFixture(kind, book);
+export const fixtureFor = (kind: StoreKind) => (book: RuleBook = TEST_RULES) => buildFixture(kind, book);
 export const fixture = fixtureFor("memory");
 
 /** Cancels every upcoming booking (a status change, as in real life: bookings are never deleted), so a test can start a slot over. */

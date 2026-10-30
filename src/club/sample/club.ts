@@ -5,6 +5,7 @@ import { clubNow } from "../clock";
 import { addDays, middayPacific, pacificDate } from "../time";
 import type { Actor, MembershipType } from "../types";
 import { seedSampleBilling } from "./billing";
+import { seedSampleDamage } from "./damage";
 import { seedSampleClasses } from "./classes";
 import { seedSampleEvents } from "./events";
 import { seedSampleEquipment } from "./equipment";
@@ -113,6 +114,7 @@ export async function seedSample(store: ClubStore, today: string = pacificDate(c
   await seedSampleClasses(store, now);
   await seedSampleEvents(store, now);
   await seedSampleBilling(store, today);
+  await seedSampleDamage(store, now);
 }
 
 /** A fresh in-memory store holding the sample club. IDs are fixed, so addresses and test links stay the same between runs. */

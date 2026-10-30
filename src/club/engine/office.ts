@@ -4,6 +4,7 @@ import { needsALook, type AttendanceRow } from "./attendance";
 import { holdExpired, placesTaken } from "./events";
 import { lockedBoats } from "./boat-access";
 import { outOfServiceAt } from "./bookings";
+import { officeDamage, type OfficeDamage } from "./damage";
 
 /**
  * What staff see first thing: what needs a look, what is on today, what is out of service and what has people waiting.
@@ -30,6 +31,8 @@ export interface OfficeSummary {
   outOfService: { itemId: string; name: string; reason: string; expectedReturn: string | null; since: string }[];
   /** Private boats with no owner who can use them: nobody can book them until staff add an owner. */
   lockedBoats: { itemId: string; name: string; upcoming: number }[];
+  /** Damage reports still to fix, most pressing first. */
+  damage: OfficeDamage;
   /** Classes and events in the next week with people waiting. */
   waiting: OfficeWaiting[];
 }
@@ -76,6 +79,7 @@ export function officeSummary(state: ClubState, now: Date, rules: AttendanceRule
     needsLook: needsALook(state, now, rules),
     outOfService,
     lockedBoats: lockedBoats(state, now),
+    damage: officeDamage(state, now),
     waiting,
   };
 }

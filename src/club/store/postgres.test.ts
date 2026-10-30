@@ -3,6 +3,7 @@ import { BookingRefused, cancelBooking, createBooking } from "../engine/bookings
 import { SignUpRefused, createClass, leaveClass, scheduleSessions, signUp } from "../engine/classes";
 import { recordCharge, runBilling } from "../engine/billing";
 import { linesComplete } from "../engine/billing-views";
+import { assignDamageReport, fileDamageReport, markDamageRepaired } from "../engine/damage";
 import { RsvpRefused, cancelRsvp, createEvent, placesTaken, rsvp } from "../engine/events";
 import { createHousehold, endHousehold, setQuickbooksId } from "../engine/households";
 import { clubLedger } from "../engine/ledger";
@@ -12,6 +13,7 @@ import { ClubError } from "../errors";
 import { seedSample } from "../sample/club";
 import { BILLING_RULES } from "../settings/billing-rules";
 import { CLASS_RULES } from "../settings/class-rules";
+import { DAMAGE_RULES } from "../settings/damage-rules";
 import { EVENT_RULES } from "../settings/event-rules";
 import { RULE_BOOK } from "../settings/rulebook";
 import { addDays, pacificDate } from "../time";
@@ -216,6 +218,19 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       expect((await f.store.read()).bookings.filter((x) => x.status === "upcoming")).toHaveLength(3);
     }, 30_000);
 
+    it("one member filing damage reports at both servers at once cannot get past the daily limit", async () => {
+      const { f, b } = await twoServers();
+      const rules = { ...DAMAGE_RULES, defaults: { ...DAMAGE_RULES.defaults, filedPerMemberPerDay: 3 } };
+      const outcomes = await Promise.allSettled(
+        Array.from({ length: 12 }, (_, n) => fileDamageReport((n % 2 ? b : f).store, memberCtx(f.m.Ada, "Ada Quill"), rules, { itemId: f.i.Heron, description: `Problem ${n}.`, major: false })),
+      );
+      expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(3);
+      for (const lost of outcomes.filter((o): o is PromiseRejectedResult => o.status === "rejected")) expect((lost.reason as ClubError).code).toBe("refused");
+      const saved = await f.store.read();
+      expect(saved.damageReports).toHaveLength(3);
+      expect(saved.damageLog.map((l) => l.kind)).toEqual(["filed", "filed", "filed"]);
+    }, 30_000);
+
     it("one member firing twenty requests at both servers cannot get past her limit of two", async () => {
       const { f, b } = await twoServers();
       const outcomes = await Promise.allSettled(
@@ -391,6 +406,36 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       await expect(f.store.transaction(async (s) => void s.households.splice(0, 1))).rejects.toThrow("never deletes households");
       await expect(f.store.transaction(async (s) => void (s.history[0].summary = "Rewritten."))).rejects.toThrow("can only be added to");
       expect((await f.store.read()).bookings).toHaveLength(1);
+    });
+
+    it("never deletes a damage report or rewrites a line of its log, and keeps every field of both through a round trip", async () => {
+      const f = await fixture();
+      const report = await fileDamageReport(f.store, memberCtx(f.m.Ada, "Ada Quill"), DAMAGE_RULES, { itemId: f.i.Heron, description: "Seat sticks.", location: "Bow", howItHappened: "Grit.\nAgain.", major: true });
+      await assignDamageReport(f.store, staffCtx(), DAMAGE_RULES, { reportId: report.id, assignedTo: "Sam" });
+      await markDamageRepaired(f.store, staffCtx(), DAMAGE_RULES, { reportId: report.id, repairedOn: "2026-10-28", repairedBy: "Sam", repairMinutes: 75, costCents: 1999, notes: "Cleaned the track." });
+      const read = await f.store.read();
+      expect(read.damageReports).toEqual([
+        {
+          ...report,
+          assignedTo: "Sam",
+          status: "repaired",
+          updatedAt: NOW.toISOString(),
+          closedAt: NOW.toISOString(),
+          repairedOn: "2026-10-28",
+          repairedBy: "Sam",
+          repairMinutes: 75,
+          costCents: 1999,
+          repairNotes: "Cleaned the track.",
+        },
+      ]);
+      expect(read.damageLog.map((l) => [l.kind, l.by.kind, l.by.label])).toEqual([
+        ["filed", "member", "Ada Quill"],
+        ["assigned", "staff", "Test staff"],
+        ["repaired", "staff", "Test staff"],
+      ]);
+      await expect(f.store.transaction(async (s) => void s.damageReports.splice(0, 1))).rejects.toThrow("never deletes damage reports");
+      await expect(f.store.transaction(async (s) => void (s.damageLog[0].text = "Rewritten."))).rejects.toThrow("can only be added to");
+      expect((await f.store.read()).damageLog[0].text).toBe("Reported by Ada Quill as major damage.");
     });
 
     it("rolls everything back when a change fails halfway", async () => {

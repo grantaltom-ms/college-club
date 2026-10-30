@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { dayView, pickableDays, type SlotView } from "@/club/engine/availability";
 import { itemVisibleTo } from "@/club/engine/boat-access";
+import { noticeWords, openDamageNotices } from "@/club/engine/damage";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { clubNow } from "@/club/clock";
@@ -103,6 +104,16 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             </p>
             {item.qualified === false && <p className="club-meta">You do not hold that qualification yet, so you cannot book this one.</p>}
             {item.note && <p className="club-meta">{item.note}</p>}
+            {(() => {
+              const notices = openDamageNotices(state, item.item.id);
+              return notices.length === 0 ? null : (
+                <div className={`club-damage${notices.some((n) => n.major) ? " club-damage-major" : ""}`} data-testid="damage-notice">
+                  {notices.map((n) => (
+                    <p key={n.reportId}>{noticeWords(n)}</p>
+                  ))}
+                </div>
+              );
+            })()}
             {item.locked && (
               <p className="club-meta" data-testid="boat-locked-note">
                 Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
@@ -130,6 +141,11 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                 );
               })}
             </ol>
+            <p className="club-meta">
+              <Link href={`/club/damage?item=${item.item.id}`} data-testid="report-damage-link" aria-label={`Report damage on ${item.item.name}`}>
+                Report damage
+              </Link>
+            </p>
           </article>
         ))}
       </div>

@@ -36,7 +36,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   const { cls, rules, requiredQualification } = rulesFor(RULE_BOOK, item);
   const lengths = lengthChoices(rules);
   const asked = intParam(params.minutes, rules.minMinutes, rules.maxMinutes, 0);
-  const minutes = lengths.includes(asked) ? asked : lengths.includes(60) ? 60 : lengths[0];
+  const minutes = lengths.includes(asked) ? asked : lengths.includes(rules.defaultMinutes) ? rules.defaultMinutes : lengths[0];
   const end = new Date(start.getTime() + minutes * 60000);
 
   const staff = actor.kind === "staff";
