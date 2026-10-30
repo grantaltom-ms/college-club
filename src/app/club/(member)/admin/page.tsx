@@ -120,7 +120,7 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
           <Link href="/club/admin/check-in">Check someone in</Link> · <Link href="/club/admin/ipad">Front-desk iPad</Link>
         </li>
         <li>
-          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link>
+          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link> · <Link href="/club/admin/equipment-import">Load the equipment list</Link>
         </li>
         <li>
           <Link href="/club/classes/manage">Add a class or schedule sessions</Link> · <Link href="/club/events/manage">Add an event</Link>

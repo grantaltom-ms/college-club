@@ -40,8 +40,15 @@ describe("the shipped booking rules", () => {
 
   it("cover shells, kayaks, paddle boards and the spaces, using only booking types the engine knows", () => {
     const types = new Set(RULE_BOOK.classes.map((c) => c.type));
-    expect(types).toEqual(new Set(["Shell", "Kayak", "Paddle Board", "Dock Space", "Gym Space", "Room Space"]));
+    expect(types).toEqual(new Set(["Shell", "Kayak", "Paddle Board", "Dock Space", "Gym Space", "Room Space", "Work Space"]));
     for (const t of types) expect(BOOKING_TYPES).toContain(t);
+  });
+
+  it("have a double kayak that seats two and a work space, which the equipment upload needs", () => {
+    const byCode = Object.fromEntries(RULE_BOOK.classes.map((c) => [c.code, c]));
+    expect(byCode["kayak-double"]).toMatchObject({ type: "Kayak", seats: 2, requiredQualification: null });
+    expect(byCode["kayak"]).toMatchObject({ type: "Kayak", seats: 1 });
+    expect(byCode["work-space"]).toMatchObject({ type: "Work Space", seats: 1, requiredQualification: null });
   });
 });
 
