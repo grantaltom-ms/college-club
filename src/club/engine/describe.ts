@@ -20,6 +20,14 @@ export function describeRules(state: ClubState, book: RuleBook, item: Item): { h
     priv ? "This is a private boat. Its owners and the people an owner has invited can use it, and its skill level is not checked: the owner vouches for who uses it." : need ? `You need ${need}.` : "No qualification is needed.",
   ];
   if (rules.gapMinutes > 0) lines.splice(3, 0, `Leave ${formatMinutes(rules.gapMinutes)} free between bookings of the same ${cls.name.toLowerCase()}.`);
+  const places = item.places ?? 1;
+  if (places > 1) {
+    lines.splice(
+      0,
+      0,
+      `${item.name} has ${places} places, shared by everyone. You book a time and the club counts how many places are left; you are not given a place number. You can hold one place at a time.`,
+    );
+  }
   if (cls.seats > 1) {
     lines.push(
       `${item.name} has ${cls.seats} seats. You can add up to ${cls.seats - 1} other member${cls.seats - 1 === 1 ? "" : "s"} as crew; ${priv ? "each must be an owner or someone an owner has invited" : "each needs the same qualification"}. Crew do not count toward their own limits, but nobody can be in two boats at once.`,

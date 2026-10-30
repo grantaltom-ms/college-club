@@ -101,6 +101,9 @@ export type BookingType = (typeof BOOKING_TYPES)[number];
 /** The kinds of space a fitness class can hold. */
 export const CLASS_ROOM_TYPES: readonly BookingType[] = ["Gym Space", "Room Space"];
 
+/** The kinds of space that can be a pool: one item with a number of places, counted rather than numbered. */
+export const POOLED_TYPES: readonly BookingType[] = ["Dock Space", "Gym Space", "Room Space"];
+
 export const BOOKING_TYPE_INFO: Record<BookingType, { onWater: boolean }> = {
   Shell: { onWater: true },
   Kayak: { onWater: true },
@@ -166,6 +169,12 @@ export interface Item {
    * and its skill level is not checked (the owner vouches). Set when the item is made and never changed.
    */
   isPrivate?: boolean;
+  /**
+   * How many people can hold this item at the same moment. Undefined means one, like every boat. Only a dock, club room or gym
+   * space (`POOLED_TYPES`) can have more: it is a pool, and the club only counts how many places are left. Set when the item is
+   * made and never changed.
+   */
+  places?: number;
 }
 
 /** An owner is picked by staff; an invited person is named by an owner (or by staff). */

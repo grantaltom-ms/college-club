@@ -19,8 +19,8 @@ import { fullName } from "./queries";
  * optional Owner emails column names its owners, each as an email address or a full name, separated by semicolons. A private
  * boat with no owner is added anyway and starts locked, so nobody can book it until staff add an owner.
  *
- * Left out on purpose, and said so in the read-back: the pooled spaces (Dock Space, Room Space and Gym Space become one pool
- * with a number of places, a later step).
+ * A Dock Space, Room Space or Gym Space row is a pool: one item with a number of places (the Places column), counted rather than
+ * numbered. Members book a time and see how many places are left; nobody is given a place number (see pools.ts).
  */
 
 export const MAX_EQUIPMENT_BYTES = 200_000;
@@ -30,7 +30,7 @@ export const MAX_EQUIPMENT_ROWS = 1000;
 export const EQUIPMENT_COLUMNS = ["Name", "Type", "Seats", "Skill level needed", "Owned by", "In service", "Places", "Notes", "Owner emails"] as const;
 
 /** The example rows in the template. They are refused if they are uploaded, so nobody loads them by accident. */
-export const EQUIPMENT_EXAMPLE_NAMES = ["EXAMPLE-1", "EXAMPLE-2", "EXAMPLE-3", "EXAMPLE-4"] as const;
+export const EQUIPMENT_EXAMPLE_NAMES = ["EXAMPLE-1", "EXAMPLE-2", "EXAMPLE-3", "EXAMPLE-4", "EXAMPLE-5"] as const;
 
 export const EQUIPMENT_TEMPLATE =
   [
@@ -39,6 +39,7 @@ export const EQUIPMENT_TEMPLATE =
     "EXAMPLE-2,Kayak,2,None,Club,No,,Paddle needs mending",
     "EXAMPLE-3,Work Space,,,Club,Yes,,",
     "EXAMPLE-4,Shell,2,,Private,Yes,,,someone@example.org; Pat Example",
+    "EXAMPLE-5,Gym Space,,,Club,Yes,8,",
   ].join("\r\n") + "\r\n";
 
 const MAX_NAME = 80;
@@ -47,7 +48,7 @@ const MAX_PLACES = 500;
 const MAX_OWNERS = 10;
 const MAX_OWNER_TOKEN = 120;
 
-/** The kinds of thing the sheet can name. Three are pools and are not loaded yet. */
+/** The kinds of thing the sheet can name. Three are pools: one item with a number of places. */
 export const EQUIPMENT_TYPES = ["Shell", "Kayak", "Paddle Board", "Work Space", "Dock Space", "Room Space", "Gym Space"] as const;
 type EquipmentType = (typeof EQUIPMENT_TYPES)[number];
 const POOL_TYPES: readonly EquipmentType[] = ["Dock Space", "Room Space", "Gym Space"];
@@ -82,9 +83,9 @@ export interface EquipmentRow {
   row: number;
   name: string;
   type: EquipmentType;
-  /** A pool is one of the three pooled spaces: described by the sheet, not loaded yet. */
+  /** A pool is one of the three pooled spaces: one item with a number of places. */
   pool: boolean;
-  /** Pools only: the number of places the sheet gives, if any. */
+  /** Pools only: the number of places the sheet gives. Null for everything else. */
   places: number | null;
   classCode: string | null;
   seats: number | null;
@@ -190,15 +191,43 @@ export function readEquipment(text: string): EquipmentReading {
     }
     if (problems.length > before || !type) continue;
 
-    // The pooled spaces are described, not loaded: only their name and place count are checked.
-    if (POOL_TYPES.includes(type)) {
-      let places: number | null = null;
-      if (placesText !== "") {
-        if (!/^\d{1,4}$/.test(placesText) || Number(placesText) < 1 || Number(placesText) > MAX_PLACES) say(`Places must be a whole number from 1 to ${MAX_PLACES}, or empty.`);
-        else places = Number(placesText);
+    // In service: Yes or empty, or No. A No item is added out of service.
+    const readInService = (): boolean => {
+      if (serviceText === "") return true;
+      const t = serviceText.toLowerCase();
+      if (["yes", "y", "true"].includes(t)) return true;
+      if (["no", "n", "false"].includes(t)) return false;
+      say(`In service "${serviceText}" is not Yes or No.`);
+      return true;
+    };
+    // The same name twice in one file is a mistake.
+    const listedOnce = (): boolean => {
+      const first = firstRowOf.get(name.toLowerCase());
+      if (first !== undefined) {
+        say(`${name} is already on row ${first}. List each item once.`);
+        return false;
       }
+      firstRowOf.set(name.toLowerCase(), row);
+      return true;
+    };
+
+    // A pool: one item with a number of places, counted rather than numbered. It is the club's, has no seats and no owners.
+    if (POOL_TYPES.includes(type)) {
+      let places = 0;
+      if (placesText === "") say(`Places is empty. A ${type.toLowerCase()} pool needs its number of places, from 1 to ${MAX_PLACES}.`);
+      else if (!/^\d{1,4}$/.test(placesText) || Number(placesText) < 1 || Number(placesText) > MAX_PLACES) say(`Places must be a whole number from 1 to ${MAX_PLACES}.`);
+      else places = Number(placesText);
+      if (seatsText !== "" && seatsText !== "1") say("Seats does not apply to a pool: leave it empty. Use Places for how many people it holds at once.");
+      const poolSkill = readSkill(skillText);
+      if (!poolSkill) say(`Skill level needed "${clean(skillText)}" is not one the system knows. ${SKILL_HELP}`);
+      if (ownedText.toLowerCase() === "private") say("A pool cannot be private. Leave Owned by empty or write Club.");
+      else if (ownedText !== "" && ownedText.toLowerCase() !== "club") say(`Owned by "${ownedText}" is not Club.`);
+      if (get(cells, "owners") !== "") say("Owner emails is only for Private boats. Clear it.");
+      const poolInService = readInService();
       if (problems.length > before) continue;
-      rows.push({ row, name, type, pool: true, places, classCode: null, seats: null, skill: { mode: "class" }, ownedBy: null, inService: true, notes, owners: [], hintedPrivate: false });
+      if (!listedOnce()) continue;
+      const poolClass = type === "Dock Space" ? "dock-space" : type === "Gym Space" ? "gym-space" : "room-space";
+      rows.push({ row, name, type, pool: true, places, classCode: poolClass, seats: 1, skill: poolSkill!, ownedBy: "club", inService: poolInService, notes, owners: [], hintedPrivate: false });
       continue;
     }
 
@@ -245,22 +274,9 @@ export function readEquipment(text: string): EquipmentReading {
       }
     }
 
-    let inService = true;
-    if (serviceText !== "") {
-      const s = serviceText.toLowerCase();
-      if (["yes", "y", "true"].includes(s)) inService = true;
-      else if (["no", "n", "false"].includes(s)) inService = false;
-      else say(`In service "${serviceText}" is not Yes or No.`);
-    }
+    const inService = readInService();
     if (problems.length > before) continue;
-
-    const key = name.toLowerCase();
-    const first = firstRowOf.get(key);
-    if (first !== undefined) {
-      say(`${name} is already on row ${first}. List each item once.`);
-      continue;
-    }
-    firstRowOf.set(key, row);
+    if (!listedOnce()) continue;
 
     let classCode: string;
     if (type === "Shell") classCode = seats === 1 ? "shell-single" : seats === 2 ? "shell-double" : "shell-quad";
@@ -301,6 +317,10 @@ export interface PlannedItem {
   outOfService: boolean;
   /** Why it starts out of service; empty when it does not. */
   reason: string;
+  /** A pool: one item with a number of places, counted rather than numbered. */
+  pool: boolean;
+  /** How many people can hold it at once: one unless it is a pool. */
+  places: number;
   /** A private boat: only its owners and the people they invite can use it. */
   private: boolean;
   /** Private boats only: the owners the file names, found among the club's members. Empty means it starts locked. */
@@ -318,8 +338,6 @@ export interface EquipmentPlan {
   toAdd: PlannedItem[];
   /** Items in the file whose name is already in the club: left alone. */
   alreadyHere: { row: number; name: string }[];
-  /** Pool rows: described by the sheet, not loaded yet. */
-  pools: { row: number; name: string; type: string; places: number | null }[];
   /** A fingerprint of the exact file, so the confirm step can tell it is the file that was checked. */
   fingerprint: string;
 }
@@ -376,14 +394,9 @@ function compute(state: ClubState, text: string): EquipmentPlan {
   const here = new Set(state.items.map((i) => clean(i.name).toLowerCase()));
   const toAdd: PlannedItem[] = [];
   const alreadyHere: EquipmentPlan["alreadyHere"] = [];
-  const pools: EquipmentPlan["pools"] = [];
   const hintedButClub: number[] = [];
 
   for (const r of reading.rows) {
-    if (r.pool) {
-      pools.push({ row: r.row, name: r.name, type: r.type, places: r.places });
-      continue;
-    }
     if (here.has(r.name.toLowerCase())) {
       alreadyHere.push({ row: r.row, name: r.name });
       continue;
@@ -405,6 +418,8 @@ function compute(state: ClubState, text: string): EquipmentPlan {
       skillMode: r.skill.mode,
       outOfService: !r.inService,
       reason: r.inService ? "" : r.notes || NOT_IN_SERVICE_REASON,
+      pool: r.pool,
+      places: r.places ?? 1,
       private: isPrivate,
       owners: owners.owners,
     });
@@ -413,9 +428,11 @@ function compute(state: ClubState, text: string): EquipmentPlan {
   problems.sort((a, b) => rowOfProblem(a) - rowOfProblem(b));
 
   if (reading.ignoredColumns.length > 0) notices.push(`The file has columns this tool does not use, and they are ignored: ${reading.ignoredColumns.map((c) => `"${c}"`).join(", ")}.`);
+  const pools = toAdd.filter((i) => i.pool);
   if (pools.length > 0) {
-    const kinds = [...new Set(pools.map((p) => p.type))].join(", ");
-    notices.push(`${plural(pools.length, "row")} (${kinds}) describe pools of places. Pools are a later step, so they are not loaded now. Upload the file again then.`);
+    notices.push(
+      `${plural(pools.length, "pool")} will be added: ${pools.slice(0, 5).map((p) => `${p.name} (${plural(p.places, "place")})`).join(", ")}${pools.length > 5 ? `, and ${pools.length - 5} more` : ""}. Members book a time and see how many places are left; nobody is given a place number.`,
+    );
   }
   const privates = toAdd.filter((i) => i.private);
   if (privates.length > 0) {
@@ -436,7 +453,7 @@ function compute(state: ClubState, text: string): EquipmentPlan {
   const out = toAdd.filter((i) => i.outOfService).length;
   if (out > 0) notices.push(`${plural(out, "item")} will be added out of service. Staff can return ${out === 1 ? "it" : "them"} to service on the Equipment page.`);
 
-  return { problems, notices, ignoredColumns: reading.ignoredColumns, rowCount: reading.rowCount, toAdd, alreadyHere, pools, fingerprint: fingerprintOf(text) };
+  return { problems, notices, ignoredColumns: reading.ignoredColumns, rowCount: reading.rowCount, toAdd, alreadyHere, fingerprint: fingerprintOf(text) };
 }
 
 /** What a file would do, without doing it. */
@@ -448,6 +465,7 @@ export interface EquipmentResult {
   added: number;
   outOfService: number;
   alreadyHere: number;
+  /** How many of the items added are pools (a dock, the club room, the gym). */
   pools: number;
   /** How many of the items added are private boats. */
   privateBoats: number;
@@ -467,9 +485,7 @@ export async function runEquipment(store: ClubStore, ctx: Ctx, text: string, exp
     if (plan.toAdd.length === 0) {
       throw new ClubError(
         "conflict",
-        plan.alreadyHere.length > 0 || plan.pools.length > 0
-          ? "Everything in the file is already here or waiting for a later step, so there is nothing to add."
-          : "The file has no equipment to add.",
+        plan.alreadyHere.length > 0 ? "Everything in the file is already here, so there is nothing to add." : "The file has no equipment to add.",
       );
     }
     if (expect && (expect.fingerprint !== plan.fingerprint || expect.items !== plan.toAdd.length)) {
@@ -483,6 +499,7 @@ export async function runEquipment(store: ClubStore, ctx: Ctx, text: string, exp
       if (source.skill.mode === "none") item.requiredQualification = null;
       else if (source.skill.mode === "code") item.requiredQualification = source.skill.code;
       if (p.private) item.isPrivate = true;
+      if (p.pool && p.places > 1) item.places = p.places;
       s.items.push(item);
       for (const owner of p.owners) {
         const line: BoatAccess = { id: newId(), itemId: item.id, memberId: owner.memberId, kind: "owner", addedAt: ctx.now.toISOString(), addedBy: ctx.actor, endedAt: null, endedBy: null, endedReason: null };
@@ -507,7 +524,7 @@ export async function runEquipment(store: ClubStore, ctx: Ctx, text: string, exp
       added: plan.toAdd.length,
       outOfService,
       alreadyHere: plan.alreadyHere.length,
-      pools: plan.pools.length,
+      pools: plan.toAdd.filter((i) => i.pool).length,
       privateBoats: plan.toAdd.filter((i) => i.private).length,
       locked: plan.toAdd.filter((i) => i.private && i.owners.length === 0).length,
     };

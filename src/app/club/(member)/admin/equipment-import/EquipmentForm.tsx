@@ -49,7 +49,7 @@ function Checked({ fileName, plan, pending, onAdd }: { fileName: string; plan: E
           This would add <strong>{plural(plan.toAdd.length, "item")}</strong> to the club ({kinds(plan)}).
         </p>
       ) : (
-        <p data-testid="equip-summary">There is nothing to add: {plan.rowCount === 0 ? "the file has no equipment." : "everything in the file is already here or waiting for a later step."}</p>
+        <p data-testid="equip-summary">There is nothing to add: {plan.rowCount === 0 ? "the file has no equipment." : "everything in the file is already here."}</p>
       )}
       {plan.notices.length > 0 && (
         <div data-testid="equip-notices">
@@ -63,8 +63,14 @@ function Checked({ fileName, plan, pending, onAdd }: { fileName: string; plan: E
             <li key={i.name.toLowerCase()} className="club-card" data-testid="equip-item">
               <h4>{i.name}</h4>
               <p className="club-meta">
-                {i.type} &middot; {i.className}, {i.seats === 1 ? "1 seat" : `${i.seats} seats`}
+                {i.type} &middot; {i.className}
+                {i.pool ? "" : `, ${i.seats === 1 ? "1 seat" : `${i.seats} seats`}`}
               </p>
+              {i.pool && (
+                <p data-testid="equip-item-pool">
+                  Pool &middot; {plural(i.places, "place")}, counted rather than numbered
+                </p>
+              )}
               <p>Skill level: {i.skill}</p>
               {i.private && (
                 <p data-testid="equip-item-private">
@@ -81,12 +87,6 @@ function Checked({ fileName, plan, pending, onAdd }: { fileName: string; plan: E
         <div data-testid="equip-already-here">
           <h4>{plural(plan.alreadyHere.length, "item")} already here, left alone</h4>
           <Limited items={plan.alreadyHere.map((i) => i.name)} />
-        </div>
-      )}
-      {plan.pools.length > 0 && (
-        <div data-testid="equip-pools">
-          <h4>{plural(plan.pools.length, "pool")}, not loaded yet</h4>
-          <Limited items={plan.pools.map((p) => `${p.name} (${p.type}${p.places ? `, ${p.places} places` : ""})`)} />
         </div>
       )}
       {plan.toAdd.length > 0 && (
@@ -160,7 +160,7 @@ export function EquipmentForm() {
             {state.alreadyHere > 0 && ` ${plural(state.alreadyHere, "item")} in the file ${state.alreadyHere === 1 ? "was" : "were"} already here and left alone.`}
             {state.privateBoats > 0 && ` ${state.privateBoats === 1 ? "1 of them is a private boat." : `${state.privateBoats} of them are private boats.`}`}
             {state.locked > 0 && ` ${plural(state.locked, "private boat")} ${state.locked === 1 ? "has" : "have"} no owner yet and ${state.locked === 1 ? "is" : "are"} locked until staff add one.`}
-            {state.pools > 0 && ` ${plural(state.pools, "row")} (pools) ${state.pools === 1 ? "is" : "are"} waiting for a later step.`}
+            {state.pools > 0 && ` ${state.pools === 1 ? "1 of them is a pool of places." : `${state.pools} of them are pools of places.`}`}
           </p>
           <p>
             <Link href="/club/equipment">See the equipment</Link>
