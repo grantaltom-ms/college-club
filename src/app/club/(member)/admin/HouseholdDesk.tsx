@@ -2,6 +2,7 @@ import Link from "next/link";
 import { fullName, membersOf, qualificationsOf } from "@/club/engine/queries";
 import { memberFieldsProblem } from "@/club/engine/households";
 import { MEMBERSHIP_TYPES, type ClubState, type Household } from "@/club/types";
+import { CoachForm } from "./households/CoachForm";
 import { QuickbooksForm } from "./households/QuickbooksForm";
 
 type Typed = { firstName: string; lastName: string; email: string; phone: string };
@@ -122,6 +123,7 @@ export function HouseholdDesk({ state, household, typed, problem }: { state: Clu
               ) : (
                 <p className="club-meta">Holds every qualification.</p>
               )}
+              <CoachForm memberId={m.id} name={fullName(m)} isCoach={m.isCoach === true} />
               <p>
                 <Link href={`/club/admin/households/${household.id}/members/${m.id}/edit`} data-testid="edit-link" aria-label={`Change details for ${fullName(m)}`}>
                   Change name, email or phone&hellip;

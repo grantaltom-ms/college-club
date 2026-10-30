@@ -20,7 +20,7 @@ import {
 import { clockWords, opensAt } from "./bookings";
 import { blockReasonFor } from "./eligibility";
 import type { BookingLedger, Ctx } from "./households";
-import { classClash, enrolledCount, fullName, memberById, ordinal, waitingCount, waitlistPlace } from "./queries";
+import { classClash, enrolledCount, fullName, memberById, ordinal, practiceSeatClash, waitingCount, waitlistPlace } from "./queries";
 
 /* ---------- Why a sign-up is refused ---------- */
 
@@ -194,6 +194,10 @@ export function checkSignUp(state: ClubState, book: RuleBook, classRules: ClassR
   const clash = classClash(state, member.id, start, end, session.id);
   if (clash) {
     add("person_busy", `${who} ${isYou ? "are" : "is"} already ${clash.waiting ? "on the waiting list for" : "signed up for"} ${clash.className} from ${formatRange(clash.startsAt, clash.endsAt)}.`);
+  }
+  const practice = practiceSeatClash(state, member.id, start, end);
+  if (practice) {
+    add("person_busy", `${who} ${isYou ? "are" : "is"} in the lineup for ${practice.practiceName} from ${formatRange(practice.startsAt, practice.endsAt)}.`);
   }
   const boat = state.bookings.find((b) => {
     if (!HOLDING_STATUSES.includes(b.status) || !(b.bookerId === member.id || b.crew.includes(member.id))) return false;

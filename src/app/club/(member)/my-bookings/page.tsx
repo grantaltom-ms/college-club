@@ -2,6 +2,7 @@ import Link from "next/link";
 import { clubNow } from "@/club/clock";
 import { checkInNeeded, rowFor, selfCheckInPhase } from "@/club/engine/attendance";
 import { bookingDamageNotices, noticeWords, type DamageNotice } from "@/club/engine/damage";
+import { myPractices, practiceNoticeFor, sideWords } from "@/club/engine/practices";
 import { fullName, memberById } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
@@ -28,6 +29,7 @@ const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
 function Row({ state, booking, viewerId, now, staff, damage }: { state: ClubState; booking: Booking; viewerId: string | null; now: Date; staff: boolean; damage: DamageNotice[] }) {
   const item = state.items.find((i) => i.id === booking.itemId)!;
+  const practiceNotice = practiceNoticeFor(state, booking);
   const booker = memberById(state, booking.bookerId)!;
   const crew = booking.crew.map((id) => fullName(memberById(state, id)!));
   const mine = booking.bookerId === viewerId;
@@ -65,6 +67,11 @@ function Row({ state, booking, viewerId, now, staff, damage }: { state: ClubStat
             <p key={n.reportId}>{noticeWords(n)}</p>
           ))}
         </div>
+      )}
+      {practiceNotice && (
+        <p className="club-alert" role="note" data-testid="booking-practice-notice">
+          {practiceNotice}
+        </p>
       )}
       {staff && attendance && <AttendanceButtons row={attendance} who={fullName(booker)} back="/club/my-bookings" />}
       <SelfCheckIn kind="booking" id={booking.id} title={item.name} phase={checkIn} now={now} back="/club/my-bookings" />
@@ -105,6 +112,7 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
   const damage = viewerId ? bookingDamageNotices(state, viewerId, now) : {};
   const nameOf = (b: Booking) => state.items.find((i) => i.id === b.itemId)!.name;
   const notice = NOTICES[one(params.notice) ?? ""];
+  const practices = viewerId && !staff ? myPractices(state, viewerId, now) : [];
 
   return (
     <section>
@@ -133,6 +141,24 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
         </p>
       )}
 
+      {practices.length > 0 && (
+        <>
+          <h2>Practices you are in</h2>
+          <ul className="club-cards" aria-label="Practices you are in" data-testid="booking-practices">
+            {practices.map((p) => (
+              <li key={p.practiceId} className="club-card" data-testid="booking-practice">
+                <h3>
+                  <Link href={`/club/practices/${p.practiceId}`}>{p.name}</Link>
+                </h3>
+                <p>
+                  {formatDayLong(pacificDate(new Date(p.startsAt)))}, {formatRange(p.startsAt, p.endsAt)} &middot; {p.boat}, seat {p.seat} ({sideWords(p.side).toLowerCase()})
+                </p>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <h2>Upcoming</h2>
       {upcoming.length === 0 ? (
         <p data-testid="no-upcoming">Nothing booked.</p>
@@ -156,6 +182,10 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
       )}
       {!staff && (
         <p className="club-meta">
+          <Link href="/club/my-practices" data-testid="my-practices-link">
+            My practices
+          </Link>{" "}
+          &middot;{" "}
           <Link href="/club/my-history" data-testid="old-bookings-link">
             Older outings from the club&apos;s previous reservation system
           </Link>

@@ -19,6 +19,7 @@ const SLOT_WORDS: Record<SlotView["state"], string> = {
   booked: "Booked",
   yours: "Yours",
   class: "Class",
+  practice: "Practice",
   out_of_service: "Out of service",
   past: "Past",
   not_open: "Not open yet",
@@ -81,7 +82,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
       <h2 data-testid="day-heading">{formatDayLong(day)}</h2>
       <ul className="club-legend" aria-label="Legend">
-        {(["free", "booked", "yours", "class", "out_of_service", "past"] as const).map((s) => (
+        {(["free", "booked", "yours", "class", "practice", "out_of_service", "past"] as const).map((s) => (
           <li key={s}>
             <span className={`slot slot-${s}`} aria-hidden="true" /> {SLOT_WORDS[s]}
           </li>

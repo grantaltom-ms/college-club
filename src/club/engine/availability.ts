@@ -5,12 +5,12 @@ import { boatLocked, isPrivate, itemVisibleTo } from "./boat-access";
 import { dayWindow, opensAt, outOfServiceAt } from "./bookings";
 import { meetsQualification } from "./eligibility";
 import { placesOf } from "./pools";
-import { fullName, memberById } from "./queries";
+import { fullName, memberById, practiceHold } from "./queries";
 
 /** Who is looking. Members see "Booked" and "Yours"; staff also see names. */
 export type Viewer = { kind: "member"; memberId: string } | { kind: "staff" };
 
-export type SlotState = "free" | "booked" | "yours" | "class" | "out_of_service" | "past" | "not_open";
+export type SlotState = "free" | "booked" | "yours" | "class" | "practice" | "out_of_service" | "past" | "not_open";
 
 export interface SlotView {
   startsAt: string;
@@ -81,6 +81,8 @@ export function dayView(state: ClubState, book: RuleBook, input: { day: string; 
           slotState = mine ? "yours" : "booked";
         } else if (heldBy) {
           slotState = "class";
+        } else if (practiceHold(state, item.id, t, end)) {
+          slotState = "practice";
         } else if (outOfServiceAt(state, item.id, new Date(t)) || state.outOfService.some((p) => p.itemId === item.id && Date.parse(p.from) < end && t < (p.until === null ? Infinity : Date.parse(p.until)))) {
           slotState = "out_of_service";
         } else if (t < now.getTime()) {

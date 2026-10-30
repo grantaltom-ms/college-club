@@ -5,6 +5,7 @@ import { recordCharge, runBilling } from "../engine/billing";
 import { linesComplete } from "../engine/billing-views";
 import { assignDamageReport, fileDamageReport, markDamageRepaired } from "../engine/damage";
 import { RsvpRefused, cancelRsvp, createEvent, placesTaken, rsvp } from "../engine/events";
+import { PracticeRefused, addPracticeBoat, cancelPractice, clearSeat, createPractice, removePracticeBoat, seatMember, setCoach } from "../engine/practices";
 import { createHousehold, endHousehold, setQuickbooksId } from "../engine/households";
 import { clubLedger } from "../engine/ledger";
 import { waitlistPlace } from "../engine/queries";
@@ -15,6 +16,7 @@ import { BILLING_RULES } from "../settings/billing-rules";
 import { CLASS_RULES } from "../settings/class-rules";
 import { DAMAGE_RULES } from "../settings/damage-rules";
 import { EVENT_RULES } from "../settings/event-rules";
+import { PRACTICE_RULES } from "../settings/practice-rules";
 import { RULE_BOOK } from "../settings/rulebook";
 import { addDays, pacificDate } from "../time";
 import { MemoryClubStore, sequentialIds } from "./memory";
@@ -216,6 +218,39 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       expect(lost).toHaveLength(17);
       for (const l of lost) expect((l.reason as BookingRefused).reasons.map((r) => r.code)).toEqual(["slot_taken"]);
       expect((await f.store.read()).bookings.filter((x) => x.status === "upcoming")).toHaveLength(3);
+    }, 30_000);
+
+    it("practices asking for one boat at both servers at once: exactly one gets it", async () => {
+      const { f, b } = await twoServers();
+      const outcomes = await Promise.allSettled(
+        Array.from({ length: 10 }, (_, n) =>
+          createPractice((n % 2 ? b : f).store, f.book, PRACTICE_RULES, staffCtx(), { name: `Session ${n}`, startsAt: at(2, 7, n), endsAt: at(2, 9, n), itemIds: [f.i.Albatross] }),
+        ),
+      );
+      expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(1);
+      for (const lost of outcomes.filter((o): o is PromiseRejectedResult => o.status === "rejected")) {
+        expect(lost.reason).toBeInstanceOf(PracticeRefused);
+        expect((lost.reason as PracticeRefused).reasons[0]).toMatch(/^Albatross is already reserved for Session \d from 7:0\d to 9:0\d am\.$/);
+      }
+      const saved = await f.store.read();
+      expect(saved.practices).toHaveLength(1);
+      expect(saved.practiceBoats).toHaveLength(1);
+    }, 30_000);
+
+    it("a booking and a practice reserving the same boat together never leave a booking inside a reservation", async () => {
+      const { f, b } = await twoServers();
+      const outcomes = await Promise.allSettled([
+        bookAs(f, "Ada", "Albatross", at(2, 8), at(2, 9)),
+        createPractice(b.store, b.book, PRACTICE_RULES, staffCtx(), { name: "Sweep", startsAt: at(2, 7), endsAt: at(2, 9), itemIds: [f.i.Albatross] }),
+      ]);
+      const saved = await f.store.read();
+      // Either order is fine: the practice is set up over the booking (and flags it), or the booking is refused. Never both quietly.
+      if (saved.practices.length === 1 && saved.bookings.length === 1) {
+        expect(outcomes.every((o) => o.status === "fulfilled")).toBe(true);
+      } else {
+        expect(saved.bookings).toHaveLength(0);
+        expect(outcomes[0].status).toBe("rejected");
+      }
     }, 30_000);
 
     it("one member filing damage reports at both servers at once cannot get past the daily limit", async () => {
@@ -436,6 +471,86 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       await expect(f.store.transaction(async (s) => void s.damageReports.splice(0, 1))).rejects.toThrow("never deletes damage reports");
       await expect(f.store.transaction(async (s) => void (s.damageLog[0].text = "Rewritten."))).rejects.toThrow("can only be added to");
       expect((await f.store.read()).damageLog[0].text).toBe("Reported by Ada Quill as major damage.");
+    });
+
+    it("keeps every field of a practice, its boats, its seats and the coach flag through a round trip, and never deletes or rewrites them", async () => {
+      const f = await fixture();
+      await setCoach(f.store, staffCtx(), f.m.Ben, true);
+      const { practice } = await createPractice(f.store, f.book, PRACTICE_RULES, memberCtx(f.m.Ben, "Ben Quill"), {
+        name: "Saturday sweep",
+        notes: "Line one\nLine two",
+        startsAt: at(2, 7),
+        endsAt: at(2, 9),
+        itemIds: [f.i.Albatross, f.i.Pelican],
+      });
+      await seatMember(f.store, f.book, memberCtx(f.m.Ben, "Ben Quill"), { practiceId: practice.id, itemId: f.i.Albatross, seat: 1, side: "port", memberId: f.m.Ada });
+      await seatMember(f.store, f.book, staffCtx(), { practiceId: practice.id, itemId: f.i.Albatross, seat: 2, side: null, memberId: f.m.Eli });
+      await clearSeat(f.store, PRACTICE_RULES, staffCtx(new Date(NOW.getTime() + 60000)), { practiceId: practice.id, itemId: f.i.Albatross, seat: 2, reason: "Sick" });
+      await removePracticeBoat(f.store, staffCtx(new Date(NOW.getTime() + 120000)), practice.id, f.i.Pelican);
+      await addPracticeBoat(f.store, f.book, PRACTICE_RULES, staffCtx(new Date(NOW.getTime() + 180000)), practice.id, f.i.Pelican);
+      const read = await f.store.read();
+      expect(read.members.find((m) => m.id === f.m.Ben)?.isCoach).toBe(true);
+      expect(read.members.find((m) => m.id === f.m.Ada)?.isCoach).toBeUndefined();
+      expect(read.practices).toEqual([
+        {
+          id: practice.id,
+          name: "Saturday sweep",
+          notes: "Line one\nLine two",
+          startsAt: at(2, 7).toISOString(),
+          endsAt: at(2, 9).toISOString(),
+          status: "scheduled",
+          coachId: f.m.Ben,
+          createdAt: NOW.toISOString(),
+          createdBy: { kind: "member", memberId: f.m.Ben, label: "Ben Quill" },
+          statusChangedAt: NOW.toISOString(),
+          cancelledBy: null,
+          cancelReason: null,
+        },
+      ]);
+      expect(read.practiceBoats.map((b) => [b.itemId, b.addedBy.kind, b.endedAt, b.endedBy?.kind ?? null])).toEqual([
+        [f.i.Albatross, "member", null, null],
+        [f.i.Pelican, "member", new Date(NOW.getTime() + 120000).toISOString(), "staff"],
+        [f.i.Pelican, "staff", null, null],
+      ]);
+      expect(read.practiceSeats.map((x) => [x.seat, x.side, x.memberId, x.addedBy.kind, x.endedAt, x.endedBy?.label ?? null, x.endedReason])).toEqual([
+        [1, "port", f.m.Ada, "member", null, null, null],
+        [2, null, f.m.Eli, "staff", new Date(NOW.getTime() + 60000).toISOString(), "Test staff", "Taken out by Test staff: Sick"],
+      ]);
+      await cancelPractice(f.store, PRACTICE_RULES, staffCtx(new Date(NOW.getTime() + 240000)), practice.id, "Wind");
+      const cancelled = (await f.store.read()).practices[0];
+      expect(cancelled).toMatchObject({ status: "cancelled", cancelledBy: { kind: "staff", label: "Test staff" }, cancelReason: "Wind", statusChangedAt: new Date(NOW.getTime() + 240000).toISOString() });
+      await expect(f.store.transaction(async (s) => void s.practices.splice(0, 1))).rejects.toThrow("never deletes practices");
+      await expect(f.store.transaction(async (s) => void s.practiceBoats.splice(0, 1))).rejects.toThrow("never deletes practice boat lines");
+      await expect(f.store.transaction(async (s) => void s.practiceSeats.splice(0, 1))).rejects.toThrow("never deletes practice seat lines");
+      await expect(f.store.transaction(async (s) => void (s.practices[0].name = "Renamed"))).rejects.toThrow(/cannot change/);
+      await expect(f.store.transaction(async (s) => void (s.practiceSeats[0].memberId = f.m.Dee))).rejects.toThrow("can only be ended, never changed");
+      await expect(f.store.transaction(async (s) => void (s.practiceBoats[0].itemId = f.i.Heron))).rejects.toThrow("can only be ended, never changed");
+      expect((await f.store.read()).practices[0].name).toBe("Saturday sweep");
+    });
+
+    it("turns the database's refusal of a booking on a reserved boat into the usual plain sentence", async () => {
+      const f = await fixture();
+      await createPractice(f.store, f.book, PRACTICE_RULES, staffCtx(), { name: "Sweep", startsAt: at(2, 7), endsAt: at(2, 9), itemIds: [f.i.Albatross] });
+      await expect(
+        f.store.transaction(async (s, newId) => {
+          s.bookings.push({
+            id: newId(),
+            itemId: f.i.Albatross,
+            bookerId: f.m.Ada,
+            crew: [],
+            startsAt: at(2, 8).toISOString(),
+            endsAt: at(2, 9).toISOString(),
+            status: "upcoming",
+            createdAt: NOW.toISOString(),
+            createdBy: { kind: "member", memberId: f.m.Ada, label: "Ada Quill" },
+            statusChangedAt: NOW.toISOString(),
+            cancelledBy: null,
+            cancelReason: null,
+            override: null,
+            removedCrew: [],
+          });
+        }),
+      ).rejects.toMatchObject({ code: "conflict", message: "That time was just taken by someone else. Pick another." });
     });
 
     it("rolls everything back when a change fails halfway", async () => {

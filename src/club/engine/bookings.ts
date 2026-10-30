@@ -25,7 +25,7 @@ import { accessKind, boatLocked, crewNotAllowedWords, isPrivate, lockedWords, no
 import { bookingBlockReason, meetsQualification } from "./eligibility";
 import type { BookingLedger, Ctx } from "./households";
 import { firstFullStretch, holdingIn, placesOf } from "./pools";
-import { classClash, fullName, householdOf, memberById } from "./queries";
+import { classClash, fullName, householdOf, memberById, practiceHold, practiceSeatClash } from "./queries";
 
 /* ---------- Why a booking is refused ---------- */
 
@@ -52,7 +52,9 @@ export type ReasonCode =
   | "gap_needed"
   | "person_busy"
   | "in_class"
-  | "room_in_use";
+  | "in_practice"
+  | "room_in_use"
+  | "boat_in_practice";
 
 /** One plain-language reason a booking cannot be made. */
 export interface Reason {
@@ -286,6 +288,18 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
       }
     }
   }
+
+  // Nobody is in a practice lineup and on the water at once.
+  if (BOOKING_TYPE_INFO[cls.type].onWater) {
+    for (const person of [booker, ...crew]) {
+      const clash = practiceSeatClash(state, person.id, start, end);
+      if (clash) add("in_practice", `${who(person.id)} ${isYou(person.id) ? "are" : "is"} in the lineup for ${clash.practiceName} from ${formatRange(clash.startsAt, clash.endsAt)}.`);
+    }
+  }
+
+  // A practice reserves its boats while it runs.
+  const reserved = practiceHold(state, item.id, start, end);
+  if (reserved) add("boat_in_practice", `${item.name} is reserved for ${reserved.name} from ${formatRange(reserved.startsAt, reserved.endsAt)}.`);
 
   // A class holds its room while it runs.
   if (state.sessions.length > 0) {
