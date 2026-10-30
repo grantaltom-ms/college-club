@@ -10,9 +10,6 @@ import { HOLDING_STATUSES, type Booking, type ClubState, type Item } from "../ty
 /** How many people can hold this item at once. One for every boat. */
 export const placesOf = (item: Item): number => item.places ?? 1;
 
-/** More than one place: the club counts places instead of checking one booking at a time. */
-export const isPool = (item: Item): boolean => placesOf(item) > 1;
-
 /** The bookings that take a place of this item at some moment inside [start, end). */
 export function holdingIn(state: ClubState, itemId: string, start: number, end: number): Booking[] {
   return state.bookings.filter(
@@ -42,11 +39,6 @@ export function occupancy(state: ClubState, itemId: string, start: number, end: 
     segments.push({ from: at, to: points[i + 1]!, count: holding.filter(({ s, e }) => s <= at && at < e).length });
   }
   return segments;
-}
-
-/** The most places taken at any one moment between `start` and `end`. */
-export function busiest(state: ClubState, itemId: string, start: number, end: number): number {
-  return Math.max(0, ...occupancy(state, itemId, start, end).map((x) => x.count));
 }
 
 /** The first stretch between `start` and `end` in which every place is taken, or null when there is always room. */

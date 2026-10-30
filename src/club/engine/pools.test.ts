@@ -6,7 +6,7 @@ import { dayView } from "./availability";
 import { BookingRefused, cancelBooking, createBooking, takeOutOfService } from "./bookings";
 import { cancelSession, createClass, scheduleSessions } from "./classes";
 import { describeRules } from "./describe";
-import { busiest, firstFullStretch, isPool, occupancy, placesOf } from "./pools";
+import { firstFullStretch, occupancy, placesOf } from "./pools";
 import { NOW, STORE_KINDS, TODAY, addMembers, at, bookAs, fixtureFor, memberCtx, refusalMessages, refusedFor, request, ruleBookWith, staffCtx, type Fixture, type StoreKind } from "./testkit";
 
 /**
@@ -96,8 +96,9 @@ for (const kind of STORE_KINDS) {
           expect.arrayContaining(["You already have a place in Dock pool from 9:00 to 10:00 am. It is one place at a time."]),
         );
         await expect(createBooking(f.store, f.book, staffCtx(), request(f, a, "Dock pool", at(1, 9, 30), at(1, 10, 30)), { override: { reason: "Please" } })).rejects.toBeInstanceOf(BookingRefused);
-        // Past it, the same person can book the pool again (the usual limits still apply, so staff set that rule aside).
-        const later = await createBooking(f.store, f.book, staffCtx(), request(f, a, "Dock pool", at(1, 11), at(1, 12)), { override: { reason: "Second visit" } });
+        // Straight after it (one ends as the next starts) is a different time, so the same person can book the pool again. The usual
+        // limits still apply, so staff set that rule aside.
+        const later = await createBooking(f.store, f.book, staffCtx(), request(f, a, "Dock pool", at(1, 10), at(1, 11)), { override: { reason: "Second visit" } });
         expect(later.waived).toEqual(["over_daily_limit"]);
         expect(await held(f, "Dock pool")).toHaveLength(2);
       });
@@ -210,6 +211,9 @@ for (const kind of STORE_KINDS) {
         const state = await f.store.read();
         const words = describeRules(state, f.book, state.items.find((i) => i.name === "Dock pool")!).lines;
         expect(words[0]).toBe("Dock pool has 8 places, shared by everyone. You book a time and the club counts how many places are left; you are not given a place number. You can hold one place at a time.");
+        await addPool(f, "Dock pair", "dock-space", 2);
+        const two = (await f.store.read()).items.find((i) => i.name === "Dock pair")!;
+        expect(describeRules(await f.store.read(), f.book, two).lines[0]).toContain("Dock pair has 2 places, shared by everyone.");
         const boat = describeRules(state, f.book, state.items.find((i) => i.name === "Heron")!).lines;
         expect(boat.join(" ")).not.toContain("places, shared");
       });
@@ -221,8 +225,8 @@ for (const kind of STORE_KINDS) {
         const items = (await f.store.read()).items;
         expect(items.find((i) => i.name === "Dock pool")!.places).toBe(12);
         expect(items.find((i) => i.name === "Heron")!.places).toBeUndefined();
-        expect(isPool(items.find((i) => i.name === "Dock pool")!)).toBe(true);
-        expect(isPool(items.find((i) => i.name === "Heron")!)).toBe(false);
+        expect(placesOf(items.find((i) => i.name === "Dock pool")!)).toBe(12);
+        expect(placesOf(items.find((i) => i.name === "Heron")!)).toBe(1);
       });
     });
 
@@ -254,6 +258,9 @@ for (const kind of STORE_KINDS) {
     });
   });
 }
+
+/** The most places taken at any one moment between `start` and `end`. */
+const busiest = (state: Parameters<typeof occupancy>[0], itemId: string, start: number, end: number) => Math.max(0, ...occupancy(state, itemId, start, end).map((x) => x.count));
 
 describe("the count itself", () => {
   const stateWith = (spans: [number, number][]) => ({
