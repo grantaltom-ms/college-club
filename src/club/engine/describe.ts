@@ -1,7 +1,16 @@
 import { classRulesFor } from "../settings/class-rules";
 import { rulesFor } from "../settings/rulebook";
 import { clockToMinutes, formatClock, formatMinutes, pacificWall } from "../time";
-import type { ClassRules, ClassTemplate, ClubState, EventRules, Item, RuleBook } from "../types";
+import type { ClassRules, ClassTemplate, ClubState, EventRules, Item, RuleBook, RuleValues } from "../types";
+
+/** How many bookings of this kind a member can hold, in words. A limit of 0 means there is none. */
+function limitWords(rules: RuleValues, type: string): string {
+  const { maxFuturePerType: held, maxPerDayPerType: perDay } = rules;
+  if (held === 0 && perDay === 0) return `There is no limit on how many ${type} bookings you can hold or make in a day.`;
+  if (held === 0) return `There is no limit on how many upcoming ${type} bookings you can hold, and you can have ${perDay} a day.`;
+  if (perDay === 0) return `You can hold ${held} upcoming ${type} booking${held === 1 ? "" : "s"} at once, with no limit on how many you make in a day.`;
+  return `You can hold ${held} upcoming ${type} booking${held === 1 ? "" : "s"} at once, and have ${perDay} a day.`;
+}
 
 /** The rules that apply to one item, in plain words, for the booking form. Every number comes from the settings file. */
 export function describeRules(state: ClubState, book: RuleBook, item: Item): { heading: string; lines: string[]; placeholder: boolean } {
@@ -15,7 +24,7 @@ export function describeRules(state: ClubState, book: RuleBook, item: Item): { h
     `Book up to ${rules.windowDays} day${rules.windowDays === 1 ? "" : "s"} ahead. A new day opens at ${opens} Pacific time.`,
     `Bookings run from ${clock(rules.dayStart)} to ${clock(rules.dayEnd)}, in ${rules.slotMinutes}-minute steps.`,
     `The shortest booking is ${formatMinutes(rules.minMinutes)} and the longest is ${formatMinutes(rules.maxMinutes)}.`,
-    `You can hold ${rules.maxFuturePerType} upcoming ${type} booking${rules.maxFuturePerType === 1 ? "" : "s"} at once, and have ${rules.maxPerDayPerType} a day.`,
+    limitWords(rules, type),
     `Cancel at least ${formatMinutes(rules.cancelCutoffMinutes)} before the start, or it counts as a late cancellation.`,
     priv ? "This is a private boat. Its owners and the people an owner has invited can use it, and its skill level is not checked: the owner vouches for who uses it." : need ? `You need ${need}.` : "No qualification is needed.",
   ];

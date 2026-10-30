@@ -6,7 +6,7 @@ import raw from "./booking-rules.json";
 /** A mistake in the rules file, worded so someone editing it can fix it. */
 export class RuleBookError extends Error {}
 
-type Kind = "count" | "minutes" | "clock" | "gap";
+type Kind = "count" | "minutes" | "clock" | "gap" | "limit";
 /** What each rule is. Unknown names are refused, so a typo in the file is caught rather than ignored. */
 const RULES: Record<keyof RuleValues, { kind: Kind; label: string }> = {
   windowDays: { kind: "count", label: "windowDays (how many days ahead)" },
@@ -15,9 +15,10 @@ const RULES: Record<keyof RuleValues, { kind: Kind; label: string }> = {
   dayEnd: { kind: "clock", label: "dayEnd (last bookable time)" },
   slotMinutes: { kind: "minutes", label: "slotMinutes (time slot size)" },
   minMinutes: { kind: "minutes", label: "minMinutes (shortest booking)" },
+  defaultMinutes: { kind: "minutes", label: "defaultMinutes (length the booking form starts with)" },
   maxMinutes: { kind: "minutes", label: "maxMinutes (longest booking)" },
-  maxFuturePerType: { kind: "count", label: "maxFuturePerType (bookings held at once)" },
-  maxPerDayPerType: { kind: "count", label: "maxPerDayPerType (bookings per day)" },
+  maxFuturePerType: { kind: "limit", label: "maxFuturePerType (bookings held at once, 0 for no limit)" },
+  maxPerDayPerType: { kind: "limit", label: "maxPerDayPerType (bookings per day, 0 for no limit)" },
   cancelCutoffMinutes: { kind: "gap", label: "cancelCutoffMinutes (latest cancel without penalty)" },
   gapMinutes: { kind: "gap", label: "gapMinutes (gap between bookings)" },
 };
@@ -36,7 +37,8 @@ function checkOne(key: string, value: unknown, where: string): void {
     return;
   }
   if (typeof value !== "number" || !Number.isInteger(value)) throw new RuleBookError(`${at} must be a whole number.`);
-  if (value < (rule.kind === "gap" ? 0 : 1)) throw new RuleBookError(`${at} must be ${rule.kind === "gap" ? "0 or more" : "1 or more"}.`);
+  const zeroAllowed = rule.kind === "gap" || rule.kind === "limit";
+  if (value < (zeroAllowed ? 0 : 1)) throw new RuleBookError(`${at} must be ${zeroAllowed ? "0 or more" : "1 or more"}.`);
 }
 
 /** Checks the rules that only make sense together. */
@@ -46,7 +48,10 @@ export function checkRuleValues(v: RuleValues, where: string): void {
   if (end <= start) throw new RuleBookError(`${where}: dayEnd (${v.dayEnd}) must be later than dayStart (${v.dayStart}).`);
   if (clockToMinutes(v.opensAt) >= 1440) throw new RuleBookError(`${where}: opensAt must be before 24:00.`);
   if (v.maxMinutes < v.minMinutes) throw new RuleBookError(`${where}: maxMinutes (${v.maxMinutes}) cannot be shorter than minMinutes (${v.minMinutes}).`);
-  for (const key of ["minMinutes", "maxMinutes"] as const) {
+  if (v.defaultMinutes < v.minMinutes || v.defaultMinutes > v.maxMinutes) {
+    throw new RuleBookError(`${where}: defaultMinutes (${v.defaultMinutes}) must be between minMinutes (${v.minMinutes}) and maxMinutes (${v.maxMinutes}).`);
+  }
+  for (const key of ["minMinutes", "defaultMinutes", "maxMinutes"] as const) {
     if (v[key] % v.slotMinutes !== 0) throw new RuleBookError(`${where}: ${key} (${v[key]}) must be a whole number of ${v.slotMinutes}-minute slots.`);
   }
   if ((end - start) % v.slotMinutes !== 0) throw new RuleBookError(`${where}: the bookable hours (${v.dayStart} to ${v.dayEnd}) must be a whole number of ${v.slotMinutes}-minute slots.`);

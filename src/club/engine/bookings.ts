@@ -220,14 +220,14 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
   // Limits on the booker. Crew do not count toward their own limits.
   const mine = state.bookings.filter((b) => b.bookerId === booker.id && sameType(state, book, b, item));
   const holding = mine.filter((b) => b.status === "upcoming" && Date.parse(b.endsAt) > now).length;
-  if (holding >= rules.maxFuturePerType) {
+  if (rules.maxFuturePerType > 0 && holding >= rules.maxFuturePerType) {
     add(
       "over_future_limit",
       `${who(booker.id)} already ${isYou(booker.id) ? "hold" : "holds"} ${plural(holding, cls.type.toLowerCase() + " booking")}, the most allowed at once. Cancel one or wait until one is done.`,
     );
   }
   const sameDay = mine.filter((b) => HOLDING_STATUSES.includes(b.status) && pacificDate(new Date(b.startsAt)) === day).length;
-  if (sameDay >= rules.maxPerDayPerType) {
+  if (rules.maxPerDayPerType > 0 && sameDay >= rules.maxPerDayPerType) {
     add(
       "over_daily_limit",
       `${who(booker.id)} can have ${plural(rules.maxPerDayPerType, cls.type.toLowerCase() + " booking")} a day, and ${isYou(booker.id) ? "you" : "they"} already have ${sameDay === 1 ? "one" : sameDay} on ${formatDayLong(day)}.`,

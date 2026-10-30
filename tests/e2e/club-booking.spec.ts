@@ -58,25 +58,28 @@ test("core flow: pick a member, find a free single, book it, see it in My bookin
   // Pick Kingfisher's 9:00 am half hour, the free single.
   await slot(page, "Kingfisher", "9:00 to 9:30 am", "free").click();
   await expect(page.getByRole("heading", { level: 1, name: "Book Kingfisher" })).toBeVisible();
-  await expect(page.getByTestId("booking-when")).toContainText("Saturday, Oct 31, 9:00 to 10:00 am");
+  await expect(page.getByTestId("booking-when")).toContainText("Saturday, Oct 31, 9:00 to 10:30 am");
   await expect(page.getByTestId("check-ok")).toHaveText("This booking meets the rules.");
   // The rules that apply are shown, with the placeholder warning.
   await expect(page.getByRole("region", { name: "Rules" })).toContainText("Rules for Kingfisher (single)");
   await expect(page.getByRole("region", { name: "Rules" })).toContainText("These numbers are placeholders");
-  await expect(page.getByRole("region", { name: "Rules" })).toContainText("The shortest booking is 30 minutes and the longest is 2 hours.");
+  await expect(page.getByRole("region", { name: "Rules" })).toContainText("The shortest booking is 30 minutes and the longest is 4 hours.");
+  await expect(page.getByRole("region", { name: "Rules" })).toContainText("Book up to 14 days ahead.");
+  await expect(page.getByRole("region", { name: "Rules" })).toContainText("There is no limit on how many shell bookings you can hold or make in a day.");
   await page.getByRole("button", { name: "Book Kingfisher", exact: true }).click();
 
   // My bookings shows it.
   await expect(page).toHaveURL(/\/club\/my-bookings\?booked=/);
-  await expect(page.getByTestId("booked-note")).toHaveText("Booked: Kingfisher, Saturday, Oct 31, 9:00 to 10:00 am.");
-  await expect(row(page, "Kingfisher")).toContainText("Saturday, Oct 31, 9:00 to 10:00 am");
+  await expect(page.getByTestId("booked-note")).toHaveText("Booked: Kingfisher, Saturday, Oct 31, 9:00 to 10:30 am.");
+  await expect(row(page, "Kingfisher")).toContainText("Saturday, Oct 31, 9:00 to 10:30 am");
   await expect(row(page, "Kingfisher").getByTestId("booking-status")).toHaveText("Upcoming");
 
   // In the day view the member's own slots read "yours"; anyone else sees "booked".
   await openDay(page, "2026-10-31", "Shell");
   await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "yours")).toBeVisible();
   await expect(slot(page, "Kingfisher", "9:30 to 10:00 am", "yours")).toBeVisible();
-  await expect(slot(page, "Kingfisher", "10:00 to 10:30 am", "free")).toBeVisible();
+  await expect(slot(page, "Kingfisher", "10:00 to 10:30 am", "yours")).toBeVisible();
+  await expect(slot(page, "Kingfisher", "10:30 to 11:00 am", "free")).toBeVisible();
   await actAs(page, "Tomas Vandermeer");
   await openDay(page, "2026-10-31", "Shell");
   await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "booked")).toBeVisible();
@@ -124,7 +127,7 @@ test("second flow: book a double with a qualified crewmate, who then sees it as 
   await openDay(page, "2026-10-31", "Shell");
   await expect(slot(page, "Pelican", "7:00 to 7:30 am", "yours")).toBeVisible();
   await slot(page, "Osprey", "7:00 to 7:30 am", "free").click();
-  await expect(page.getByTestId("refusal-reasons")).toContainText("You are already on another boat from 7:00 to 8:00 am.");
+  await expect(page.getByTestId("refusal-reasons")).toContainText("You are already on another boat from 7:00 to 8:30 am.");
   await expect(page.getByRole("button", { name: "Book Osprey" })).toHaveCount(0);
 
   // Hollis cancels, which frees Maren too.
@@ -164,8 +167,8 @@ test("a refusal is always explained in plain words and never offers a Book butto
   await actAs(page, "Nora Abernathy");
   await page.goto(`/club/book/new?item=${itemId}&start=2026-10-29T14:00:00.000Z`); // Heron, Thu 7 am: Sasha has it
   await expect(page.getByTestId("refusal-reasons").getByRole("listitem")).toHaveText(["Heron is already booked from 7:00 to 8:00 am."]);
-  await page.goto(`/club/book/new?item=${itemId}&start=2026-11-05T13:00:00.000Z`); // Thu Nov 5, 5 am: one day too far
-  await expect(page.getByTestId("refusal-reasons").getByRole("listitem")).toHaveText(["You can book up to 7 days ahead. Thursday, Nov 5 opens Thursday, Oct 29 at midnight."]);
+  await page.goto(`/club/book/new?item=${itemId}&start=2026-11-12T13:00:00.000Z`); // Thu Nov 12, 5 am: one day too far
+  await expect(page.getByTestId("refusal-reasons").getByRole("listitem")).toHaveText(["You can book up to 14 days ahead. Thursday, Nov 12 opens Thursday, Oct 29 at midnight."]);
   await page.goto(`/club/book/new?item=${itemId}&start=2026-10-28T19:00:00.000Z`); // 12 noon today: already started
   await expect(page.getByTestId("refusal-reasons")).toContainText("That time has already started. Choose a later time.");
   await page.goto(`/club/book/new?item=${itemId}&start=2026-10-30T11:00:00.000Z`); // 4 am Fri: before the club opens
@@ -186,41 +189,35 @@ test("a booking that goes stale between the form and the button is refused by th
   const res = await page.request.post("/api/club/bookings", { form: { item: itemId, start: "2026-10-30T13:00:00.000Z", minutes: "60" }, maxRedirects: 0 });
   expect(res.status()).toBe(303);
   await page.goto(res.headers()["location"]);
-  await expect(page.getByTestId("refusal-reasons")).toHaveText("Grebe is already booked from 6:00 to 7:00 am.");
+  await expect(page.getByTestId("refusal-reasons")).toHaveText("Grebe is already booked from 6:00 to 7:30 am.");
   await actAs(page, "Lars Eriksen");
   await cancelAll(page);
 });
 
-test("book, cancel and rebook again and again: the limits and the slots always count right", async ({ page }) => {
+test("book, cancel and rebook again and again: nothing limits how many a member holds, and the slots always count right", async ({ page }) => {
   await actAs(page, "Jordan Bellweather");
   await cancelAll(page);
   const pastBefore = await pastRows(page).count();
+  const mine = (boat: string, from: string) => upcomingRows(page).filter({ hasText: boat }).filter({ hasText: from });
 
   for (let round = 1; round <= 3; round++) {
+    // The club's own numbers put no limit on how many bookings one member holds or makes in a day: four shell bookings, two on one day.
     await book(page, { item: "Osprey", day: "2026-10-31", range: "6:00 to 6:30 am" });
     await book(page, { item: "Kingfisher", day: "2026-11-01", range: "6:00 to 6:30 am" });
-    await expect(upcomingRows(page)).toHaveCount(2);
+    await book(page, { item: "Heron", day: "2026-11-02", range: "6:00 to 6:30 am" });
+    await book(page, { item: "Osprey", day: "2026-10-31", range: "9:00 to 9:30 am" });
+    await expect(upcomingRows(page)).toHaveCount(4);
     // Every booking cancelled in the rounds before is still on record, in the Past list.
-    await expect(pastRows(page)).toHaveCount(pastBefore + (round - 1) * 2);
+    await expect(pastRows(page)).toHaveCount(pastBefore + (round - 1) * 4);
 
-    // At the limit of two: a third shell booking is refused, in words.
-    await openDay(page, "2026-11-02", "Shell");
-    await slot(page, "Heron", "6:00 to 6:30 am", "free").click();
-    await expect(page.getByTestId("refusal-reasons")).toContainText("You already hold 2 shell bookings, the most allowed at once. Cancel one or wait until one is done.");
-    await expect(page.getByRole("button", { name: "Book Heron" })).toHaveCount(0);
-    // A kayak is a different kind of booking and is fine.
-    await openDay(page, "2026-11-02", "Kayak");
-    await slot(page, "Otter", "6:00 to 6:30 am", "free").click();
-    await expect(page.getByTestId("check-ok")).toBeVisible();
-
-    // Cancel one: the allowance and the slot come straight back.
+    // Cancel one: the slot comes straight back, and the others stay.
     await page.goto("/club/my-bookings");
-    await row(page, "Osprey").getByRole("button", { name: /^Cancel Osprey/ }).click();
-    await openDay(page, "2026-11-02", "Shell");
-    await slot(page, "Heron", "6:00 to 6:30 am", "free").click();
-    await expect(page.getByTestId("check-ok")).toBeVisible();
+    await mine("Osprey", "6:00").getByRole("button", { name: /^Cancel Osprey/ }).click();
+    await expect(page.getByTestId("cancelled-note")).toBeVisible();
+    await expect(upcomingRows(page)).toHaveCount(3);
     await openDay(page, "2026-10-31", "Shell");
     await expect(slot(page, "Osprey", "6:00 to 6:30 am", "free")).toBeVisible();
+    await expect(slot(page, "Osprey", "9:00 to 9:30 am", "yours")).toBeVisible();
     await cancelAll(page);
   }
   await page.goto("/club/my-bookings");
@@ -353,7 +350,7 @@ test("staff can book past the rules with a reason, and the record says so", asyn
   const lesson = row(page, "Heron").filter({ hasText: "Ines Castellanos" });
   await expect(lesson).toHaveCount(1);
   await expect(lesson).toContainText("staff override: Learn-to-row lesson with the coach");
-  await expect(lesson).toContainText("Wednesday, Nov 4, 5:00 to 6:00 am");
+  await expect(lesson).toContainText("Wednesday, Nov 4, 5:00 to 6:30 am");
 
   // A staff override never beats a fact: nobody else can take the same slot, override or not.
   await openDay(page, "2026-11-04", "Shell");

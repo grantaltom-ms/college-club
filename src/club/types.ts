@@ -125,10 +125,12 @@ export interface RuleValues {
   dayEnd: string;
   slotMinutes: number;
   minMinutes: number;
+  /** How long the booking form starts with, between minMinutes and maxMinutes. */
+  defaultMinutes: number;
   maxMinutes: number;
-  /** Bookings one member can hold at once, per booking type. */
+  /** Bookings one member can hold at once, per booking type. 0 means no limit. */
   maxFuturePerType: number;
-  /** Bookings one member can have on one day, per booking type. */
+  /** Bookings one member can have on one day, per booking type. 0 means no limit. */
   maxPerDayPerType: number;
   /** Cancelling later than this many minutes before the start counts as a late cancellation. */
   cancelCutoffMinutes: number;

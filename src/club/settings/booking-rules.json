@@ -1,16 +1,17 @@
 {
   "placeholder": true,
-  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (open question 5 in CLAUDE.md). Times are Pacific. 'defaults' apply to everything bookable; a class (for example all singles) can override any of them under 'rules'; a single item can override them again. Change a number here and the booking screens and rule checks follow.",
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (open question 5 in CLAUDE.md). The booking numbers were copied from iCrew's Reservation Settings on Oct 30, 2026: 14 days ahead, 90 minutes by default and up to 4 hours, and no limit per member (a limit of 0 means no limit). Times are Pacific. 'defaults' apply to everything bookable; a class (for example all singles) can override any of them under 'rules'; a single item can override them again. Change a number here and the booking screens and rule checks follow.",
   "defaults": {
-    "windowDays": 7,
+    "windowDays": 14,
     "opensAt": "00:00",
     "dayStart": "05:00",
     "dayEnd": "20:00",
     "slotMinutes": 30,
     "minMinutes": 30,
-    "maxMinutes": 120,
-    "maxFuturePerType": 2,
-    "maxPerDayPerType": 1,
+    "defaultMinutes": 90,
+    "maxMinutes": 240,
+    "maxFuturePerType": 0,
+    "maxPerDayPerType": 0,
     "cancelCutoffMinutes": 120,
     "gapMinutes": 0
   },
