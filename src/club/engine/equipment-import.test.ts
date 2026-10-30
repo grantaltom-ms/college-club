@@ -125,8 +125,8 @@ describe("reading an equipment file", () => {
       'Row 16: Owned by "Somebody" is not Club or Private.',
       'Row 17: In service "maybe" is not Yes or No.',
       "Row 18: Notes is longer than 200 characters.",
-      "Row 19: Places must be a whole number from 1 to 500, or empty.",
-      "Row 20: Places must be a whole number from 1 to 500, or empty.",
+      "Row 19: Places must be a whole number from 1 to 500.",
+      "Row 20: Places must be a whole number from 1 to 500.",
     ]);
   });
 
@@ -142,7 +142,7 @@ describe("reading an equipment file", () => {
     );
     expect(reading.problems).toEqual([
       "Row 2: Name has a character that cannot be saved. Retype it.",
-      "Row 3: Places must be a whole number from 1 to 500, or empty.",
+      "Row 3: Places must be a whole number from 1 to 500.",
       "Row 4: Seats 2 does not fit a work space: leave it empty or use 1.",
       "Row 5: Seats 2 does not fit a paddle board: leave it empty or use 1.",
     ]);
@@ -157,14 +157,50 @@ describe("reading an equipment file", () => {
     expect(skills).toEqual([{ mode: "code", code: "scull-2" }, { mode: "code", code: "scull-3" }, { mode: "code", code: "sweep" }, { mode: "none" }, { mode: "none" }, { mode: "class" }]);
   });
 
-  it("describes pools and private boats without needing seats or an owner for the pools", () => {
-    const reading = readEquipment(file(row("Dock spaces", "Dock Space", "", "", "", "", "60"), row("Club spaces", "Room Space", "", "", "Club", "", ""), row("Test Private", "Shell", "1", "", "Private")));
+  it("reads a pool as one item with its number of places: the club's, no seats, the class from its type", () => {
+    const reading = readEquipment(file(row("Dock spaces", "Dock Space", "", "", "", "", "60"), row("Club spaces", "Room Space", "1", "", "Club", "", "49"), row("Weight room", "gym space", "", "", "", "No", "8", "Closed for repairs"), row("Test Private", "Shell", "1", "", "Private")));
     expect(reading.problems).toEqual([]);
-    expect(reading.rows.map((r) => [r.name, r.pool, r.places, r.ownedBy])).toEqual([
-      ["Dock spaces", true, 60, null],
-      ["Club spaces", true, null, null],
-      ["Test Private", false, null, "private"],
+    expect(reading.rows.map((r) => [r.name, r.pool, r.places, r.ownedBy, r.classCode, r.seats, r.inService])).toEqual([
+      ["Dock spaces", true, 60, "club", "dock-space", 1, true],
+      ["Club spaces", true, 49, "club", "room-space", 1, true],
+      ["Weight room", true, 8, "club", "gym-space", 1, false],
+      ["Test Private", false, null, "private", "shell-single", 1, true],
     ]);
+  });
+
+  it("refuses a pool with no places, seats, an owner or a private mark, an unknown skill level, an in-service word that is not Yes or No, or a name used twice", () => {
+    const reading = readEquipment(
+      file(
+        row("Pool A", "Dock Space", "", "", "", "", ""), // 2: no places
+        row("Pool B", "Dock Space", "2", "", "", "", "10"), // 3: seats
+        row("Pool C", "Gym Space", "", "", "Private", "", "10"), // 4: private
+        row("Pool D", "Gym Space", "", "", "Somebody", "", "10"), // 5: owned by something else
+        row("Pool E", "Room Space", "", "", "", "", "10", "", "ada@example.com"), // 6: owners
+        row("Pool F", "Room Space", "", "level 9", "", "", "10"), // 7: unknown skill
+        row("Pool G", "Room Space", "", "", "", "maybe", "10"), // 8: in service neither
+        row("Pool H", "Room Space", "", "", "", "", "10"), // 9: fine
+        row("pool  h", "Gym Space", "", "", "", "", "10"), // 10: same name as row 9
+        row("Pool I", "Dock Space", "", "", "", "", "0"), // 11: places 0
+      ),
+    );
+    expect(reading.problems).toEqual([
+      "Row 2: Places is empty. A dock space pool needs its number of places, from 1 to 500.",
+      "Row 3: Seats does not apply to a pool: leave it empty. Use Places for how many people it holds at once.",
+      "Row 4: A pool cannot be private. Leave Owned by empty or write Club.",
+      'Row 5: Owned by "Somebody" is not Club.',
+      "Row 6: Owner emails is only for Private boats. Clear it.",
+      expect.stringContaining('Row 7: Skill level needed "level 9" is not one the system knows.'),
+      'Row 8: In service "maybe" is not Yes or No.',
+      "Row 10: pool h is already on row 9. List each item once.",
+      "Row 11: Places must be a whole number from 1 to 500.",
+    ]);
+    expect(reading.rows.map((r) => r.name)).toEqual(["Pool H"]);
+  });
+
+  it("allows seats of 1 on a pool, a pool of one place, and the club's hint column on a pool row without effect", () => {
+    const reading = readEquipment(file(row("Pool A", "Dock Space", "1", "None", "Club", "Yes", "1")));
+    expect(reading.problems).toEqual([]);
+    expect(reading.rows[0]).toMatchObject({ pool: true, places: 1, skill: { mode: "none" } });
   });
 
   it("notes when the sheet's own hint says a boat looks private", () => {
@@ -223,7 +259,7 @@ describe("reading an equipment file", () => {
 
   it("has a template whose only problems are its own example rows", () => {
     const reading = readEquipment(EQUIPMENT_TEMPLATE);
-    expect(reading.problems).toHaveLength(4);
+    expect(reading.problems).toHaveLength(5);
     expect(reading.problems.every((p) => p.includes("example rows"))).toBe(true);
     expect(EQUIPMENT_TEMPLATE.split("\r\n")[0]).toBe(HEADER);
   });
@@ -263,18 +299,31 @@ describe("planning an equipment upload", () => {
     expect(plan.toAdd[0].reason).toBe("Not in service when the equipment list was loaded.");
   });
 
-  it("adds a private boat, with no owner it starts locked and says so, and leaves the pools out and says why", async () => {
+  it("adds a private boat that starts locked and says so, and adds a pool with its places and says so", async () => {
     const plan = planEquipment(await emptyState(), file(row("Test Single", "Shell", "1"), row("Test Private", "Shell", "1", "", "Private"), row("Dock spaces", "Dock Space", "", "", "Club", "", "60")));
     expect(plan.problems).toEqual([]);
-    expect(plan.toAdd.map((i) => [i.name, i.private, i.owners])).toEqual([
-      ["Test Single", false, []],
-      ["Test Private", true, []],
+    expect(plan.toAdd.map((i) => [i.name, i.private, i.owners, i.pool, i.places])).toEqual([
+      ["Test Single", false, [], false, 1],
+      ["Test Private", true, [], false, 1],
+      ["Dock spaces", false, [], true, 60],
     ]);
     expect(plan.toAdd[1].skill).toBe("not checked on a private boat");
-    expect(plan.pools).toEqual([{ row: 4, name: "Dock spaces", type: "Dock Space", places: 60 }]);
+    expect(plan.toAdd[2]).toMatchObject({ className: "Dock space", classCode: "dock-space", skill: "none needed", outOfService: false });
     expect(plan.notices).toContain("1 private boat will be added. Only a private boat's owners and the people they invite can see or book it, and its skill level is not checked.");
     expect(plan.notices.join(" ")).toContain("1 private boat has no owner in the file (Test Private), so it will start locked: nobody can book it until staff add an owner on the Private boats screen.");
-    expect(plan.notices.join(" ")).toContain("Pools are a later step");
+    expect(plan.notices).toContain("1 pool will be added: Dock spaces (60 places). Members book a time and see how many places are left; nobody is given a place number.");
+  });
+
+  it("lists up to five pools by name in the notice, a pool of one place in the singular, and leaves a pool whose name is already here alone", async () => {
+    const names = ["A", "B", "C", "D", "E", "F"].map((n, i) => row(`Pool ${n}`, i % 2 ? "Gym Space" : "Dock Space", "", "", "", "", i === 0 ? "1" : "9"));
+    const plan = planEquipment(await emptyState(), file(...names));
+    expect(plan.problems).toEqual([]);
+    expect(plan.notices).toContain("6 pools will be added: Pool A (1 place), Pool B (9 places), Pool C (9 places), Pool D (9 places), Pool E (9 places), and 1 more. Members book a time and see how many places are left; nobody is given a place number.");
+    const store = new MemoryClubStore(sequentialIds());
+    await runEquipment(store, staffCtx(), file(row("Pool A", "Dock Space", "", "", "", "", "5")));
+    const again = planEquipment(await store.read(), file(row("pool  a", "Dock Space", "", "", "", "", "9")));
+    expect(again.alreadyHere).toEqual([{ row: 2, name: "pool a" }]);
+    expect(again.toAdd).toEqual([]);
   });
 
   it("warns when a boat marked Club looks private in the sheet's hint column", async () => {
@@ -321,11 +370,11 @@ for (const kind of STORE_KINDS) {
       expect((await store.read()).items).toEqual([]);
     });
 
-    it("adds exactly what was previewed, with each skill setting, the private boat and the out-of-service period, and leaves the pools out", async () => {
+    it("adds exactly what was previewed, with each skill setting, the private boat, the pool with its places and the out-of-service period", async () => {
       const store = await fresh();
       const plan = planEquipment(await store.read(), text);
       const result = await runEquipment(store, staffCtx(), text, { fingerprint: plan.fingerprint, items: plan.toAdd.length });
-      expect(result).toEqual({ added: 7, outOfService: 1, alreadyHere: 0, pools: 1, privateBoats: 1, locked: 1 });
+      expect(result).toEqual({ added: 8, outOfService: 1, alreadyHere: 0, pools: 1, privateBoats: 1, locked: 1 });
       const state = await store.read();
       expect(state.items.map((i) => [i.name, i.classCode, i.requiredQualification])).toEqual([
         ["Test Single", "shell-single", undefined],
@@ -335,6 +384,17 @@ for (const kind of STORE_KINDS) {
         ["Test Board", "paddle-board", undefined],
         ["Test Room", "work-space", undefined],
         ["Test Private", "shell-single", undefined],
+        ["Dock spaces", "dock-space", undefined],
+      ]);
+      expect(state.items.map((i) => [i.name, i.places])).toEqual([
+        ["Test Single", undefined],
+        ["Test Double", undefined],
+        ["Test Falcon", undefined],
+        ["Test Twin Kayak", undefined],
+        ["Test Board", undefined],
+        ["Test Room", undefined],
+        ["Test Private", undefined],
+        ["Dock spaces", 60],
       ]);
       expect(state.items.filter((i) => i.isPrivate).map((i) => i.name)).toEqual(["Test Private"]);
       expect(state.boatAccess).toEqual([]);
@@ -354,7 +414,7 @@ for (const kind of STORE_KINDS) {
       await expect(runEquipment(store, staffCtx(), text, { fingerprint: plan.fingerprint, items: plan.toAdd.length + 1 })).rejects.toMatchObject({ code: "conflict" });
       expect((await store.read()).items).toEqual([]);
       await runEquipment(store, staffCtx(), text, { fingerprint: plan.fingerprint, items: plan.toAdd.length });
-      await expect(runEquipment(store, staffCtx(), text)).rejects.toMatchObject({ code: "conflict", message: "Everything in the file is already here or waiting for a later step, so there is nothing to add." });
+      await expect(runEquipment(store, staffCtx(), text)).rejects.toMatchObject({ code: "conflict", message: "Everything in the file is already here, so there is nothing to add." });
       await expect(runEquipment(store, staffCtx(), file())).rejects.toMatchObject({ code: "conflict", message: "The file has no equipment to add." });
     });
 
@@ -384,7 +444,7 @@ for (const kind of STORE_KINDS) {
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
       for (const r of results.filter((x): x is PromiseRejectedResult => x.status === "rejected")) expect(r.reason).toBeInstanceOf(ClubError);
       const state = await store.read();
-      expect(state.items).toHaveLength(7);
+      expect(state.items).toHaveLength(8);
       expect(state.outOfService).toHaveLength(1);
     });
 

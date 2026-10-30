@@ -147,7 +147,7 @@ describe("the equipment screen's action: adding", () => {
 
   it("says so, and changes nothing more, when everything is already here", async () => {
     await add(GOOD, await checked(GOOD));
-    expect(await add(GOOD, await checked(GOOD))).toEqual({ kind: "error", message: "Everything in the file is already here or waiting for a later step, so there is nothing to add." });
+    expect(await add(GOOD, await checked(GOOD))).toEqual({ kind: "error", message: "Everything in the file is already here, so there is nothing to add." });
     expect(await names()).toEqual(["Test Single", "Test Twin Kayak"]);
   });
 

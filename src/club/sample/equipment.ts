@@ -16,6 +16,8 @@ interface SampleItem {
   ruleOverrides?: Partial<RuleValues>;
   /** A privately owned boat, with the members who own it and the members an owner has invited (by full name). No owners: locked. */
   private?: { owners: string[]; invited: string[] };
+  /** A pool: how many people can hold it at once. Counted, not numbered. Leave it out for a single item. */
+  places?: number;
 }
 
 export const SAMPLE_ITEMS: SampleItem[] = [
@@ -41,6 +43,9 @@ export const SAMPLE_ITEMS: SampleItem[] = [
   // The two spaces fitness classes use. Members can book them too, when no class is in them.
   { name: "Boathouse gym", classCode: "gym-space" },
   { name: "Clubhouse room", classCode: "room-space" },
+  // Two pools: one item with a number of places, counted rather than numbered. Members book a time and see how many are left.
+  { name: "Dock berths", classCode: "dock-space", places: 4 },
+  { name: "Weight room", classCode: "gym-space", places: 3 },
   // Private boats. Only their owners and the people an owner has invited can see or book them, and their skill level is not checked
   // (Ines Castellanos holds no qualification and can still use Starling). Wren has no owner, so it is locked until staff add one.
   { name: "Kestrel", classCode: "shell-single", private: { owners: ["Nora Abernathy"], invited: ["Tomas Vandermeer"] } },
@@ -62,6 +67,7 @@ export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<
     for (const i of SAMPLE_ITEMS) {
       const item: Item = { id: newId(), name: i.name, classCode: i.classCode, ruleOverrides: i.ruleOverrides ?? {} };
       if (i.private) item.isPrivate = true;
+      if (i.places && i.places > 1) item.places = i.places;
       s.items.push(item);
       const line = (name: string, kind: BoatAccess["kind"]): BoatAccess => ({ id: newId(), itemId: item.id, memberId: memberId(name), kind, addedAt: now.toISOString(), addedBy: SAMPLE_STAFF, endedAt: null, endedBy: null, endedReason: null });
       for (const name of i.private?.owners ?? []) s.boatAccess.push(line(name, "owner"));

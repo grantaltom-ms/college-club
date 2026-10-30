@@ -54,7 +54,7 @@ test.describe("who can load equipment", () => {
 });
 
 test.describe("the template", () => {
-  test("downloads as a CSV with every column and four example rows, and the example rows cannot be loaded by accident", async ({ page }) => {
+  test("downloads as a CSV with every column and five example rows, and the example rows cannot be loaded by accident", async ({ page }) => {
     await openUpload(page);
     const res = await page.request.get("/api/club/equipment/template");
     expect(res.status()).toBe(200);
@@ -65,7 +65,7 @@ test.describe("the template", () => {
     expect(body).toContain("EXAMPLE-1");
     await check(page, body, "ccs-equipment-template.csv");
     const problems = page.getByTestId("equip-problems");
-    await expect(problems).toContainText("ccs-equipment-template.csv has 4 problems");
+    await expect(problems).toContainText("ccs-equipment-template.csv has 5 problems");
     await expect(problems).toContainText("Row 2:");
     await expect(problems).toContainText("one of the template's example rows");
     await expect(page.getByTestId("equip-add")).toHaveCount(0);
@@ -92,18 +92,18 @@ test.describe("checking and adding", () => {
 
     await openUpload(page);
     await check(page, sheet, "starter.csv");
-    await expect(page.getByTestId("equip-summary")).toHaveText("This would add 4 items to the club (3 singles, 1 double kayak).");
-    await expect(page.getByTestId("equip-item")).toHaveCount(4);
+    await expect(page.getByTestId("equip-summary")).toHaveText("This would add 5 items to the club (3 singles, 1 double kayak, 1 dock space).");
+    await expect(page.getByTestId("equip-item")).toHaveCount(5);
     await expect(page.getByTestId("equip-item").filter({ hasText: single })).toContainText("Skill level: the usual level for this class (Sculling level 1 (placeholder))");
     await expect(page.getByTestId("equip-item").filter({ hasText: anyone })).toContainText("Skill level: none needed");
     await expect(page.getByTestId("equip-item").filter({ hasText: twin })).toContainText("Added out of service: Paddle needs mending");
     await expect(page.getByTestId("equip-item").filter({ hasText: privateBoat })).toContainText("Skill level: not checked on a private boat");
     await expect(page.getByTestId("equip-item").filter({ hasText: privateBoat }).getByTestId("equip-item-private")).toHaveText("Private boat · no owner yet, so it starts locked until staff add one");
-    await expect(page.getByTestId("equip-pools")).toContainText(`${docks} (Dock Space, 60 places)`);
+    await expect(page.getByTestId("equip-item").filter({ hasText: docks }).getByTestId("equip-item-pool")).toHaveText("Pool · 60 places, counted rather than numbered");
     const notices = page.getByTestId("equip-notices");
     await expect(notices).toContainText("1 private boat will be added");
     await expect(notices).toContainText("has no owner in the file");
-    await expect(notices).toContainText("Pools are a later step");
+    await expect(notices).toContainText(`1 pool will be added: ${docks} (60 places)`);
     await expect(notices).toContainText("looks like a private boat in the sheet's hint column");
     await expect(notices).toContainText("1 item will be added out of service");
     // Looking saved nothing.
@@ -113,15 +113,15 @@ test.describe("checking and adding", () => {
     await page.goto("/club/admin/equipment-import");
     await check(page, sheet, "starter.csv");
     await page.getByTestId("equip-add").click();
-    await expect(page.getByTestId("equip-done")).toContainText("Added 4 items. 1 item was added out of service. 1 of them is a private boat. 1 private boat has no owner yet and is locked until staff add one. 1 row (pools) is waiting for a later step.");
+    await expect(page.getByTestId("equip-done")).toContainText("Added 5 items. 1 item was added out of service. 1 of them is a private boat. 1 private boat has no owner yet and is locked until staff add one. 1 of them is a pool of places.");
 
-    // The staff equipment page lists them; the out-of-service one says why; the private boat is there too (staff see everything); the pool is not.
+    // The staff equipment page lists them; the out-of-service one says why; the private boat and the pool are there too.
     await page.goto("/club/equipment");
     await expect(equipmentRow(page, single)).toContainText("In service");
     await expect(equipmentRow(page, anyone)).toContainText("In service");
     await expect(equipmentRow(page, twin).getByTestId("equipment-status")).toContainText("Paddle needs mending");
     await expect(equipmentRow(page, privateBoat)).toHaveCount(1);
-    await expect(equipmentRow(page, docks)).toHaveCount(0);
+    await expect(equipmentRow(page, docks)).toHaveCount(1);
 
     // A member with no qualification is refused the single with the usual level, and can book the one that needs none.
     await actAs(page, "Ines Castellanos");
@@ -199,10 +199,15 @@ test.describe("checking and adding", () => {
   test("a file with nothing to add says so and offers no Add button", async ({ page }) => {
     const t = tag();
     await openUpload(page);
-    // Only a pool, which waits for a later step, so there is nothing to load now.
-    await check(page, csv(row(`Playwright Docks ${t}`, "Dock Space", "", "", "Club", "", "60")), "waiting.csv");
-    await expect(page.getByTestId("equip-summary")).toHaveText("There is nothing to add: everything in the file is already here or waiting for a later step.");
-    await expect(page.getByTestId("equip-pools")).toBeVisible();
+    const sheet = csv(row(`Playwright Docks ${t}`, "Dock Space", "", "", "Club", "", "60"));
+    await check(page, sheet, "docks.csv");
+    await page.getByTestId("equip-add").click();
+    await expect(page.getByTestId("equip-done")).toContainText("Added 1 item.");
+    // The same file again: everything in it is already here.
+    await page.goto("/club/admin/equipment-import");
+    await check(page, sheet, "docks.csv");
+    await expect(page.getByTestId("equip-summary")).toHaveText("There is nothing to add: everything in the file is already here.");
+    await expect(page.getByTestId("equip-already-here")).toBeVisible();
     await expect(page.getByTestId("equip-add")).toHaveCount(0);
   });
 

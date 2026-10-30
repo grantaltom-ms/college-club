@@ -24,6 +24,7 @@ import {
 import { accessKind, boatLocked, crewNotAllowedWords, isPrivate, lockedWords, notAllowedWords } from "./boat-access";
 import { bookingBlockReason, meetsQualification } from "./eligibility";
 import type { BookingLedger, Ctx } from "./households";
+import { firstFullStretch, holdingIn, placesOf } from "./pools";
 import { classClash, fullName, householdOf, memberById } from "./queries";
 
 /* ---------- Why a booking is refused ---------- */
@@ -47,6 +48,7 @@ export type ReasonCode =
   | "over_future_limit"
   | "over_daily_limit"
   | "slot_taken"
+  | "already_has_place"
   | "gap_needed"
   | "person_busy"
   | "in_class"
@@ -232,19 +234,32 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
     );
   }
 
-  // The item is free.
-  const gap = ms(rules.gapMinutes);
-  for (const b of state.bookings) {
-    if (b.itemId !== item.id || !HOLDING_STATUSES.includes(b.status)) continue;
-    const bs = Date.parse(b.startsAt);
-    const be = Date.parse(b.endsAt);
-    if (overlaps(start, end, bs, be)) {
-      add("slot_taken", `${item.name} is already booked from ${formatRange(b.startsAt, b.endsAt)}.`);
-      break;
+  // The item is free. A pool is counted: at no moment may more people hold it than it has places. Nobody holds two places of one
+  // pool at once. A single item is simply taken or not, and may ask for a gap between bookings.
+  const places = placesOf(item);
+  if (places > 1) {
+    const mineHere = holdingIn(state, item.id, start, end).find((b) => b.bookerId === booker.id);
+    if (mineHere) {
+      add("already_has_place", `${who(booker.id)} already ${isYou(booker.id) ? "have" : "has"} a place in ${item.name} from ${formatRange(mineHere.startsAt, mineHere.endsAt)}. It is one place at a time.`);
     }
-    if (gap > 0 && overlaps(start, end, bs - gap, be + gap)) {
-      add("gap_needed", `${item.name} needs ${formatMinutes(rules.gapMinutes)} free between bookings.`);
-      break;
+    const full = firstFullStretch(state, item.id, start, end, places);
+    if (full) {
+      add("slot_taken", `${item.name} is full from ${formatRange(new Date(full.from).toISOString(), new Date(full.to).toISOString())}: all ${places} places are booked.`);
+    }
+  } else {
+    const gap = ms(rules.gapMinutes);
+    for (const b of state.bookings) {
+      if (b.itemId !== item.id || !HOLDING_STATUSES.includes(b.status)) continue;
+      const bs = Date.parse(b.startsAt);
+      const be = Date.parse(b.endsAt);
+      if (overlaps(start, end, bs, be)) {
+        add("slot_taken", `${item.name} is already booked from ${formatRange(b.startsAt, b.endsAt)}.`);
+        break;
+      }
+      if (gap > 0 && overlaps(start, end, bs - gap, be + gap)) {
+        add("gap_needed", `${item.name} needs ${formatMinutes(rules.gapMinutes)} free between bookings.`);
+        break;
+      }
     }
   }
 

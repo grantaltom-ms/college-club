@@ -200,6 +200,22 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       expect((await f.store.read()).bookings.filter((x) => x.status === "upcoming")).toHaveLength(1);
     }, 30_000);
 
+    it("twenty members on two servers grab a pool of three places: exactly three get a place", async () => {
+      const { f, b } = await twoServers();
+      await f.store.transaction(async (s, newId) => {
+        const id = newId();
+        s.items.push({ id, name: "Dock pool", classCode: "dock-space", ruleOverrides: {}, places: 3 });
+        f.i["Dock pool"] = id;
+      });
+      const people = await addMembers(f, 20);
+      const outcomes = await Promise.allSettled(people.map((id, n) => bookAs(n % 2 ? b : f, id, "Dock pool", at(1, 7), at(1, 8))));
+      expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(3);
+      const lost = outcomes.filter((o): o is PromiseRejectedResult => o.status === "rejected");
+      expect(lost).toHaveLength(17);
+      for (const l of lost) expect((l.reason as BookingRefused).reasons.map((r) => r.code)).toEqual(["slot_taken"]);
+      expect((await f.store.read()).bookings.filter((x) => x.status === "upcoming")).toHaveLength(3);
+    }, 30_000);
+
     it("one member firing twenty requests at both servers cannot get past her limit of two", async () => {
       const { f, b } = await twoServers();
       const outcomes = await Promise.allSettled(

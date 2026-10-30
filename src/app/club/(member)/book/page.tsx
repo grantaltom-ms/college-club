@@ -98,6 +98,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             <p className="club-meta">
               {item.type}
               {item.seats > 1 ? ` · ${item.seats} seats` : ""}
+              {item.places > 1 ? ` · ${item.places} places` : ""}
               {item.needs ? ` · needs ${item.needs}` : ""}
             </p>
             {item.qualified === false && <p className="club-meta">You do not hold that qualification yet, so you cannot book this one.</p>}
@@ -109,17 +110,20 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             )}
             <ol className="slots">
               {item.slots.map((slot) => {
-                const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${slot.heldFor ? `${slot.heldFor} class` : SLOT_WORDS[slot.state].toLowerCase()}`;
+                const counted = slot.placesLeft !== null && !slot.heldFor && (slot.state === "free" || slot.state === "booked" || slot.state === "yours");
+                const words = slot.heldFor ? `${slot.heldFor} class` : counted && slot.state !== "yours" ? `${slot.placesLeft} of ${item.places} places left` : SLOT_WORDS[slot.state].toLowerCase();
+                const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${words}`;
                 return (
                   <li key={slot.startsAt}>
                     {slot.state === "free" && !item.locked ? (
                       <Link className="slot slot-free" href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })} aria-label={label}>
                         {formatClock(slot.startsAt)}
+                        {slot.placesLeft !== null && <small>{slot.placesLeft} left</small>}
                       </Link>
                     ) : (
-                      <span className={`slot slot-${slot.state}`} aria-label={label} data-state={slot.state}>
+                      <span className={`slot slot-${slot.state}`} aria-label={label} data-state={slot.state} title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}>
                         {formatClock(slot.startsAt)}
-                        <small>{slot.bookedBy ?? slot.heldFor ?? (slot.state === "past" ? "" : SLOT_WORDS[slot.state])}</small>
+                        <small>{slot.bookedBy ?? slot.heldFor ?? (slot.state === "past" ? "" : slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state])}</small>
                       </span>
                     )}
                   </li>
