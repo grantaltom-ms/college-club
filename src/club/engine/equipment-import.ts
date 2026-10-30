@@ -300,7 +300,7 @@ const NOT_IN_SERVICE_REASON = "Not in service when the equipment list was loaded
 
 function compute(state: ClubState, text: string): EquipmentPlan {
   const reading = readEquipment(text);
-  const problems = [...reading.problems];
+  const problems = reading.problems;
   const notices: string[] = [];
   const here = new Set(state.items.map((i) => clean(i.name).toLowerCase()));
   const toAdd: PlannedItem[] = [];
@@ -357,10 +357,6 @@ function compute(state: ClubState, text: string): EquipmentPlan {
   if (alreadyHere.length > 0) notices.push(`${plural(alreadyHere.length, "item")} already in the club ${alreadyHere.length === 1 ? "is" : "are"} left alone: an upload never changes or removes anything that is already here.`);
   const out = toAdd.filter((i) => i.outOfService).length;
   if (out > 0) notices.push(`${plural(out, "item")} will be added out of service. Staff can return ${out === 1 ? "it" : "them"} to service on the Equipment page.`);
-
-  // The reader's mistakes and the read-back's are listed in the order a spreadsheet shows them: by row, then anything about the file as a whole.
-  const rowOf = (problem: string) => Number(/^Row (\d+):/.exec(problem)?.[1] ?? Infinity);
-  problems.sort((a, b) => (rowOf(a) === rowOf(b) ? 0 : rowOf(a) < rowOf(b) ? -1 : 1));
 
   return { problems, notices, ignoredColumns: reading.ignoredColumns, rowCount: reading.rowCount, toAdd, alreadyHere, pools, privateBoats, fingerprint: fingerprintOf(text) };
 }

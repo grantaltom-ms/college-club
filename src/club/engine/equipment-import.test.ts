@@ -132,6 +132,20 @@ describe("reading an equipment file", () => {
     expect(reading.rows.map((r) => r.name)).toEqual(["Test Single"]);
   });
 
+  it("refuses a name with a character that cannot be saved, a place count over the limit, and seats that do not fit a work space or a paddle board", () => {
+    const reading = readEquipment(
+      file(row("Test\u0007Bell", "Shell", "1"), row("Dock spaces", "Dock Space", "", "", "", "", "501"), row("Test Room", "Work Space", "2"), row("Test Board", "Paddle Board", "2")),
+    );
+    expect(reading.problems).toEqual([
+      "Row 2: Name has a character that cannot be saved. Retype it.",
+      "Row 3: Places must be a whole number from 1 to 500, or empty.",
+      "Row 4: Seats 2 does not fit a work space: leave it empty or use 1.",
+      "Row 5: Seats 2 does not fit a paddle board: leave it empty or use 1.",
+    ]);
+    // Exactly at the limit is fine.
+    expect(readEquipment(file(row("Dock spaces", "Dock Space", "", "", "", "", "500"))).rows[0].places).toBe(500);
+  });
+
   it("reads a skill level as a qualification's code or name, None for anyone, or empty for the class's usual", () => {
     const skills = readEquipment(
       file(row("A", "Shell", "1", "scull-2"), row("B", "Shell", "1", "Sculling level 3 (placeholder)"), row("C", "Shell", "1", "SWEEP"), row("D", "Shell", "1", "None"), row("E", "Shell", "1", "anyone"), row("F", "Shell", "1", "")),
@@ -202,6 +216,7 @@ describe("planning an equipment upload", () => {
       ["Test Room", "Work space", 1, "none needed", false, ""],
     ]);
     expect(first.fingerprint).toBe(fingerprintOf(text));
+    expect(first.notices).toContain("1 item will be added out of service. Staff can return it to service on the Equipment page.");
   });
 
   it("gives an out-of-service item without notes a plain reason", async () => {
@@ -233,7 +248,7 @@ describe("planning an equipment upload", () => {
     expect(plan.notices[0]).toContain('"Colour"');
   });
 
-  it("includes the file's own mistakes, sorted by row", async () => {
+  it("includes the file's own mistakes, in the order a spreadsheet shows them", async () => {
     const plan = planEquipment(await emptyState(), file(row("Test A", "Shell", "3"), row("Test B", "Shell", "1"), row("Test C", "Kayak", "")));
     expect(plan.problems.map((p) => p.slice(0, 6))).toEqual(["Row 2:", "Row 4:"]);
     // The good row is still described, but with problems on the page nothing can be loaded: the run refuses (see below).
@@ -279,7 +294,7 @@ for (const kind of STORE_KINDS) {
       expect(state.items.every((i) => Object.keys(i.ruleOverrides).length === 0)).toBe(true);
       const twin = state.items.find((i) => i.name === "Test Twin Kayak")!;
       expect(state.outOfService).toHaveLength(1);
-      expect(state.outOfService[0]).toMatchObject({ itemId: twin.id, reason: "Paddle needs mending", until: null, expectedReturn: null, createdBy: { kind: "staff" } });
+      expect(state.outOfService[0]).toMatchObject({ itemId: twin.id, reason: "Paddle needs mending", until: null, expectedReturn: null, createdBy: { kind: "staff", label: "Test staff" } });
       expect(state.outOfService[0].from).toBe(NOW.toISOString());
     });
 
@@ -304,6 +319,7 @@ for (const kind of STORE_KINDS) {
       const second = file(row("test  single", "Shell", "2", "scull-3", "Club", "No", "", "changed"), row("Test Board", "Paddle Board"));
       const plan = planEquipment(await store.read(), second);
       expect(plan.alreadyHere).toEqual([{ row: 2, name: "test single" }]);
+      expect(plan.notices).toContain("1 item already in the club is left alone: an upload never changes or removes anything that is already here.");
       expect(plan.toAdd.map((i) => i.name)).toEqual(["Test Board"]);
       const result = await runEquipment(store, staffCtx(), second, { fingerprint: plan.fingerprint, items: 1 });
       expect(result).toMatchObject({ added: 1, alreadyHere: 1, outOfService: 0 });
