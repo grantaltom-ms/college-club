@@ -112,7 +112,7 @@ describe("the equipment screen's action: adding", () => {
   };
 
   it("adds the file that was checked, as the signed-in staff member, and says how many", async () => {
-    expect(await add(GOOD, await checked(GOOD))).toEqual({ kind: "added", fileName: "equipment.csv", added: 2, outOfService: 1, alreadyHere: 0, pools: 0, privateBoats: 0 });
+    expect(await add(GOOD, await checked(GOOD))).toEqual({ kind: "added", fileName: "equipment.csv", added: 2, outOfService: 1, alreadyHere: 0, pools: 0, privateBoats: 0, locked: 0 });
     expect(await names()).toEqual(["Test Single", "Test Twin Kayak"]);
     const state = await (h.store as ClubStore).read();
     expect(state.outOfService[0]).toMatchObject({ reason: "Paddle needs mending", createdBy: { kind: "staff", label: "Alex Staffer" } });

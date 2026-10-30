@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { dayView, pickableDays, type SlotView } from "@/club/engine/availability";
+import { itemVisibleTo } from "@/club/engine/boat-access";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { clubNow } from "@/club/clock";
@@ -34,10 +35,11 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const params = await searchParams;
   const days = pickableDays(state, RULE_BOOK, now);
   const day = dayParam(params.day, days, days[0]);
-  const present = new Set(state.items.map((i) => classOf(RULE_BOOK, i).type));
+  const viewer = viewerOf(actor);
+  const present = new Set(state.items.filter((i) => itemVisibleTo(state, i, viewer)).map((i) => classOf(RULE_BOOK, i).type));
   const types = BOOKING_TYPES.filter((t) => present.has(t));
   const type = typeParam(params.type);
-  const view = dayView(state, RULE_BOOK, { day, now, viewer: viewerOf(actor), type: type && present.has(type) ? type : null });
+  const view = dayView(state, RULE_BOOK, { day, now, viewer, type: type && present.has(type) ? type : null });
   const blocked = blockedReason(actor);
   const href = (d: string, t: string | null) => `/club/book?day=${d}${t ? `&type=${encodeURIComponent(t)}` : ""}`;
   const today = pacificDate(now);
@@ -49,6 +51,12 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
       {blocked && (
         <p className="club-alert" role="alert" data-testid="blocked-note">
           You cannot make new bookings. {blocked}
+        </p>
+      )}
+
+      {actor.kind === "member" && state.boatAccess.some((a) => a.memberId === actor.member.id && a.endedAt === null) && (
+        <p className="club-meta" data-testid="my-boats-link">
+          You can use private boats. <Link href="/club/my-boats">My boats</Link>
         </p>
       )}
 
@@ -85,6 +93,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           <article key={item.item.id} className="club-card" aria-label={item.item.name} data-testid="item-card" data-item={item.item.name}>
             <h3>
               {item.item.name} <span className="club-meta">{item.className}</span>
+              {item.isPrivate && <span className="club-tag">Private</span>}
             </h3>
             <p className="club-meta">
               {item.type}
@@ -93,12 +102,17 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             </p>
             {item.qualified === false && <p className="club-meta">You do not hold that qualification yet, so you cannot book this one.</p>}
             {item.note && <p className="club-meta">{item.note}</p>}
+            {item.locked && (
+              <p className="club-meta" data-testid="boat-locked-note">
+                Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
+              </p>
+            )}
             <ol className="slots">
               {item.slots.map((slot) => {
                 const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${slot.heldFor ? `${slot.heldFor} class` : SLOT_WORDS[slot.state].toLowerCase()}`;
                 return (
                   <li key={slot.startsAt}>
-                    {slot.state === "free" ? (
+                    {slot.state === "free" && !item.locked ? (
                       <Link className="slot slot-free" href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })} aria-label={label}>
                         {formatClock(slot.startsAt)}
                       </Link>

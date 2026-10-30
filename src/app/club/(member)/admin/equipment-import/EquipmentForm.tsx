@@ -66,6 +66,11 @@ function Checked({ fileName, plan, pending, onAdd }: { fileName: string; plan: E
                 {i.type} &middot; {i.className}, {i.seats === 1 ? "1 seat" : `${i.seats} seats`}
               </p>
               <p>Skill level: {i.skill}</p>
+              {i.private && (
+                <p data-testid="equip-item-private">
+                  Private boat &middot; {i.owners.length > 0 ? `owned by ${i.owners.map((o) => o.name).join(", ")}` : "no owner yet, so it starts locked until staff add one"}
+                </p>
+              )}
               {i.outOfService && <p className="club-meta">Added out of service: {i.reason}</p>}
             </li>
           ))}
@@ -76,12 +81,6 @@ function Checked({ fileName, plan, pending, onAdd }: { fileName: string; plan: E
         <div data-testid="equip-already-here">
           <h4>{plural(plan.alreadyHere.length, "item")} already here, left alone</h4>
           <Limited items={plan.alreadyHere.map((i) => i.name)} />
-        </div>
-      )}
-      {plan.privateBoats.length > 0 && (
-        <div data-testid="equip-private">
-          <h4>{plural(plan.privateBoats.length, "private boat")}, not loaded yet</h4>
-          <Limited items={plan.privateBoats.map((i) => `${i.name} (${i.type})`)} />
         </div>
       )}
       {plan.pools.length > 0 && (
@@ -159,10 +158,17 @@ export function EquipmentForm() {
             <strong>Added {plural(state.added, "item")}.</strong>
             {state.outOfService > 0 && ` ${plural(state.outOfService, "item")} ${state.outOfService === 1 ? "was" : "were"} added out of service.`}
             {state.alreadyHere > 0 && ` ${plural(state.alreadyHere, "item")} in the file ${state.alreadyHere === 1 ? "was" : "were"} already here and left alone.`}
-            {state.privateBoats + state.pools > 0 && ` ${plural(state.privateBoats + state.pools, "row")} (private boats and pools) ${state.privateBoats + state.pools === 1 ? "is" : "are"} waiting for a later step.`}
+            {state.privateBoats > 0 && ` ${state.privateBoats === 1 ? "1 of them is a private boat." : `${state.privateBoats} of them are private boats.`}`}
+            {state.locked > 0 && ` ${plural(state.locked, "private boat")} ${state.locked === 1 ? "has" : "have"} no owner yet and ${state.locked === 1 ? "is" : "are"} locked until staff add one.`}
+            {state.pools > 0 && ` ${plural(state.pools, "row")} (pools) ${state.pools === 1 ? "is" : "are"} waiting for a later step.`}
           </p>
           <p>
             <Link href="/club/equipment">See the equipment</Link>
+            {state.privateBoats > 0 && (
+              <>
+                {" "}&middot; <Link href="/club/admin/boats">Private boats</Link>
+              </>
+            )}
           </p>
         </section>
       )}

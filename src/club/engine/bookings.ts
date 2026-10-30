@@ -21,6 +21,7 @@ import {
   type OutOfServicePeriod,
   type RuleBook,
 } from "../types";
+import { accessKind, boatLocked, crewNotAllowedWords, isPrivate, lockedWords, notAllowedWords } from "./boat-access";
 import { bookingBlockReason, meetsQualification } from "./eligibility";
 import type { BookingLedger, Ctx } from "./households";
 import { classClash, fullName, householdOf, memberById } from "./queries";
@@ -30,6 +31,9 @@ import { classClash, fullName, householdOf, memberById } from "./queries";
 export type ReasonCode =
   | "member_blocked"
   | "crew_blocked"
+  | "boat_locked"
+  | "not_allowed_on_boat"
+  | "crew_not_allowed"
   | "out_of_service"
   | "starts_in_past"
   | "too_far_ahead"
@@ -56,7 +60,10 @@ export interface Reason {
   overridable: boolean;
 }
 
-/** The rules staff can book past. Never the facts: a taken slot, a boat out of service, a member who has left, a time already gone. */
+/**
+ * The rules staff can book past. Never the facts: a taken slot, a boat out of service, a member who has left, a time already gone,
+ * and who may use a private boat (that is the owner's say, not the club's).
+ */
 const OVERRIDABLE: ReadonlySet<ReasonCode> = new Set<ReasonCode>([
   "too_far_ahead",
   "outside_hours",
@@ -152,6 +159,15 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
     if (why) add("crew_blocked", `${fullName(m)} cannot be added to the crew: ${why}`);
   }
 
+  // A private boat: only its owners and the people they invited, in the booker's seat and in every other seat.
+  if (isPrivate(item)) {
+    if (boatLocked(state, item)) add("boat_locked", lockedWords(item));
+    if (accessKind(state, item.id, booker.id) === null) add("not_allowed_on_boat", notAllowedWords(item, { name: fullName(booker), you: isYou(booker.id) }));
+    for (const m of crew) {
+      if (accessKind(state, item.id, m.id) === null) add("crew_not_allowed", crewNotAllowedWords(item, fullName(m)));
+    }
+  }
+
   // The item.
   for (const p of state.outOfService) {
     if (p.itemId !== item.id) continue;
@@ -183,8 +199,8 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
   if (minutes < rules.minMinutes) add("too_short", `The shortest booking is ${formatMinutes(rules.minMinutes)}.`);
   if (minutes > rules.maxMinutes) add("too_long", `The longest booking is ${formatMinutes(rules.maxMinutes)}.`);
 
-  // Skill.
-  const need = requiredQualification ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;
+  // Skill. A private boat's skill level is not checked: its owner vouches for who uses it.
+  const need = requiredQualification && !isPrivate(item) ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;
   if (need && !meetsQualification(state, booker.id, need.code)) {
     add("not_qualified", `${who(booker.id)} ${isYou(booker.id) ? "need" : "needs"} ${need.name} to use ${item.name}.`);
   }

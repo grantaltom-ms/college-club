@@ -161,6 +161,31 @@ export interface Item {
   ruleOverrides: Partial<RuleValues>;
   /** undefined: use the class's. null: none needed. A code: that qualification. */
   requiredQualification?: string | null;
+  /**
+   * A privately owned boat. Only its owners and the people they have invited can book it or sit in it, nobody else is shown it,
+   * and its skill level is not checked (the owner vouches). Set when the item is made and never changed.
+   */
+  isPrivate?: boolean;
+}
+
+/** An owner is picked by staff; an invited person is named by an owner (or by staff). */
+export type BoatAccessKind = "owner" | "invited";
+
+/**
+ * One line on a private boat's access list: this member may use this boat. Lines are only added and ended, never removed, so
+ * the list doubles as the log of who was let on or taken off, when, and by whom. A line is active while `endedAt` is null.
+ */
+export interface BoatAccess {
+  id: string;
+  itemId: string;
+  memberId: string;
+  kind: BoatAccessKind;
+  addedAt: string;
+  addedBy: Actor;
+  endedAt: string | null;
+  endedBy: Actor | null;
+  /** Why it ended, in words: "Taken off by Ada Quill", "Became an owner". Null while active. */
+  endedReason: string | null;
 }
 
 /** A stretch of time when an item cannot be booked. */
@@ -555,6 +580,8 @@ export interface ClubState {
   history: HistoryEntry[];
   items: Item[];
   outOfService: OutOfServicePeriod[];
+  /** Who may use each private boat. Empty lines for a club boat: it has no list. */
+  boatAccess: BoatAccess[];
   bookings: Booking[];
   classes: ClassTemplate[];
   sessions: ClassSession[];

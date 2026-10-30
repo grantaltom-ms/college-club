@@ -1,30 +1,36 @@
+import { normalizeEmail } from "../auth/email";
 import { ClubError } from "../errors";
 import { QUALIFICATIONS } from "../qualifications";
 import { RULE_BOOK } from "../settings/rulebook";
 import type { ClubStore } from "../store/memory";
-import type { ClubState, Item, OutOfServicePeriod } from "../types";
+import type { BoatAccess, ClubState, Item, OutOfServicePeriod } from "../types";
 import { parseCsv } from "./csv";
+import { blockReasonFor } from "./eligibility";
 import type { Ctx } from "./households";
 import { fingerprintOf } from "./import";
+import { fullName } from "./queries";
 
 /**
  * The unit list: loading the club's boats, kayaks, paddle boards and work rooms from a sheet staff prepared. Two steps, like the
  * roster import: `planEquipment` says exactly what a file would do and changes nothing; `runEquipment` does it, all or nothing.
  * It only ever adds. An item already here (same name) is left alone, so a second upload cannot change or remove anything.
  *
+ * A row marked Private is added as a private boat: only its owners and the people they invite can use it (see boat-access.ts). The
+ * optional Owner emails column names its owners, each as an email address or a full name, separated by semicolons. A private
+ * boat with no owner is added anyway and starts locked, so nobody can book it until staff add an owner.
+ *
  * Left out on purpose, and said so in the read-back: the pooled spaces (Dock Space, Room Space and Gym Space become one pool
- * with a number of places, a later step) and Private boats (who may book them, owners plus the people they name, is a later
- * step, so nothing private can become bookable by everyone by mistake).
+ * with a number of places, a later step).
  */
 
 export const MAX_EQUIPMENT_BYTES = 200_000;
 export const MAX_EQUIPMENT_ROWS = 1000;
 
 /** The columns, as the starter sheet names them. Name, Type, Seats and Owned by are required; the rest are optional. */
-export const EQUIPMENT_COLUMNS = ["Name", "Type", "Seats", "Skill level needed", "Owned by", "In service", "Places", "Notes"] as const;
+export const EQUIPMENT_COLUMNS = ["Name", "Type", "Seats", "Skill level needed", "Owned by", "In service", "Places", "Notes", "Owner emails"] as const;
 
 /** The example rows in the template. They are refused if they are uploaded, so nobody loads them by accident. */
-export const EQUIPMENT_EXAMPLE_NAMES = ["EXAMPLE-1", "EXAMPLE-2", "EXAMPLE-3"] as const;
+export const EQUIPMENT_EXAMPLE_NAMES = ["EXAMPLE-1", "EXAMPLE-2", "EXAMPLE-3", "EXAMPLE-4"] as const;
 
 export const EQUIPMENT_TEMPLATE =
   [
@@ -32,19 +38,22 @@ export const EQUIPMENT_TEMPLATE =
     "EXAMPLE-1,Shell,1,,Club,Yes,,",
     "EXAMPLE-2,Kayak,2,None,Club,No,,Paddle needs mending",
     "EXAMPLE-3,Work Space,,,Club,Yes,,",
+    "EXAMPLE-4,Shell,2,,Private,Yes,,,someone@example.org; Pat Example",
   ].join("\r\n") + "\r\n";
 
 const MAX_NAME = 80;
 const MAX_NOTE = 200;
 const MAX_PLACES = 500;
+const MAX_OWNERS = 10;
+const MAX_OWNER_TOKEN = 120;
 
 /** The kinds of thing the sheet can name. Three are pools and are not loaded yet. */
 export const EQUIPMENT_TYPES = ["Shell", "Kayak", "Paddle Board", "Work Space", "Dock Space", "Room Space", "Gym Space"] as const;
 type EquipmentType = (typeof EQUIPMENT_TYPES)[number];
 const POOL_TYPES: readonly EquipmentType[] = ["Dock Space", "Room Space", "Gym Space"];
 
-type Field = "name" | "type" | "seats" | "skill" | "ownedBy" | "inService" | "places" | "notes" | "privateHint";
-const LABEL: Record<Field, string> = { name: "Name", type: "Type", seats: "Seats", skill: "Skill level needed", ownedBy: "Owned by", inService: "In service", places: "Places", notes: "Notes", privateHint: "Hint: name looks like a private boat" };
+type Field = "name" | "type" | "seats" | "skill" | "ownedBy" | "inService" | "places" | "notes" | "owners" | "privateHint";
+const LABEL: Record<Field, string> = { name: "Name", type: "Type", seats: "Seats", skill: "Skill level needed", ownedBy: "Owned by", inService: "In service", places: "Places", notes: "Notes", owners: "Owner emails", privateHint: "Hint: name looks like a private boat" };
 const REQUIRED: Field[] = ["name", "type", "seats", "ownedBy"];
 /** Header names as people write them, with spaces, capitals and punctuation ignored. */
 const ALIASES: Record<Field, string[]> = {
@@ -56,6 +65,7 @@ const ALIASES: Record<Field, string[]> = {
   inService: ["inservice"],
   places: ["places", "capacity"],
   notes: ["notes", "note", "comment", "comments"],
+  owners: ["owneremails", "owneremail", "owners", "ownersemails", "ownernames"],
   privateHint: ["hintnamelookslikeaprivateboat"],
 };
 
@@ -82,6 +92,8 @@ export interface EquipmentRow {
   ownedBy: "club" | "private" | null;
   inService: boolean;
   notes: string;
+  /** Private rows only: the owners as written (an email address or a full name each), before they are looked up. */
+  owners: string[];
   /** The sheet's own hint column said the name looks like a private boat. */
   hintedPrivate: boolean;
 }
@@ -186,7 +198,7 @@ export function readEquipment(text: string): EquipmentReading {
         else places = Number(placesText);
       }
       if (problems.length > before) continue;
-      rows.push({ row, name, type, pool: true, places, classCode: null, seats: null, skill: { mode: "class" }, ownedBy: null, inService: true, notes, hintedPrivate: false });
+      rows.push({ row, name, type, pool: true, places, classCode: null, seats: null, skill: { mode: "class" }, ownedBy: null, inService: true, notes, owners: [], hintedPrivate: false });
       continue;
     }
 
@@ -210,6 +222,28 @@ export function readEquipment(text: string): EquipmentReading {
     else if (ownedText.toLowerCase() === "club") ownedBy = "club";
     else if (ownedText.toLowerCase() === "private") ownedBy = "private";
     else say(`Owned by "${ownedText}" is not Club or Private.`);
+
+    const owners: string[] = [];
+    const ownersText = get(cells, "owners");
+    if (ownersText !== "") {
+      if (ownedBy === "club") say("Owner emails is only for Private boats. Clear it, or change Owned by to Private.");
+      else {
+        const seen = new Set<string>();
+        for (const raw of ownersText.split(/[;\n]/)) {
+          const token = clean(raw);
+          if (token === "") continue;
+          if (token.length > MAX_OWNER_TOKEN || /[\u0000-\u001f\u007f]/.test(token)) {
+            say(`An owner "${token.slice(0, 30)}..." is not an email address or a name. Write each owner as an email address or a full name, separated by semicolons.`);
+            continue;
+          }
+          const key = token.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          owners.push(token);
+        }
+        if (owners.length > MAX_OWNERS) say(`Owner emails lists ${owners.length} people. A boat can have up to ${MAX_OWNERS} owners here; add the rest on the Private boats screen.`);
+      }
+    }
 
     let inService = true;
     if (serviceText !== "") {
@@ -245,6 +279,7 @@ export function readEquipment(text: string): EquipmentReading {
       ownedBy,
       inService,
       notes,
+      owners,
       hintedPrivate: letters(get(cells, "privateHint")) === "yes",
     });
   }
@@ -266,6 +301,10 @@ export interface PlannedItem {
   outOfService: boolean;
   /** Why it starts out of service; empty when it does not. */
   reason: string;
+  /** A private boat: only its owners and the people they invite can use it. */
+  private: boolean;
+  /** Private boats only: the owners the file names, found among the club's members. Empty means it starts locked. */
+  owners: { memberId: string; name: string }[];
 }
 
 export interface EquipmentPlan {
@@ -281,8 +320,6 @@ export interface EquipmentPlan {
   alreadyHere: { row: number; name: string }[];
   /** Pool rows: described by the sheet, not loaded yet. */
   pools: { row: number; name: string; type: string; places: number | null }[];
-  /** Rows marked Private: not loaded yet. */
-  privateBoats: { row: number; name: string; type: string }[];
   /** A fingerprint of the exact file, so the confirm step can tell it is the file that was checked. */
   fingerprint: string;
 }
@@ -298,15 +335,48 @@ function skillWords(skill: EquipmentSkill, classLevel: string | null): string {
 
 const NOT_IN_SERVICE_REASON = "Not in service when the equipment list was loaded.";
 
+/** The spreadsheet row a problem is about ("Row 7: ..."), or 0 for a problem about the whole file. */
+const rowOfProblem = (problem: string) => Number(/^Row (\d+):/.exec(problem)?.[1] ?? 0);
+
+/**
+ * Finds the club members an owners cell names. Each owner is an email address or a full name. Only active members can own a boat.
+ * An address two partners share, or two members with one name, is a problem: the sheet must say which person it means.
+ */
+function findOwners(state: ClubState, row: EquipmentRow): { owners: PlannedItem["owners"]; problems: string[] } {
+  const active = state.members.filter((m) => blockReasonFor(state, m.id) === null);
+  const owners: PlannedItem["owners"] = [];
+  const problems: string[] = [];
+  for (const token of row.owners) {
+    const email = token.includes("@") ? normalizeEmail(token) : null;
+    if (token.includes("@") && !email) {
+      problems.push(`Row ${row.row}: "${token}" does not look like an email address. Write each owner as an email address or a full name, separated by semicolons.`);
+      continue;
+    }
+    const wanted = email ?? clean(token).toLowerCase();
+    const found = active.filter((m) => (email ? m.email.trim().toLowerCase() === email : clean(fullName(m)).toLowerCase() === wanted));
+    if (found.length === 0) {
+      problems.push(`Row ${row.row}: no active member has ${email ? `the email address ${token}` : `the name ${token}`}. Check the spelling, or leave it out and add the owner on the Private boats screen.`);
+    } else if (found.length > 1) {
+      problems.push(
+        email
+          ? `Row ${row.row}: the email address ${token} is shared by ${found.map(fullName).join(" and ")}. Write the owner's full name instead.`
+          : `Row ${row.row}: more than one member is called ${token}. Write the owner's email address instead.`,
+      );
+    } else if (!owners.some((o) => o.memberId === found[0].id)) {
+      owners.push({ memberId: found[0].id, name: fullName(found[0]) });
+    }
+  }
+  return { owners, problems };
+}
+
 function compute(state: ClubState, text: string): EquipmentPlan {
   const reading = readEquipment(text);
-  const problems = reading.problems;
+  const problems = [...reading.problems];
   const notices: string[] = [];
   const here = new Set(state.items.map((i) => clean(i.name).toLowerCase()));
   const toAdd: PlannedItem[] = [];
   const alreadyHere: EquipmentPlan["alreadyHere"] = [];
   const pools: EquipmentPlan["pools"] = [];
-  const privateBoats: EquipmentPlan["privateBoats"] = [];
   const hintedButClub: number[] = [];
 
   for (const r of reading.rows) {
@@ -314,17 +384,16 @@ function compute(state: ClubState, text: string): EquipmentPlan {
       pools.push({ row: r.row, name: r.name, type: r.type, places: r.places });
       continue;
     }
-    if (r.ownedBy === "private") {
-      privateBoats.push({ row: r.row, name: r.name, type: r.type });
-      continue;
-    }
     if (here.has(r.name.toLowerCase())) {
       alreadyHere.push({ row: r.row, name: r.name });
       continue;
     }
-    if (r.hintedPrivate) hintedButClub.push(r.row);
+    if (r.hintedPrivate && r.ownedBy === "club") hintedButClub.push(r.row);
     const cls = RULE_BOOK.classes.find((c) => c.code === r.classCode)!;
-    const skill = skillWords(r.skill, cls.requiredQualification);
+    const isPrivate = r.ownedBy === "private";
+    const skill = isPrivate ? "not checked on a private boat" : skillWords(r.skill, cls.requiredQualification);
+    const owners = isPrivate ? findOwners(state, r) : { owners: [], problems: [] };
+    problems.push(...owners.problems);
     toAdd.push({
       row: r.row,
       name: r.name,
@@ -336,18 +405,27 @@ function compute(state: ClubState, text: string): EquipmentPlan {
       skillMode: r.skill.mode,
       outOfService: !r.inService,
       reason: r.inService ? "" : r.notes || NOT_IN_SERVICE_REASON,
+      private: isPrivate,
+      owners: owners.owners,
     });
   }
+  // The reader's problems and the owner lookups' come from two places; list them all in the order of the file.
+  problems.sort((a, b) => rowOfProblem(a) - rowOfProblem(b));
 
   if (reading.ignoredColumns.length > 0) notices.push(`The file has columns this tool does not use, and they are ignored: ${reading.ignoredColumns.map((c) => `"${c}"`).join(", ")}.`);
   if (pools.length > 0) {
     const kinds = [...new Set(pools.map((p) => p.type))].join(", ");
     notices.push(`${plural(pools.length, "row")} (${kinds}) describe pools of places. Pools are a later step, so they are not loaded now. Upload the file again then.`);
   }
-  if (privateBoats.length > 0) {
-    notices.push(
-      `${plural(privateBoats.length, "row")} ${privateBoats.length === 1 ? "is" : "are"} marked Private and ${privateBoats.length === 1 ? "is" : "are"} not loaded now. Who may book a private boat (its owners and the people they name) is a later step, and loading them now would let everyone book them. Upload the file again then; items already here are skipped.`,
-    );
+  const privates = toAdd.filter((i) => i.private);
+  if (privates.length > 0) {
+    notices.push(`${plural(privates.length, "private boat")} will be added. Only a private boat's owners and the people they invite can see or book it, and its skill level is not checked.`);
+    const locked = privates.filter((i) => i.owners.length === 0);
+    if (locked.length > 0) {
+      notices.push(
+        `${plural(locked.length, "private boat")} ${locked.length === 1 ? "has" : "have"} no owner in the file (${locked.slice(0, 5).map((i) => i.name).join(", ")}${locked.length > 5 ? ", ..." : ""}), so ${locked.length === 1 ? "it" : "they"} will start locked: nobody can book ${locked.length === 1 ? "it" : "them"} until staff add an owner on the Private boats screen.`,
+      );
+    }
   }
   if (hintedButClub.length > 0) {
     notices.push(
@@ -358,7 +436,7 @@ function compute(state: ClubState, text: string): EquipmentPlan {
   const out = toAdd.filter((i) => i.outOfService).length;
   if (out > 0) notices.push(`${plural(out, "item")} will be added out of service. Staff can return ${out === 1 ? "it" : "them"} to service on the Equipment page.`);
 
-  return { problems, notices, ignoredColumns: reading.ignoredColumns, rowCount: reading.rowCount, toAdd, alreadyHere, pools, privateBoats, fingerprint: fingerprintOf(text) };
+  return { problems, notices, ignoredColumns: reading.ignoredColumns, rowCount: reading.rowCount, toAdd, alreadyHere, pools, fingerprint: fingerprintOf(text) };
 }
 
 /** What a file would do, without doing it. */
@@ -371,7 +449,10 @@ export interface EquipmentResult {
   outOfService: number;
   alreadyHere: number;
   pools: number;
+  /** How many of the items added are private boats. */
   privateBoats: number;
+  /** How many of those private boats start locked because the file named no owner. */
+  locked: number;
 }
 
 /**
@@ -386,7 +467,7 @@ export async function runEquipment(store: ClubStore, ctx: Ctx, text: string, exp
     if (plan.toAdd.length === 0) {
       throw new ClubError(
         "conflict",
-        plan.alreadyHere.length > 0 || plan.pools.length > 0 || plan.privateBoats.length > 0
+        plan.alreadyHere.length > 0 || plan.pools.length > 0
           ? "Everything in the file is already here or waiting for a later step, so there is nothing to add."
           : "The file has no equipment to add.",
       );
@@ -401,7 +482,12 @@ export async function runEquipment(store: ClubStore, ctx: Ctx, text: string, exp
       const item: Item = { id: newId(), name: p.name, classCode: p.classCode, ruleOverrides: {} };
       if (source.skill.mode === "none") item.requiredQualification = null;
       else if (source.skill.mode === "code") item.requiredQualification = source.skill.code;
+      if (p.private) item.isPrivate = true;
       s.items.push(item);
+      for (const owner of p.owners) {
+        const line: BoatAccess = { id: newId(), itemId: item.id, memberId: owner.memberId, kind: "owner", addedAt: ctx.now.toISOString(), addedBy: ctx.actor, endedAt: null, endedBy: null, endedReason: null };
+        s.boatAccess.push(line);
+      }
       if (p.outOfService) {
         const period: OutOfServicePeriod = {
           id: newId(),
@@ -417,6 +503,13 @@ export async function runEquipment(store: ClubStore, ctx: Ctx, text: string, exp
         outOfService += 1;
       }
     }
-    return { added: plan.toAdd.length, outOfService, alreadyHere: plan.alreadyHere.length, pools: plan.pools.length, privateBoats: plan.privateBoats.length };
+    return {
+      added: plan.toAdd.length,
+      outOfService,
+      alreadyHere: plan.alreadyHere.length,
+      pools: plan.pools.length,
+      privateBoats: plan.toAdd.filter((i) => i.private).length,
+      locked: plan.toAdd.filter((i) => i.private && i.owners.length === 0).length,
+    };
   });
 }

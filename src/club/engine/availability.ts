@@ -1,6 +1,7 @@
 import { classOf, rulesFor } from "../settings/rulebook";
 import { addDays, clockToMinutes, formatClock, formatDayLong, pacificDate, pacificWall } from "../time";
 import { HOLDING_STATUSES, type BookingType, type ClubState, type Item, type RuleBook } from "../types";
+import { boatLocked, isPrivate, itemVisibleTo } from "./boat-access";
 import { dayWindow, opensAt, outOfServiceAt } from "./bookings";
 import { meetsQualification } from "./eligibility";
 import { fullName, memberById } from "./queries";
@@ -33,6 +34,10 @@ export interface ItemDayView {
   qualified: boolean | null;
   /** Why the whole day is closed to booking for this item, in words (for example when it opens). */
   note: string | null;
+  /** A privately owned boat. Only staff and its owners and invited people are ever shown it. */
+  isPrivate: boolean;
+  /** A private boat with no owner who can use it: nobody can book it until staff add an owner. */
+  locked: boolean;
 }
 
 export interface DayView {
@@ -44,6 +49,7 @@ export interface DayView {
 export function dayView(state: ClubState, book: RuleBook, input: { day: string; now: Date; viewer: Viewer; type?: BookingType | null }): DayView {
   const { day, now, viewer } = input;
   const items = state.items
+    .filter((item) => itemVisibleTo(state, item, viewer))
     .filter((item) => !input.type || classOf(book, item).type === input.type)
     .map((item): ItemDayView => {
       const { cls, rules, requiredQualification } = rulesFor(book, item);
@@ -83,7 +89,7 @@ export function dayView(state: ClubState, book: RuleBook, input: { day: string; 
           heldFor: heldBy ? (state.classes.find((c) => c.id === heldBy.classId)?.name ?? "A class") : null,
         });
       }
-      const need = requiredQualification ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;
+      const need = requiredQualification && !isPrivate(item) ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;
       let note: string | null = null;
       if (now.getTime() < opens.getTime()) {
         const openDay = pacificDate(opens);
@@ -99,6 +105,8 @@ export function dayView(state: ClubState, book: RuleBook, input: { day: string; 
         needs: need?.name ?? null,
         qualified: viewer.kind === "member" && need ? meetsQualification(state, viewer.memberId, need.code) : null,
         note,
+        isPrivate: isPrivate(item),
+        locked: boatLocked(state, item),
       };
     });
   return { day, items };

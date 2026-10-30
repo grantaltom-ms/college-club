@@ -9,13 +9,17 @@ import {
   readEquipment,
   runEquipment,
 } from "./equipment-import";
+import { accessKind, activeAccess, activeOwners, boatLocked } from "./boat-access";
 import { fingerprintOf } from "./import";
+import { bookingLedger } from "./bookings";
+import { createHousehold, endHousehold } from "./households";
 import { NOW, STORE_KINDS, at, bookAs, fixtureFor, makeStore, memberCtx, refusedFor, staffCtx, type StoreKind } from "./testkit";
 import { MemoryClubStore, sequentialIds } from "../store/memory";
 
 const HEADER = EQUIPMENT_COLUMNS.join(",");
-/** A row in the column order: Name, Type, Seats, Skill level needed, Owned by, In service, Places, Notes. */
-const row = (name: string, type: string, seats = "", skill = "", owned = "Club", service = "", places = "", notes = "") => [name, type, seats, skill, owned, service, places, notes].join(",");
+/** A row in the column order: Name, Type, Seats, Skill level needed, Owned by, In service, Places, Notes, Owner emails. */
+const row = (name: string, type: string, seats = "", skill = "", owned = "Club", service = "", places = "", notes = "", owners = "") =>
+  [name, type, seats, skill, owned, service, places, notes, owners.includes(",") || owners.includes(";") ? `"${owners}"` : owners].join(",");
 const file = (...rows: string[]) => [HEADER, ...rows].join("\n");
 
 describe("reading an equipment file", () => {
@@ -182,9 +186,44 @@ describe("reading an equipment file", () => {
     expect(readEquipment(file(...rows(MAX_EQUIPMENT_ROWS + 1))).problems).toEqual([`The file has ${MAX_EQUIPMENT_ROWS + 1} rows. It can have up to ${MAX_EQUIPMENT_ROWS}.`]);
   });
 
+  describe("the Owner emails column", () => {
+    it("reads each owner from a semicolon list, trimmed, once however it is written, for Private rows", () => {
+      const reading = readEquipment(file(row("Test Private", "Shell", "1", "", "Private", "", "", "", " Ada@Example.com ;  Ben Quill;; ada@example.com;BEN  quill ")));
+      expect(reading.problems).toEqual([]);
+      expect(reading.rows[0].owners).toEqual(["Ada@Example.com", "Ben Quill"]);
+    });
+
+    it("finds the column under its other names, in any place, and reads a file without it as having no owners", () => {
+      const text = ["Owners,Name,Type,Seats,Owned by", "Ada Quill,Test Private,Shell,1,Private"].join("\n");
+      expect(readEquipment(text).rows[0].owners).toEqual(["Ada Quill"]);
+      expect(readEquipment(file(row("Test Private", "Shell", "1", "", "Private"))).rows[0].owners).toEqual([]);
+      expect(readEquipment(["Name,Type,Seats,Owned by", "Test Private,Shell,1,Private"].join("\n")).rows[0].owners).toEqual([]);
+    });
+
+    it("refuses owners on a club boat, too many owners, and an owner that cannot be real", () => {
+      const reading = readEquipment(
+        file(
+          row("Test Club", "Shell", "1", "", "Club", "", "", "", "ada@example.com"),
+          row("Test Crowd", "Shell", "1", "", "Private", "", "", "", Array.from({ length: 11 }, (_, i) => `person${i}@example.com`).join(";")),
+          row("Test Long", "Shell", "1", "", "Private", "", "", "", "x".repeat(121)),
+        ),
+      );
+      expect(reading.problems).toEqual([
+        "Row 2: Owner emails is only for Private boats. Clear it, or change Owned by to Private.",
+        "Row 3: Owner emails lists 11 people. A boat can have up to 10 owners here; add the rest on the Private boats screen.",
+        'Row 4: An owner "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..." is not an email address or a name. Write each owner as an email address or a full name, separated by semicolons.',
+      ]);
+    });
+
+    it("accepts exactly ten owners", () => {
+      const ten = Array.from({ length: 10 }, (_, i) => `person${i}@example.com`).join(";");
+      expect(readEquipment(file(row("Test Crowd", "Shell", "1", "", "Private", "", "", "", ten))).problems).toEqual([]);
+    });
+  });
+
   it("has a template whose only problems are its own example rows", () => {
     const reading = readEquipment(EQUIPMENT_TEMPLATE);
-    expect(reading.problems).toHaveLength(3);
+    expect(reading.problems).toHaveLength(4);
     expect(reading.problems.every((p) => p.includes("example rows"))).toBe(true);
     expect(EQUIPMENT_TEMPLATE.split("\r\n")[0]).toBe(HEADER);
   });
@@ -224,12 +263,17 @@ describe("planning an equipment upload", () => {
     expect(plan.toAdd[0].reason).toBe("Not in service when the equipment list was loaded.");
   });
 
-  it("leaves out private boats and pools, lists them, and says why", async () => {
+  it("adds a private boat, with no owner it starts locked and says so, and leaves the pools out and says why", async () => {
     const plan = planEquipment(await emptyState(), file(row("Test Single", "Shell", "1"), row("Test Private", "Shell", "1", "", "Private"), row("Dock spaces", "Dock Space", "", "", "Club", "", "60")));
-    expect(plan.toAdd.map((i) => i.name)).toEqual(["Test Single"]);
-    expect(plan.privateBoats).toEqual([{ row: 3, name: "Test Private", type: "Shell" }]);
+    expect(plan.problems).toEqual([]);
+    expect(plan.toAdd.map((i) => [i.name, i.private, i.owners])).toEqual([
+      ["Test Single", false, []],
+      ["Test Private", true, []],
+    ]);
+    expect(plan.toAdd[1].skill).toBe("not checked on a private boat");
     expect(plan.pools).toEqual([{ row: 4, name: "Dock spaces", type: "Dock Space", places: 60 }]);
-    expect(plan.notices.join(" ")).toContain("marked Private and is not loaded now");
+    expect(plan.notices).toContain("1 private boat will be added. Only a private boat's owners and the people they invite can see or book it, and its skill level is not checked.");
+    expect(plan.notices.join(" ")).toContain("1 private boat has no owner in the file (Test Private), so it will start locked: nobody can book it until staff add an owner on the Private boats screen.");
     expect(plan.notices.join(" ")).toContain("Pools are a later step");
   });
 
@@ -277,11 +321,11 @@ for (const kind of STORE_KINDS) {
       expect((await store.read()).items).toEqual([]);
     });
 
-    it("adds exactly what was previewed, with each skill setting and the out-of-service period, and leaves private boats and pools out", async () => {
+    it("adds exactly what was previewed, with each skill setting, the private boat and the out-of-service period, and leaves the pools out", async () => {
       const store = await fresh();
       const plan = planEquipment(await store.read(), text);
       const result = await runEquipment(store, staffCtx(), text, { fingerprint: plan.fingerprint, items: plan.toAdd.length });
-      expect(result).toEqual({ added: 6, outOfService: 1, alreadyHere: 0, pools: 1, privateBoats: 1 });
+      expect(result).toEqual({ added: 7, outOfService: 1, alreadyHere: 0, pools: 1, privateBoats: 1, locked: 1 });
       const state = await store.read();
       expect(state.items.map((i) => [i.name, i.classCode, i.requiredQualification])).toEqual([
         ["Test Single", "shell-single", undefined],
@@ -290,7 +334,10 @@ for (const kind of STORE_KINDS) {
         ["Test Twin Kayak", "kayak-double", undefined],
         ["Test Board", "paddle-board", undefined],
         ["Test Room", "work-space", undefined],
+        ["Test Private", "shell-single", undefined],
       ]);
+      expect(state.items.filter((i) => i.isPrivate).map((i) => i.name)).toEqual(["Test Private"]);
+      expect(state.boatAccess).toEqual([]);
       expect(state.items.every((i) => Object.keys(i.ruleOverrides).length === 0)).toBe(true);
       const twin = state.items.find((i) => i.name === "Test Twin Kayak")!;
       expect(state.outOfService).toHaveLength(1);
@@ -337,7 +384,7 @@ for (const kind of STORE_KINDS) {
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
       for (const r of results.filter((x): x is PromiseRejectedResult => x.status === "rejected")) expect(r.reason).toBeInstanceOf(ClubError);
       const state = await store.read();
-      expect(state.items).toHaveLength(6);
+      expect(state.items).toHaveLength(7);
       expect(state.outOfService).toHaveLength(1);
     });
 
@@ -379,6 +426,124 @@ for (const kind of STORE_KINDS) {
       for (const i of (await f.store.read()).items) f.i[i.name] = i.id;
       expect(await refusedFor(bookAs(f, "Ada", "Test Twin Kayak", at(1, 7), at(1, 8), ["Ben"]))).toEqual([]);
       expect(await refusedFor(bookAs(f, "Ada", "Test Solo Kayak", at(2, 9), at(2, 10), ["Ben"]))).toEqual(["too_many_crew"]);
+    });
+  });
+}
+
+for (const kind of STORE_KINDS) {
+  describe(`private boats in an equipment upload on the ${kind} store`, () => {
+    it("finds each owner by email address or full name among active members, and adds the boat private with its owners", async () => {
+      const f = await fixtureFor(kind)();
+      const text = file(
+        row("Test Single", "Shell", "1"),
+        row("Kestrel", "Shell", "1", "", "Private", "", "", "", "ada@example.com; Dee Reed"),
+        row("Starling", "Shell", "2", "", "Private", "No", "", "In the shed", "ben@example.com"),
+        row("Wren", "Shell", "1", "", "Private"),
+      );
+      const plan = planEquipment(await f.store.read(), text);
+      expect(plan.problems).toEqual([]);
+      expect(plan.toAdd.map((i) => [i.name, i.private, i.owners.map((o) => o.name), i.outOfService])).toEqual([
+        ["Test Single", false, [], false],
+        ["Kestrel", true, ["Ada Quill", "Dee Reed"], false],
+        ["Starling", true, ["Ben Quill"], true],
+        ["Wren", true, [], false],
+      ]);
+      expect(plan.notices).toContain("3 private boats will be added. Only a private boat's owners and the people they invite can see or book it, and its skill level is not checked.");
+      expect(plan.notices.join(" ")).toContain("1 private boat has no owner in the file (Wren), so it will start locked");
+
+      const result = await runEquipment(f.store, staffCtx(), text, { fingerprint: plan.fingerprint, items: plan.toAdd.length });
+      expect(result).toEqual({ added: 4, outOfService: 1, alreadyHere: 0, pools: 0, privateBoats: 3, locked: 1 });
+      const state = await f.store.read();
+      const item = (name: string) => state.items.find((i) => i.name === name)!;
+      expect(item("Test Single").isPrivate).toBeUndefined();
+      expect(["Kestrel", "Starling", "Wren"].map((n) => item(n).isPrivate)).toEqual([true, true, true]);
+      expect(activeAccess(state, item("Kestrel").id).map((a) => [a.memberId === f.m.Ada ? "Ada" : "Dee", a.kind, a.addedBy.label, a.addedAt])).toEqual([
+        ["Ada", "owner", "Test staff", NOW.toISOString()],
+        ["Dee", "owner", "Test staff", NOW.toISOString()],
+      ]);
+      expect(boatLocked(state, item("Wren"))).toBe(true);
+      expect(boatLocked(state, item("Kestrel"))).toBe(false);
+      expect(state.outOfService.map((p) => [p.itemId === item("Starling").id, p.reason])).toEqual([[true, "In the shed"]]);
+    });
+
+    it("gives an uploaded private boat the private rules: owners book it without the skill level, others cannot", async () => {
+      const f = await fixtureFor(kind)();
+      await runEquipment(f.store, staffCtx(), file(row("Big Private", "Shell", "4", "", "Private", "", "", "", "cy@example.com")));
+      for (const i of (await f.store.read()).items) f.i[i.name] = i.id;
+      // Cy holds no qualification, and a quad needs level 3 as a club boat.
+      expect(await refusedFor(bookAs(f, "Cy", "Big Private", at(1, 7), at(1, 8)))).toEqual([]);
+      expect(await refusedFor(bookAs(f, "Ada", "Big Private", at(1, 9), at(1, 10)))).toEqual(["not_allowed_on_boat"]);
+    });
+
+    it("lists every owner it cannot find at once, with the row, and adds nothing", async () => {
+      const f = await fixtureFor(kind)();
+      const text = file(row("Kestrel", "Shell", "1", "", "Private", "", "", "", "ada@example.com; nobody@example.com"), row("Starling", "Shell", "1", "", "Private", "", "", "", "Nobody Atall; not an address@"), row("Third", "Shell", "1", "", "Private", "", "", "", "ben@example.com"));
+      const plan = planEquipment(await f.store.read(), text);
+      expect(plan.problems).toEqual([
+        "Row 2: no active member has the email address nobody@example.com. Check the spelling, or leave it out and add the owner on the Private boats screen.",
+        "Row 3: no active member has the name Nobody Atall. Check the spelling, or leave it out and add the owner on the Private boats screen.",
+        'Row 3: "not an address@" does not look like an email address. Write each owner as an email address or a full name, separated by semicolons.',
+      ]);
+      await expect(runEquipment(f.store, staffCtx(), text)).rejects.toMatchObject({ code: "invalid", message: expect.stringContaining("3 problems, so nothing was added") });
+      expect((await f.store.read()).items.filter((i) => ["Kestrel", "Starling", "Third"].includes(i.name))).toEqual([]);
+    });
+
+    it("does not count a member who has left, and says which person a shared address or a shared name could mean", async () => {
+      const f = await fixtureFor(kind)();
+      await createHousehold(f.store, staffCtx(), {
+        displayName: "The Moreau household",
+        membershipType: "Resident",
+        joinedOn: "2020-01-01",
+        primary: { firstName: "Camille", lastName: "Moreau", email: "moreau@example.com" },
+        additional: [{ firstName: "Julien", lastName: "Moreau", email: "moreau@example.com" }],
+      });
+      await createHousehold(f.store, staffCtx(), { displayName: "The Other Reed household", membershipType: "Resident", joinedOn: "2020-01-01", primary: { firstName: "Dee", lastName: "Reed", email: "dee2@example.com" } });
+      await endHousehold(f.store, bookingLedger, staffCtx(), f.h.Quill);
+      const text = file(
+        row("Shared", "Shell", "1", "", "Private", "", "", "", "moreau@example.com"),
+        row("Twins", "Shell", "1", "", "Private", "", "", "", "Dee Reed"),
+        row("Left", "Shell", "1", "", "Private", "", "", "", "ada@example.com"),
+        row("Fine", "Shell", "1", "", "Private", "", "", "", "Julien Moreau; dee2@example.com; moreau@example.com"),
+      );
+      const plan = planEquipment(await f.store.read(), text);
+      expect(plan.problems).toEqual([
+        "Row 2: the email address moreau@example.com is shared by Camille Moreau and Julien Moreau. Write the owner's full name instead.",
+        "Row 3: more than one member is called Dee Reed. Write the owner's email address instead.",
+        "Row 4: no active member has the email address ada@example.com. Check the spelling, or leave it out and add the owner on the Private boats screen.",
+        "Row 5: the email address moreau@example.com is shared by Camille Moreau and Julien Moreau. Write the owner's full name instead.",
+      ]);
+    });
+
+    it("lists the problems in the order of the file when the reader and the owner lookup both have some", async () => {
+      const f = await fixtureFor(kind)();
+      const text = file(row("A", "Shell", "1", "", "Private", "", "", "", "nobody@example.com"), row("B", "Shell", "3"), row("C", "Shell", "1", "", "Private", "", "", "", "nobody2@example.com"));
+      expect(planEquipment(await f.store.read(), text).problems.map((p) => p.slice(0, 6))).toEqual(["Row 2:", "Row 3:", "Row 4:"]);
+    });
+
+    it("never changes the owners of a boat already here, and counts it as already here", async () => {
+      const f = await fixtureFor(kind)();
+      await runEquipment(f.store, staffCtx(), file(row("Kestrel", "Shell", "1", "", "Private", "", "", "", "ada@example.com")));
+      const second = file(row("kestrel", "Shell", "1", "", "Private", "", "", "", "ben@example.com"), row("Wren", "Shell", "1", "", "Private", "", "", "", "dee@example.com"));
+      const plan = planEquipment(await f.store.read(), second);
+      expect(plan.alreadyHere).toEqual([{ row: 2, name: "kestrel" }]);
+      expect(plan.toAdd.map((i) => i.name)).toEqual(["Wren"]);
+      await runEquipment(f.store, staffCtx(), second, { fingerprint: plan.fingerprint, items: 1 });
+      const state = await f.store.read();
+      const kestrel = state.items.find((i) => i.name === "Kestrel")!;
+      expect(activeOwners(state, kestrel.id).map((m) => m.firstName)).toEqual(["Ada"]);
+      expect(accessKind(state, kestrel.id, f.m.Ben)).toBeNull();
+    });
+
+    it("adds one boat's worth of lines once however many people press confirm at once", async () => {
+      const f = await fixtureFor(kind)();
+      const text = file(row("Kestrel", "Shell", "1", "", "Private", "", "", "", "ada@example.com;dee@example.com"));
+      const plan = planEquipment(await f.store.read(), text);
+      const expectation = { fingerprint: plan.fingerprint, items: plan.toAdd.length };
+      const results = await Promise.allSettled([runEquipment(f.store, staffCtx(), text, expectation), runEquipment(f.store, staffCtx(), text, expectation), runEquipment(f.store, staffCtx(), text, expectation)]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const state = await f.store.read();
+      expect(state.items.filter((i) => i.name === "Kestrel")).toHaveLength(1);
+      expect(state.boatAccess).toHaveLength(2);
     });
   });
 }

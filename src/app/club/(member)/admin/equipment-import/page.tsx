@@ -23,7 +23,7 @@ export default async function EquipmentImportPage() {
       <h2>Getting the sheet ready</h2>
       <ol className="club-list">
         <li>
-          Start from the starter sheet you were sent, or from <a href="/api/club/equipment/template" data-testid="equip-template">the blank template</a> (a CSV file you can open in Excel or Google Sheets). Delete the template&rsquo;s three example rows.
+          Start from the starter sheet you were sent, or from <a href="/api/club/equipment/template" data-testid="equip-template">the blank template</a> (a CSV file you can open in Excel or Google Sheets). Delete the template&rsquo;s four example rows.
         </li>
         <li>
           <strong>One row for each item.</strong> Columns:{" "}
@@ -41,7 +41,10 @@ export default async function EquipmentImportPage() {
           <strong>Owned by</strong> is Club or Private. <strong>In service</strong> is Yes or No; a No item is added out of service, with its Notes as the reason.
         </li>
         <li>
-          <strong>Left out for now:</strong> Private boats (who may book them is a later step) and the pooled spaces (Dock Space, Room Space and Gym Space become one pool each, also a later step). They are listed in the read-back, not loaded.
+          <strong>Private boats:</strong> only its owners, and the people they invite, can see or book a private boat, and its skill level is not checked. Put the owners in <strong>Owner emails</strong>, each as an email address or a full name, separated by semicolons (a shared email address needs the full name instead). A private boat with no owner is still added, but starts locked until you add an owner on the <Link href="/club/admin/boats">Private boats</Link> screen.
+        </li>
+        <li>
+          <strong>Left out for now:</strong> the pooled spaces (Dock Space, Room Space and Gym Space become one pool each, a later step). They are listed in the read-back, not loaded.
         </li>
         <li>Save it as CSV (in Excel: Save As, then CSV Comma delimited) and choose it below.</li>
       </ol>

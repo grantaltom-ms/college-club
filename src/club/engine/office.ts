@@ -2,6 +2,7 @@ import { addDays, pacificDate } from "../time";
 import type { AttendanceRules, ClubState } from "../types";
 import { needsALook, type AttendanceRow } from "./attendance";
 import { holdExpired, placesTaken } from "./events";
+import { lockedBoats } from "./boat-access";
 import { outOfServiceAt } from "./bookings";
 
 /**
@@ -27,6 +28,8 @@ export interface OfficeSummary {
   needsLook: AttendanceRow[];
   /** Things out of service right now. */
   outOfService: { itemId: string; name: string; reason: string; expectedReturn: string | null; since: string }[];
+  /** Private boats with no owner who can use them: nobody can book them until staff add an owner. */
+  lockedBoats: { itemId: string; name: string; upcoming: number }[];
   /** Classes and events in the next week with people waiting. */
   waiting: OfficeWaiting[];
 }
@@ -72,6 +75,7 @@ export function officeSummary(state: ClubState, now: Date, rules: AttendanceRule
     },
     needsLook: needsALook(state, now, rules),
     outOfService,
+    lockedBoats: lockedBoats(state, now),
     waiting,
   };
 }

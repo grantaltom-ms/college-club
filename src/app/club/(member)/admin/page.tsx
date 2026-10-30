@@ -97,6 +97,20 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
         </ul>
       )}
 
+      {summary.lockedBoats.length > 0 && (
+        <>
+          <h2>Private boats with no owner</h2>
+          <ul className="club-list" data-testid="locked-boats">
+            {summary.lockedBoats.map((b) => (
+              <li key={b.itemId}>
+                <strong>{b.name}</strong>: nobody can book it until an owner is added
+                {b.upcoming > 0 ? ` · ${b.upcoming} upcoming booking${b.upcoming === 1 ? "" : "s"} stay` : ""} · <Link href="/club/admin/boats">Private boats</Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <h2>Full, with people waiting (next 7 days)</h2>
       {summary.waiting.length === 0 ? (
         <p>Nobody is waiting for anything.</p>
@@ -120,7 +134,7 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
           <Link href="/club/admin/check-in">Check someone in</Link> · <Link href="/club/admin/ipad">Front-desk iPad</Link>
         </li>
         <li>
-          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link> · <Link href="/club/admin/equipment-import">Load the equipment list</Link>
+          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link> · <Link href="/club/admin/equipment-import">Load the equipment list</Link> · <Link href="/club/admin/boats">Private boats</Link>
         </li>
         <li>
           <Link href="/club/classes/manage">Add a class or schedule sessions</Link> · <Link href="/club/events/manage">Add an event</Link>

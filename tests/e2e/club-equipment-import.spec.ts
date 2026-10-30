@@ -6,12 +6,12 @@ import { expect, test, type Page } from "@playwright/test";
  * items appear in the club, an out-of-service one is marked, and a member can book (or is refused) according to the skill level.
  */
 
-const HEADER = "Name,Type,Seats,Skill level needed,Owned by,In service,Places,Notes";
+const HEADER = "Name,Type,Seats,Skill level needed,Owned by,In service,Places,Notes,Owner emails";
 const SHEET_HEADER = `${HEADER},Hint: times booked in 2026,Hint: last booked,Hint: name looks like a private boat,Hint: most people listed on one booking`;
 const tag = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const csv = (...rows: string[]) => [HEADER, ...rows].join("\r\n") + "\r\n";
-/** A row in the column order: Name, Type, Seats, Skill level needed, Owned by, In service, Places, Notes. */
-const row = (name: string, type: string, seats = "", skill = "", owned = "Club", service = "", places = "", notes = "") => [name, type, seats, skill, owned, service, places, notes].join(",");
+/** A row in the column order: Name, Type, Seats, Skill level needed, Owned by, In service, Places, Notes, Owner emails. */
+const row = (name: string, type: string, seats = "", skill = "", owned = "Club", service = "", places = "", notes = "", owners = "") => [name, type, seats, skill, owned, service, places, notes, owners].join(",");
 
 const actAs = async (page: Page, who: string) => {
   await page.goto("/club/act-as");
@@ -54,7 +54,7 @@ test.describe("who can load equipment", () => {
 });
 
 test.describe("the template", () => {
-  test("downloads as a CSV with every column and three example rows, and the example rows cannot be loaded by accident", async ({ page }) => {
+  test("downloads as a CSV with every column and four example rows, and the example rows cannot be loaded by accident", async ({ page }) => {
     await openUpload(page);
     const res = await page.request.get("/api/club/equipment/template");
     expect(res.status()).toBe(200);
@@ -65,7 +65,7 @@ test.describe("the template", () => {
     expect(body).toContain("EXAMPLE-1");
     await check(page, body, "ccs-equipment-template.csv");
     const problems = page.getByTestId("equip-problems");
-    await expect(problems).toContainText("ccs-equipment-template.csv has 3 problems");
+    await expect(problems).toContainText("ccs-equipment-template.csv has 4 problems");
     await expect(problems).toContainText("Row 2:");
     await expect(problems).toContainText("one of the template's example rows");
     await expect(page.getByTestId("equip-add")).toHaveCount(0);
@@ -92,16 +92,17 @@ test.describe("checking and adding", () => {
 
     await openUpload(page);
     await check(page, sheet, "starter.csv");
-    await expect(page.getByTestId("equip-summary")).toHaveText("This would add 3 items to the club (2 singles, 1 double kayak).");
-    await expect(page.getByTestId("equip-item")).toHaveCount(3);
+    await expect(page.getByTestId("equip-summary")).toHaveText("This would add 4 items to the club (3 singles, 1 double kayak).");
+    await expect(page.getByTestId("equip-item")).toHaveCount(4);
     await expect(page.getByTestId("equip-item").filter({ hasText: single })).toContainText("Skill level: the usual level for this class (Sculling level 1 (placeholder))");
     await expect(page.getByTestId("equip-item").filter({ hasText: anyone })).toContainText("Skill level: none needed");
     await expect(page.getByTestId("equip-item").filter({ hasText: twin })).toContainText("Added out of service: Paddle needs mending");
-    await expect(page.getByTestId("equip-private")).toContainText(`1 private boat, not loaded yet`);
-    await expect(page.getByTestId("equip-private")).toContainText(privateBoat);
+    await expect(page.getByTestId("equip-item").filter({ hasText: privateBoat })).toContainText("Skill level: not checked on a private boat");
+    await expect(page.getByTestId("equip-item").filter({ hasText: privateBoat }).getByTestId("equip-item-private")).toHaveText("Private boat · no owner yet, so it starts locked until staff add one");
     await expect(page.getByTestId("equip-pools")).toContainText(`${docks} (Dock Space, 60 places)`);
     const notices = page.getByTestId("equip-notices");
-    await expect(notices).toContainText("marked Private and is not loaded now");
+    await expect(notices).toContainText("1 private boat will be added");
+    await expect(notices).toContainText("has no owner in the file");
     await expect(notices).toContainText("Pools are a later step");
     await expect(notices).toContainText("looks like a private boat in the sheet's hint column");
     await expect(notices).toContainText("1 item will be added out of service");
@@ -112,14 +113,14 @@ test.describe("checking and adding", () => {
     await page.goto("/club/admin/equipment-import");
     await check(page, sheet, "starter.csv");
     await page.getByTestId("equip-add").click();
-    await expect(page.getByTestId("equip-done")).toContainText("Added 3 items. 1 item was added out of service. 2 rows (private boats and pools) are waiting for a later step.");
+    await expect(page.getByTestId("equip-done")).toContainText("Added 4 items. 1 item was added out of service. 1 of them is a private boat. 1 private boat has no owner yet and is locked until staff add one. 1 row (pools) is waiting for a later step.");
 
-    // The staff equipment page lists them; the out-of-service one says why; the private boat and the pool are not there.
+    // The staff equipment page lists them; the out-of-service one says why; the private boat is there too (staff see everything); the pool is not.
     await page.goto("/club/equipment");
     await expect(equipmentRow(page, single)).toContainText("In service");
     await expect(equipmentRow(page, anyone)).toContainText("In service");
     await expect(equipmentRow(page, twin).getByTestId("equipment-status")).toContainText("Paddle needs mending");
-    await expect(equipmentRow(page, privateBoat)).toHaveCount(0);
+    await expect(equipmentRow(page, privateBoat)).toHaveCount(1);
     await expect(equipmentRow(page, docks)).toHaveCount(0);
 
     // A member with no qualification is refused the single with the usual level, and can book the one that needs none.
@@ -198,10 +199,9 @@ test.describe("checking and adding", () => {
   test("a file with nothing to add says so and offers no Add button", async ({ page }) => {
     const t = tag();
     await openUpload(page);
-    // Only a private boat and a pool: both wait for later steps, so there is nothing to load now.
-    await check(page, csv(row(`Playwright Private ${t}`, "Shell", "1", "", "Private"), row(`Playwright Docks ${t}`, "Dock Space", "", "", "Club", "", "60")), "waiting.csv");
+    // Only a pool, which waits for a later step, so there is nothing to load now.
+    await check(page, csv(row(`Playwright Docks ${t}`, "Dock Space", "", "", "Club", "", "60")), "waiting.csv");
     await expect(page.getByTestId("equip-summary")).toHaveText("There is nothing to add: everything in the file is already here or waiting for a later step.");
-    await expect(page.getByTestId("equip-private")).toBeVisible();
     await expect(page.getByTestId("equip-pools")).toBeVisible();
     await expect(page.getByTestId("equip-add")).toHaveCount(0);
   });
