@@ -349,7 +349,8 @@ export async function markDamageRepaired(store: ClubStore, ctx: Ctx, rules: Dama
         returned = true;
       }
     }
-    const otherOpenMajor = s.damageReports.filter((x) => x.id !== report.id && x.itemId === report.itemId && isOpen(x) && x.major).length;
+    // This report is already repaired here, so it cannot count itself.
+    const otherOpenMajor = s.damageReports.filter((x) => x.itemId === report.itemId && isOpen(x) && x.major).length;
     return { report: structuredClone(report), returned, otherOpenMajor };
   });
 }

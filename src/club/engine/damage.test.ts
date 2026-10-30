@@ -645,6 +645,51 @@ for (const kind of STORE_KINDS) {
         expect(officeDamage(await state(empty), NOW)).toEqual({ open: 0, major: 0, majorInService: 0, top: [] });
       });
 
+      it("counts whole days open, rounding down, and stops counting on the day a report is closed", async () => {
+        const f = await fixture();
+        const report = await file(f, "Ada", "Heron");
+        const days = async (now: Date) => damageQueue(await state(f), now, "open")[0].daysOpen;
+        expect(await days(later(0))).toBe(0);
+        expect(await days(later(23 * HOUR))).toBe(0);
+        expect(await days(later(36 * HOUR))).toBe(1);
+        expect(await days(later(47 * HOUR))).toBe(1);
+        expect(await days(later(48 * HOUR))).toBe(2);
+        await dismissDamageReport(f.store, asStaff(later(36 * HOUR)), DAMAGE_RULES, { reportId: report.id, reason: "Duplicate." });
+        expect(damageQueue(await state(f), later(90 * HOUR), "closed")[0].daysOpen).toBe(1);
+      });
+
+      it("says Being fixed once work has started, in the queue and on the report's own page", async () => {
+        const f = await fixture();
+        const report = await file(f, "Ada", "Heron");
+        expect(damageQueue(await state(f), NOW, "open")[0].statusWords).toBe("Open");
+        await startDamageRepair(f.store, asStaff(), { reportId: report.id });
+        expect(damageQueue(await state(f), NOW, "open")[0].statusWords).toBe("Being fixed");
+        expect(damageDetail(await state(f), report.id, NOW)!.statusWords).toBe("Being fixed");
+        expect(myDamageReports(await state(f), f.m.Ada)[0].statusWords).toBe("Being fixed");
+      });
+
+      it("lists the other open reports on a boat by urgency, then oldest, and leaves out the ones already closed", async () => {
+        const f = await fixture();
+        const main = await file(f, "Ada", "Heron", { description: "Main one." });
+        const low = await file(f, "Ben", "Heron", { description: "Low.", major: false }, later(HOUR));
+        const urgent = await file(f, "Cy", "Heron", { description: "Urgent.", major: true }, later(2 * HOUR));
+        const closed = await file(f, "Dee", "Heron", { description: "Closed.", major: true }, later(3 * HOUR));
+        await dismissDamageReport(f.store, asStaff(later(4 * HOUR)), DAMAGE_RULES, { reportId: closed.id, reason: "Duplicate." });
+        await file(f, "Eli", "Osprey", { description: "Other boat." }, later(5 * HOUR));
+        const others = damageDetail(await state(f), main.id, later(6 * HOUR))!.otherOpen;
+        expect(others.map((o) => o.reportId)).toEqual([urgent.id, low.id]);
+        expect(others.map((o) => o.priority)).toEqual([1, 3]);
+      });
+
+      it("tells someone who is not staff they cannot take a boat out of service before it says anything about the report", async () => {
+        const f = await fixture();
+        const report = await file(f, "Ada", "Heron");
+        const forbidden = { code: "forbidden", message: "Only club staff can take something out of service." };
+        expect(await refusedWith(takeOutOfServiceForReport(f.store, asMember(f, "Ada"), { reportId: "00000000-0000-4000-8000-0000000000ff" }))).toEqual(forbidden);
+        await dismissDamageReport(f.store, asStaff(), DAMAGE_RULES, { reportId: report.id, reason: "Duplicate." });
+        expect(await refusedWith(takeOutOfServiceForReport(f.store, asMember(f, "Ada"), { reportId: report.id }))).toEqual(forbidden);
+      });
+
       it("says time spent in hours and minutes", () => {
         expect(repairTimeWords(0)).toBe("0 minutes");
         expect(repairTimeWords(1)).toBe("1 minute");
