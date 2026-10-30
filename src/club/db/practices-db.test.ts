@@ -202,10 +202,15 @@ describe.skipIf(!ADMIN_URL)("practices and lineups", () => {
       expect((await insertPractice({ day, start: T(10, day), end: T(9, day) }))?.code).toBe(CHECK_VIOLATION);
     });
 
-    it("starts out scheduled", async () => {
+    it("starts out scheduled, even when its cancellation is filled in completely", async () => {
       const day = nextDay();
-      const failure = await insertPractice({ day, status: "cancelled" });
-      expect(failure).not.toBeNull();
+      const failure = await attempt(
+        `insert into club.practices (name, starts_at, ends_at, status, created_at, created_by_kind, created_by_label, status_changed_at, cancelled_by_kind, cancelled_by_label)
+         values ('Made cancelled',$1,$2,'cancelled',$3,'staff','Test staff',$3,'staff','Test staff')`,
+        [T(7, day), T(9, day), T(1, day)],
+      );
+      expect(failure?.message).toMatch(/starts out scheduled/);
+      expect(await insertPractice({ day, status: "cancelled" })).not.toBeNull();
     });
 
     it("is run by an active coach, never by an ordinary member, one who left, or a made-up person", async () => {
@@ -213,6 +218,22 @@ describe.skipIf(!ADMIN_URL)("practices and lineups", () => {
       expect((await insertPractice({ day, coach: members.Ada }))?.message).toMatch(/run by an active coach, or by staff/);
       expect((await insertPractice({ day, coach: members.Cy }))?.message).toMatch(/run by an active coach, or by staff/);
       expect(await insertPractice({ day, coach: "00000000-0000-4000-8000-0000000fffff" })).not.toBeNull();
+    });
+
+    it("is not run by a coach who has since left the club", async () => {
+      const day = nextDay();
+      const hal = (await q(`insert into club.members (household_id, first_name, last_name, email, role) values ($1, 'Hal', 'Test', 'hal@example.com', 'additional') returning id`, [household])).rows[0].id;
+      expect(await markCoach(hal, true)).toBeNull();
+      expect(await insertPractice({ day, coach: hal })).toBeNull();
+      await q(`update club.members set status = 'removed' where id = $1`, [hal]);
+      expect((await insertPractice({ day, coach: hal }))?.message).toMatch(/run by an active coach, or by staff/);
+    });
+
+    it("names a member as its maker only when a member made it", async () => {
+      const day = nextDay();
+      expect((await insertPractice({ day, by: "staff", byId: members.Ada }))?.code).toBe(CHECK_VIOLATION);
+      expect((await insertPractice({ day, by: "staff", byId: members.Ben, coach: members.Ben }))?.code).toBe(CHECK_VIOLATION);
+      expect(await insertPractice({ day, by: "staff", byId: null })).toBeNull();
     });
 
     it("set up by a member must be run by that same member", async () => {
@@ -251,6 +272,19 @@ describe.skipIf(!ADMIN_URL)("practices and lineups", () => {
       expect((await attempt(`update club.practices set cancelled_by_label='Someone' where id = $1`, [id]))).not.toBeNull();
     });
 
+    it("cannot be brought back by clearing its whole cancellation, and its time of change cannot be rewritten", async () => {
+      const day = nextDay();
+      const open = await practice({ day });
+      const id = await practice({ day });
+      expect((await attempt(`update club.practices set status_changed_at=$2 where id = $1`, [open, T(6, 1)]))?.message).toMatch(/can be cancelled once/);
+      expect(await cancel(id)).toBeNull();
+      expect((await attempt(`update club.practices set status_changed_at=$2 where id = $1`, [id, T(6, 1)]))?.message).toMatch(/can be cancelled once/);
+      expect(
+        (await attempt(`update club.practices set status='scheduled', cancelled_by_kind=null, cancelled_by_id=null, cancelled_by_label=null, cancel_reason=null where id = $1`, [id]))?.message,
+      ).toMatch(/cannot be brought back/);
+      expect((await q(`select status from club.practices where id = $1`, [id])).rows[0].status).toBe("cancelled");
+    });
+
     it("needs its cancellation filled in completely, and a reason only when cancelled", async () => {
       const day = nextDay();
       const id = await practice({ day });
@@ -269,6 +303,20 @@ describe.skipIf(!ADMIN_URL)("practices and lineups", () => {
       const id = await practice({ day });
       expect((await attempt(`delete from club.practices where id = $1`, [id]))?.message).toMatch(/cannot be removed/);
       expect((await attempt(`truncate club.practices cascade`))?.message).toMatch(/cannot be removed/);
+    });
+
+    it("cannot be wiped by emptying its table, with the boat and seat tables' own guards switched off", async () => {
+      // Emptying the practices table with cascade also empties the boat and seat tables, which guard themselves too.
+      // Switch those two guards off for this one check, so that only this table's guard is being tried.
+      await q(`alter table club.practice_boats disable trigger practice_boats_no_truncate`);
+      await q(`alter table club.practice_seats disable trigger practice_seats_no_truncate`);
+      try {
+        expect((await attempt(`truncate club.practices cascade`))?.message).toMatch(/cannot be removed/);
+      } finally {
+        await q(`alter table club.practice_boats enable trigger practice_boats_no_truncate`);
+        await q(`alter table club.practice_seats enable trigger practice_seats_no_truncate`);
+      }
+      expect((await q(`select count(*)::int as n from club.practices`)).rows[0].n).toBeGreaterThan(0);
     });
   });
 
@@ -348,6 +396,29 @@ describe.skipIf(!ADMIN_URL)("practices and lineups", () => {
       expect((await attempt(`truncate club.practice_boats`))?.message).toMatch(/cannot be removed/);
     });
 
+    it("cannot have anything else changed in the very step that ends it", async () => {
+      const day = nextDay();
+      const id = await practice({ day });
+      const item = await boat("single");
+      await addBoat(id, item);
+      const otherPractice = await practice({ day: nextDay() });
+      const otherBoat = await boat("single");
+      for (const [column, value] of [
+        ["practice_id", otherPractice],
+        ["item_id", otherBoat],
+        ["added_at", T(9, 1)],
+        ["added_by_label", "Someone else"],
+      ] as const) {
+        const failure = await attempt(
+          `update club.practice_boats set ${column} = $3, ended_at=$4, ended_by_kind='staff', ended_by_label='Test staff' where practice_id=$1 and item_id=$2 and ended_at is null`,
+          [id, item, value, T(5, 1)],
+        );
+        expect(failure?.message, column).toMatch(/can only be ended, once/);
+      }
+      expect((await q(`select count(*)::int as n from club.practice_boats where practice_id=$1 and item_id=$2 and ended_at is null`, [id, item])).rows[0].n).toBe(1);
+      expect(await endBoat(id, item)).toBeNull();
+    });
+
     it("needs its ending filled in completely", async () => {
       const day = nextDay();
       const id = await practice({ day });
@@ -419,6 +490,76 @@ describe.skipIf(!ADMIN_URL)("practices and lineups", () => {
       expect(await book(item, members.Ada, T(8, day), T(9, day))).toBeNull();
       const id = await practice({ day });
       expect(await addBoat(id, item)).toBeNull();
+    });
+
+    it("a second request for a boat waits for the first to be settled, then finds it taken", async () => {
+      // Deterministic, unlike a race: the first change is held open, so the second must wait its turn behind the boat's lock.
+      const day = nextDay();
+      const item = await boat("single");
+      const a = await practice({ day, name: "A" });
+      const b = await practice({ day, name: "B", start: T(8, day), end: T(10, day) });
+      const first = new Client({ connectionString: db.url });
+      const second = new Client({ connectionString: db.url });
+      await first.connect();
+      await second.connect();
+      const insert = `insert into club.practice_boats (practice_id, item_id, added_at, added_by_kind, added_by_label) values ($1,$2,$3,'staff','Test staff')`;
+      try {
+        await first.query("begin");
+        await first.query(insert, [a, item, T(1, 1)]);
+        await second.query("begin");
+        let settled = false;
+        const waiting = second.query(insert, [b, item, T(1, 1)]).then(
+          () => "in",
+          (e: Failure) => e.code ?? "failed",
+        ).finally(() => {
+          settled = true;
+        });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        expect(settled, "the second request should still be waiting behind the first").toBe(false);
+        await first.query("commit");
+        expect(await waiting).toBe(EXCLUSION_VIOLATION);
+      } finally {
+        await second.query("rollback").catch(() => undefined);
+        await first.query("rollback").catch(() => undefined);
+        await first.end();
+        await second.end();
+      }
+      expect((await q(`select count(*)::int as n from club.practice_boats where item_id=$1 and ended_at is null`, [item])).rows[0].n).toBe(1);
+    });
+
+    it("a booking asked for while a practice is taking the boat waits for it, then finds the boat reserved", async () => {
+      const day = nextDay();
+      const item = await boat("single");
+      const id = await practice({ day });
+      const first = new Client({ connectionString: db.url });
+      const second = new Client({ connectionString: db.url });
+      await first.connect();
+      await second.connect();
+      try {
+        await first.query("begin");
+        await first.query(`insert into club.practice_boats (practice_id, item_id, added_at, added_by_kind, added_by_label) values ($1,$2,$3,'staff','Test staff')`, [id, item, T(1, 1)]);
+        await second.query("begin");
+        let settled = false;
+        const waiting = second
+          .query(`insert into club.bookings (item_id, booker_id, starts_at, ends_at, created_by_kind, created_by_label) values ($1,$2,$3,$4,'member','A Member')`, [item, members.Ada, T(8, day), T(9, day)])
+          .then(
+            () => "in",
+            (e: Failure) => e.code ?? "failed",
+          )
+          .finally(() => {
+            settled = true;
+          });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        expect(settled, "the booking should still be waiting behind the practice").toBe(false);
+        await first.query("commit");
+        expect(await waiting).toBe(EXCLUSION_VIOLATION);
+      } finally {
+        await second.query("rollback").catch(() => undefined);
+        await first.query("rollback").catch(() => undefined);
+        await first.end();
+        await second.end();
+      }
+      expect((await q(`select count(*)::int as n from club.bookings where item_id=$1`, [item])).rows[0].n).toBe(0);
     });
 
     it("two practices asking for the same boat at overlapping times together get it once", async () => {
@@ -542,6 +683,30 @@ describe.skipIf(!ADMIN_URL)("practices and lineups", () => {
       expect((await attempt(`update club.practice_seats set ended_reason='Another' where practice_id=$1`, [id]))?.message).toMatch(/can only be ended, once/);
       expect((await attempt(`delete from club.practice_seats where practice_id=$1`, [id]))?.message).toMatch(/cannot be removed/);
       expect((await attempt(`truncate club.practice_seats`))?.message).toMatch(/cannot be removed/);
+    });
+
+    it("cannot have anything else changed in the very step that ends it", async () => {
+      const { id, item } = await ready();
+      expect(await seat(id, item, 1, members.Ada, { side: "port" })).toBeNull();
+      const otherPractice = await practice({ day: nextDay() });
+      const otherBoat = await boat("quad");
+      for (const [column, value] of [
+        ["practice_id", otherPractice],
+        ["item_id", otherBoat],
+        ["seat", 2],
+        ["side", "starboard"],
+        ["member_id", members.Cy],
+        ["added_at", T(9, 1)],
+        ["added_by_label", "Someone else"],
+      ] as const) {
+        const failure = await attempt(
+          `update club.practice_seats set ${column} = $2, ended_at=$3, ended_by_kind='staff', ended_by_label='Test staff', ended_reason='Taken out' where practice_id=$1 and ended_at is null`,
+          [id, value, T(5, 1)],
+        );
+        expect(failure?.message, column).toMatch(/can only be ended, once/);
+      }
+      expect((await q(`select count(*)::int as n from club.practice_seats where practice_id=$1 and ended_at is null`, [id])).rows[0].n).toBe(1);
+      expect(await endSeat(id, item, 1)).toBeNull();
     });
 
     it("needs its ending filled in completely, including why", async () => {

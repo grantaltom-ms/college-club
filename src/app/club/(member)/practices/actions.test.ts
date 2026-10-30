@@ -175,6 +175,13 @@ describe("changing a practice", () => {
     expect((await state()).bookings.filter((b) => b.status === "cancelled")).toEqual([]);
   });
 
+  it("says nothing about earlier bookings when none of them overlaps the practice", async () => {
+    staff();
+    await redirectedTo(setUpPractice(form({ name: "Quiet", day: "2026-11-20", start: "07:00", end: "08:00", boat: await sampleItem("Osprey") })));
+    const quiet = (await state()).practices.find((p) => p.name === "Quiet")!;
+    expect(await addBoatToPractice(form({ practice: quiet.id, boat: await sampleItem("Heron") }))).toEqual({ kind: "ok", message: "The boat is on the practice." });
+  });
+
   it("asks which boat, refuses a boat already on it, and says why in words", async () => {
     staff();
     const p = await samplePractice();
