@@ -120,7 +120,7 @@ function checkHouseholdFields(input: Pick<NewHousehold, "membershipType" | "join
   if (!isRealDay(input.joinedOn)) throw new ClubError("invalid", "That join date is not a real date.");
 }
 
-function log(
+export function log(
   s: ClubState,
   newId: () => string,
   ctx: Ctx,

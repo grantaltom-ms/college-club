@@ -28,7 +28,7 @@ vi.mock("@/club/identity", () => ({
 vi.mock("@/club/store/instance", () => ({ getClubStore: async () => h.store }));
 
 import { addCharge, voidChargeAction } from "./charges/actions";
-import { saveQuickbooksId } from "./households/actions";
+import { markCoach, saveQuickbooksId } from "./households/actions";
 import { closeMonth } from "./billing/actions";
 import { addVisitors, voidVisitorsAction } from "./visitors/actions";
 
@@ -67,6 +67,7 @@ describe("the staff billing actions: who may use them", () => {
       ["voidVisitors", () => voidVisitorsAction(form({ id: crypto.randomUUID(), reason: "x" }))],
       ["closeMonth", () => closeMonth(form({ month: "2026-09", fingerprint: "a".repeat(64) }))],
       ["saveQuickbooksId", () => saveQuickbooksId(form({ household: lindqvist.id, quickbooks: "NEW-1" }))],
+      ["markCoach", () => markCoach(form({ member: erik.id, coach: "yes" }))],
     ];
     for (const [name, call] of every) {
       h.enabled = false;
@@ -281,5 +282,27 @@ describe("the staff billing actions: a household's QuickBooks ID", () => {
     expect(await saveQuickbooksId(form({ household: nakamura.householdId, quickbooks: "QB-9" }))).toMatchObject({ kind: "error" });
     const clash = await saveQuickbooksId(form({ household: nakamura.householdId, quickbooks: lindqvist.quickbooksId! }));
     expect(clash).toEqual({ kind: "error", message: `QuickBooks ID ${lindqvist.quickbooksId} already belongs to The Lindqvist household.` });
+  });
+});
+
+describe("the staff billing actions: marking a coach", () => {
+  it("marks an adult as a coach, says so, and takes the mark off again", async () => {
+    const erik = await person("Erik Lindqvist");
+    expect(await markCoach(form({ member: erik.id, coach: "yes" }))).toEqual({
+      kind: "ok",
+      message: "Marked as a coach. They can now set up practices and seat crews. The change is in the household's file.",
+    });
+    expect((await person("Erik Lindqvist")).isCoach).toBe(true);
+    expect((await state()).history.filter((l) => l.kind === "coach_changed" && l.details.memberId === erik.id)).toHaveLength(1);
+    expect(await markCoach(form({ member: erik.id, coach: "no" }))).toEqual({ kind: "ok", message: "No longer marked as a coach. The change is in the household's file." });
+    expect((await person("Erik Lindqvist")).isCoach).toBeUndefined();
+  });
+
+  it("refuses in words: a member who does not exist, marking twice, and anything but yes meaning no", async () => {
+    const erik = await person("Erik Lindqvist");
+    expect(await markCoach(form({ coach: "yes" }))).toEqual({ kind: "error", message: "That member could not be found." });
+    expect(await markCoach(form({ member: erik.id, coach: "maybe" }))).toEqual({ kind: "error", message: "Erik Lindqvist is not marked as a coach." });
+    await markCoach(form({ member: erik.id, coach: "yes" }));
+    expect(await markCoach(form({ member: erik.id, coach: "yes" }))).toEqual({ kind: "error", message: "Erik Lindqvist is already a coach." });
   });
 });

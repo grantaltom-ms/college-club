@@ -62,6 +62,12 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         "/club/admin/damage",
         "/club/admin/damage?show=closed",
         `/club/admin/damage/${FIRST_HOUSEHOLD}`,
+        "/club/practices",
+        "/club/practices?show=past",
+        "/club/practices/new",
+        `/club/practices/${FIRST_HOUSEHOLD}`,
+        `/club/practices/${FIRST_HOUSEHOLD}?find=ada`,
+        "/club/my-practices",
         "/club/admin/history",
         "/club/admin/history?name=pat+example",
         "/api/club/history/template",
@@ -98,7 +104,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Mark as being fixed/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Mark as being fixed|Set up a practice|Seat someone|Boats and lineup|Wednesday technique|Back to practices|Practices you are in|Mark as a coach|Take out of seat/i);
       }
     });
 
@@ -195,6 +201,14 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         voidVisitorsAction: "/club/admin/visitors",
         closeMonth: "/club/admin/billing",
         saveQuickbooksId: `/club/household/${FIRST_HOUSEHOLD}`,
+        markCoach: `/club/household/${FIRST_HOUSEHOLD}`,
+        // The practice buttons: the set-up form has its own page, and the rest are used on one practice's page.
+        setUpPractice: "/club/practices/new",
+        addBoatToPractice: `/club/practices/${FIRST_HOUSEHOLD}`,
+        takeBoatOffPractice: `/club/practices/${FIRST_HOUSEHOLD}`,
+        seatPerson: `/club/practices/${FIRST_HOUSEHOLD}`,
+        takeOutOfSeat: `/club/practices/${FIRST_HOUSEHOLD}`,
+        cancelThePractice: `/club/practices/${FIRST_HOUSEHOLD}`,
       };
       const manifest = JSON.parse(readFileSync(join(process.cwd(), ".next/server/server-reference-manifest.json"), "utf8")) as { node: Record<string, { exportedName?: string }> };
       const built = Object.entries(manifest.node).map(([id, action]) => ({ id, name: action.exportedName ?? "" }));
@@ -208,7 +222,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
             body: "[]",
           });
           expect(res.status, `${name} ${JSON.stringify(extra)}`).toBe(404);
-          expect(await res.text(), `${name} ${JSON.stringify(extra)}`).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build|Monthly billing|Recent charges|Add a charge|Record visitors|QuickBooks|added to|recorded for|is closed|old booking|iCrew|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|followed up|Request a tour|Send request|My boats|Private boats|Make owner|Take off|no owner|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Note added/i);
+          expect(await res.text(), `${name} ${JSON.stringify(extra)}`).not.toMatch(/Import households|roster|Check the file|Staff office|Households|Lindqvist|Test staff|invented|test build|Monthly billing|Recent charges|Add a charge|Record visitors|QuickBooks|added to|recorded for|is closed|old booking|iCrew|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|followed up|Request a tour|Send request|My boats|Private boats|Make owner|Take off|no owner|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Note added|Set up a practice|Seat someone|Boats and lineup|They are in the seat|The seat is empty|practice is cancelled|Marked as a coach/i);
         }
       }
     });

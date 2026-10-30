@@ -310,6 +310,12 @@ a.slot-free:focus-visible {
   color: var(--ink);
 }
 
+.slot-practice {
+  background: #dcebe6;
+  border-color: #8fb8ab;
+  color: var(--ink);
+}
+
 .slot-out_of_service {
   background: #ecd9d3;
   border-color: #c4a89f;

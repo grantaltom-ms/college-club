@@ -38,6 +38,11 @@ export interface Member {
   brivoCredentialId: string | null;
   mailchimpContactId: string | null;
   loginId: string | null;
+  /**
+   * Marked by staff. A coach can set up practices and seat crews in them, and nothing else in the staff office. Staff are coaches
+   * without being marked. Undefined means not a coach.
+   */
+  isCoach?: boolean;
 }
 
 /** A level on a track, for example sculling level 2. Higher rank in the same track includes the lower ones. */
@@ -74,6 +79,7 @@ export const HISTORY_KINDS = [
   "signups_cancelled",
   "rsvps_cancelled",
   "quickbooks_linked",
+  "coach_changed",
   "membership_ended",
 ] as const;
 export type HistoryKind = (typeof HISTORY_KINDS)[number];
@@ -671,6 +677,87 @@ export interface BillingLine {
   adjustment: boolean;
 }
 
+/* ---------- Practices and lineups ---------- */
+
+/** The house rules for practices. Every value lives in settings/practice-rules.json, never in code. */
+export interface PracticeRuleValues {
+  /** The longest name a practice can have, in characters. */
+  nameMax: number;
+  /** The longest note a practice can have, in characters. */
+  notesMax: number;
+  /** The longest a practice can run, in hours. */
+  maxHours: number;
+  /** The most boats one practice can reserve. */
+  maxBoats: number;
+  /** How many days ahead a practice can be set up. */
+  daysAhead: number;
+  /** The longest reason for cancelling or taking someone out, in characters. */
+  reasonMax: number;
+}
+
+export interface PracticeRules {
+  placeholder: boolean;
+  defaults: PracticeRuleValues;
+}
+
+export const PRACTICE_STATUSES = ["scheduled", "cancelled"] as const;
+export type PracticeStatus = (typeof PRACTICE_STATUSES)[number];
+
+/**
+ * A coached or organized rowing session. It reserves the boats it names while it runs (nobody else can book them) and holds a
+ * lineup: who sits where. It is optional: ordinary bookings never need one. Never removed; it is cancelled, once.
+ */
+export interface Practice {
+  id: string;
+  name: string;
+  notes: string;
+  /** ISO moments. */
+  startsAt: string;
+  endsAt: string;
+  status: PracticeStatus;
+  /** The coach running it: a member staff have marked as a coach. Null when staff run it themselves. */
+  coachId: string | null;
+  createdAt: string;
+  createdBy: Actor;
+  statusChangedAt: string;
+  cancelledBy: Actor | null;
+  cancelReason: string | null;
+}
+
+/** One boat reserved for a practice. A line is active while `endedAt` is null; lines are only added and ended, never removed. */
+export interface PracticeBoat {
+  id: string;
+  practiceId: string;
+  itemId: string;
+  addedAt: string;
+  addedBy: Actor;
+  endedAt: string | null;
+  endedBy: Actor | null;
+}
+
+export const SEAT_SIDES = ["port", "starboard"] as const;
+export type SeatSide = (typeof SEAT_SIDES)[number];
+
+/**
+ * One person in one seat of one boat of one practice, with the side they row on (none for sculling). A line is active while
+ * `endedAt` is null; lines are only added and ended, never removed, so the lineup keeps its own history.
+ */
+export interface PracticeSeat {
+  id: string;
+  practiceId: string;
+  itemId: string;
+  /** Counting from 1. */
+  seat: number;
+  side: SeatSide | null;
+  memberId: string;
+  addedAt: string;
+  addedBy: Actor;
+  endedAt: string | null;
+  endedBy: Actor | null;
+  /** Why it ended, in words: "Taken out by Sam Coach", "The boat came off the practice". Null while active. */
+  endedReason: string | null;
+}
+
 export interface ClubState {
   households: Household[];
   members: Member[];
@@ -691,6 +778,10 @@ export interface ClubState {
   events: ClubEvent[];
   rsvps: Rsvp[];
   attendance: AttendanceEntry[];
+  /** Coached or organized rowing sessions, the boats each reserves, and who sits where. Never removed. */
+  practices: Practice[];
+  practiceBoats: PracticeBoat[];
+  practiceSeats: PracticeSeat[];
   charges: Charge[];
   visitors: VisitorEntry[];
   billingRuns: BillingRun[];

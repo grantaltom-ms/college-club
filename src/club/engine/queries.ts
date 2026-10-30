@@ -75,3 +75,44 @@ export function classClash(state: ClubState, memberId: string, startMs: number, 
   }
   return undefined;
 }
+
+/* ---------- Practices ---------- */
+
+export interface PracticeHold {
+  practiceId: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+}
+
+/**
+ * The scheduled practice that has this item reserved at some moment between two times, if any. A cancelled practice holds
+ * nothing, and neither does a boat taken off a practice. `exceptPracticeId` leaves one practice out (the one being edited).
+ */
+export function practiceHold(state: ClubState, itemId: string, startMs: number, endMs: number, exceptPracticeId?: string): PracticeHold | undefined {
+  for (const b of state.practiceBoats) {
+    if (b.itemId !== itemId || b.endedAt !== null || b.practiceId === exceptPracticeId) continue;
+    const p = state.practices.find((x) => x.id === b.practiceId);
+    if (!p || p.status !== "scheduled") continue;
+    if (Date.parse(p.startsAt) < endMs && startMs < Date.parse(p.endsAt)) return { practiceId: p.id, name: p.name, startsAt: p.startsAt, endsAt: p.endsAt };
+  }
+  return undefined;
+}
+
+export interface PracticeSeatClash {
+  practiceId: string;
+  practiceName: string;
+  startsAt: string;
+  endsAt: string;
+}
+
+/** The practice lineup (of a scheduled practice) that fills this person's time between two moments, if any. */
+export function practiceSeatClash(state: ClubState, memberId: string, startMs: number, endMs: number, exceptPracticeId?: string): PracticeSeatClash | undefined {
+  for (const seat of state.practiceSeats) {
+    if (seat.memberId !== memberId || seat.endedAt !== null || seat.practiceId === exceptPracticeId) continue;
+    const p = state.practices.find((x) => x.id === seat.practiceId);
+    if (!p || p.status !== "scheduled") continue;
+    if (Date.parse(p.startsAt) < endMs && startMs < Date.parse(p.endsAt)) return { practiceId: p.id, practiceName: p.name, startsAt: p.startsAt, endsAt: p.endsAt };
+  }
+  return undefined;
+}

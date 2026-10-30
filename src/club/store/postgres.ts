@@ -37,6 +37,11 @@ import type {
   MemberStatus,
   MembershipType,
   OutOfServicePeriod,
+  Practice,
+  PracticeBoat,
+  PracticeSeat,
+  PracticeStatus,
+  SeatSide,
   Qualification,
   RuleBook,
   RuleValues,
@@ -104,13 +109,16 @@ export function createClubPool(url: string, max = 4): Pool {
 /* ---------- Rows <-> records ---------- */
 
 interface HouseholdRow { id: string; display_name: string; membership_type: MembershipType; status: HouseholdStatus; joined_on: string; ended_on: string | null; quickbooks_id: string | null; notes: string }
-interface MemberRow { id: string; household_id: string; first_name: string; last_name: string; email: string; phone: string; role: MemberRole; status: MemberStatus; brivo_credential_id: string | null; mailchimp_contact_id: string | null; login_id: string | null }
+interface MemberRow { id: string; household_id: string; first_name: string; last_name: string; email: string; phone: string; role: MemberRole; status: MemberStatus; brivo_credential_id: string | null; mailchimp_contact_id: string | null; login_id: string | null; is_coach: boolean }
 interface MemberQualificationRow { member_id: string; qualification_code: string; granted_by_label: string; granted_at: Date }
 interface HistoryRow { id: string; household_id: string; at: Date; kind: HistoryKind; summary: string; actor_kind: string; actor_id: string | null; actor_label: string; details: HistoryEntry["details"] }
 interface ItemRow { id: string; name: string; class_code: string; rule_overrides: Partial<RuleValues>; qualification_mode: "class" | "none" | "code"; required_qualification: string | null; is_private: boolean; places: number }
 interface BoatAccessRow { id: string; item_id: string; member_id: string; kind: BoatAccessKind; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null; ended_reason: string | null }
 interface DamageReportRow { id: string; item_id: string; reported_by_kind: string; reported_by_id: string | null; reported_by_label: string; reported_at: Date; description: string; location: string; how_it_happened: string; major: boolean; priority: number; status: DamageStatus; updated_at: Date; assigned_to: string | null; closed_at: Date | null; repaired_on: string | null; repaired_by: string | null; repair_minutes: number | null; cost_cents: number | null; repair_notes: string | null; dismissed_reason: string | null }
 interface DamageLogRow { id: string; report_id: string; at: Date; kind: DamageLogKind; by_kind: string; by_id: string | null; by_label: string; text: string }
+interface PracticeRow { id: string; name: string; notes: string; starts_at: Date; ends_at: Date; status: PracticeStatus; coach_id: string | null; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
+interface PracticeBoatRow { id: string; practice_id: string; item_id: string; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null }
+interface PracticeSeatRow { id: string; practice_id: string; item_id: string; seat: number; side: SeatSide | null; member_id: string; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null; ended_reason: string | null }
 interface OutOfServiceRow { id: string; item_id: string; from_at: Date; until_at: Date | null; reason: string; expected_return: string | null; created_by_kind: string; created_by_label: string; created_at: Date }
 interface BookingRow { id: string; item_id: string; booker_id: string; starts_at: Date; ends_at: Date; status: BookingStatus; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null; override_reason: string | null; override_by_label: string | null; override_waived: string[] | null }
 interface ClassRow { id: string; name: string; description: string; instructor: string; default_capacity: number; default_minutes: number; room_item_id: string | null; rules: Partial<ClassRuleValues> }
@@ -145,19 +153,23 @@ const toHousehold = (r: HouseholdRow): Household => ({
   notes: r.notes,
 });
 
-const toMember = (r: MemberRow): Member => ({
-  id: r.id,
-  householdId: r.household_id,
-  firstName: r.first_name,
-  lastName: r.last_name,
-  email: r.email,
-  phone: r.phone,
-  role: r.role,
-  status: r.status,
-  brivoCredentialId: r.brivo_credential_id,
-  mailchimpContactId: r.mailchimp_contact_id,
-  loginId: r.login_id,
-});
+function toMember(r: MemberRow): Member {
+  const member: Member = {
+    id: r.id,
+    householdId: r.household_id,
+    firstName: r.first_name,
+    lastName: r.last_name,
+    email: r.email,
+    phone: r.phone,
+    role: r.role,
+    status: r.status,
+    brivoCredentialId: r.brivo_credential_id,
+    mailchimpContactId: r.mailchimp_contact_id,
+    loginId: r.login_id,
+  };
+  if (r.is_coach) member.isCoach = true;
+  return member;
+}
 
 const toHistory = (r: HistoryRow): HistoryEntry => ({
   id: r.id,
@@ -183,6 +195,45 @@ const toBoatAccess = (r: BoatAccessRow): BoatAccess => ({
   itemId: r.item_id,
   memberId: r.member_id,
   kind: r.kind,
+  addedAt: iso(r.added_at),
+  addedBy: actorFrom(r.added_by_kind, r.added_by_id, r.added_by_label),
+  endedAt: r.ended_at ? iso(r.ended_at) : null,
+  endedBy: r.ended_by_kind ? actorFrom(r.ended_by_kind, r.ended_by_id, r.ended_by_label ?? "") : null,
+  endedReason: r.ended_reason,
+});
+
+const toPractice = (r: PracticeRow): Practice => ({
+  id: r.id,
+  name: r.name,
+  notes: r.notes,
+  startsAt: iso(r.starts_at),
+  endsAt: iso(r.ends_at),
+  status: r.status,
+  coachId: r.coach_id,
+  createdAt: iso(r.created_at),
+  createdBy: actorFrom(r.created_by_kind, r.created_by_id, r.created_by_label),
+  statusChangedAt: iso(r.status_changed_at),
+  cancelledBy: r.cancelled_by_kind ? actorFrom(r.cancelled_by_kind, r.cancelled_by_id, r.cancelled_by_label ?? "") : null,
+  cancelReason: r.cancel_reason,
+});
+
+const toPracticeBoat = (r: PracticeBoatRow): PracticeBoat => ({
+  id: r.id,
+  practiceId: r.practice_id,
+  itemId: r.item_id,
+  addedAt: iso(r.added_at),
+  addedBy: actorFrom(r.added_by_kind, r.added_by_id, r.added_by_label),
+  endedAt: r.ended_at ? iso(r.ended_at) : null,
+  endedBy: r.ended_by_kind ? actorFrom(r.ended_by_kind, r.ended_by_id, r.ended_by_label ?? "") : null,
+});
+
+const toPracticeSeat = (r: PracticeSeatRow): PracticeSeat => ({
+  id: r.id,
+  practiceId: r.practice_id,
+  itemId: r.item_id,
+  seat: r.seat,
+  side: r.side,
+  memberId: r.member_id,
   addedAt: iso(r.added_at),
   addedBy: actorFrom(r.added_by_kind, r.added_by_id, r.added_by_label),
   endedAt: r.ended_at ? iso(r.ended_at) : null,
@@ -403,12 +454,15 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
   const sinceDay = pacificDate(since);
   // One query at a time: a single connection runs them in order anyway.
   const households = await rows<HouseholdRow>(c, `select id, display_name, membership_type, status, joined_on, ended_on, quickbooks_id, notes from club.households order by seq`);
-  const members = await rows<MemberRow>(c, `select id, household_id, first_name, last_name, email, phone, role, status, brivo_credential_id, mailchimp_contact_id, login_id from club.members order by seq`);
+  const members = await rows<MemberRow>(c, `select id, household_id, first_name, last_name, email, phone, role, status, brivo_credential_id, mailchimp_contact_id, login_id, is_coach from club.members order by seq`);
   const qualifications = await rows<Qualification>(c, `select code, name, track, rank from club.qualifications order by code`);
   const memberQualifications = await rows<MemberQualificationRow>(c, `select member_id, qualification_code, granted_by_label, granted_at from club.member_qualifications order by seq`);
   const history = await rows<HistoryRow>(c, `select id, household_id, at, kind, summary, actor_kind, actor_id, actor_label, details from club.household_history order by seq`);
   const items = await rows<ItemRow>(c, `select id, name, class_code, rule_overrides, qualification_mode, required_qualification, is_private, places from club.items order by seq`);
   const access = await rows<BoatAccessRow>(c, `select id, item_id, member_id, kind, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label, ended_reason from club.item_access order by seq`);
+  const practiceRows = await rows<PracticeRow>(c, `select id, name, notes, starts_at, ends_at, status, coach_id, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason from club.practices order by seq`);
+  const practiceBoatRows = await rows<PracticeBoatRow>(c, `select id, practice_id, item_id, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label from club.practice_boats order by seq`);
+  const practiceSeatRows = await rows<PracticeSeatRow>(c, `select id, practice_id, item_id, seat, side, member_id, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label, ended_reason from club.practice_seats order by seq`);
   const damage = await rows<DamageReportRow>(
     c,
     `select id, item_id, reported_by_kind, reported_by_id, reported_by_label, reported_at, description, location, how_it_happened, major, priority, status, updated_at, assigned_to, closed_at,
@@ -493,6 +547,9 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
     items: items.map(toItem),
     outOfService: oos.map(toOutOfService),
     boatAccess: access.map(toBoatAccess),
+    practices: practiceRows.map(toPractice),
+    practiceBoats: practiceBoatRows.map(toPracticeBoat),
+    practiceSeats: practiceSeatRows.map(toPracticeSeat),
     damageReports: damage.map(toDamageReport),
     damageLog: damageLog.map(toDamageLog),
     bookings: bookingRows.map((b) => toBooking(b, crew)),
@@ -533,15 +590,15 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
   const mm = compare("members", before.members, after.members);
   for (const m of mm.added) {
     await run(
-      `insert into club.members (id, household_id, first_name, last_name, email, phone, role, status, brivo_credential_id, mailchimp_contact_id, login_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [m.id, m.householdId, m.firstName, m.lastName, m.email, m.phone, m.role, m.status, m.brivoCredentialId, m.mailchimpContactId, m.loginId],
+      `insert into club.members (id, household_id, first_name, last_name, email, phone, role, status, brivo_credential_id, mailchimp_contact_id, login_id, is_coach) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [m.id, m.householdId, m.firstName, m.lastName, m.email, m.phone, m.role, m.status, m.brivoCredentialId, m.mailchimpContactId, m.loginId, m.isCoach === true],
     );
   }
   // Adults who stop being active go first, so a replacement primary never briefly makes two.
   for (const m of [...mm.updated.filter((x) => x.status !== "active"), ...mm.updated.filter((x) => x.status === "active")]) {
     await run(
-      `update club.members set first_name=$2, last_name=$3, email=$4, phone=$5, role=$6, status=$7, brivo_credential_id=$8, mailchimp_contact_id=$9, login_id=$10 where id=$1`,
-      [m.id, m.firstName, m.lastName, m.email, m.phone, m.role, m.status, m.brivoCredentialId, m.mailchimpContactId, m.loginId],
+      `update club.members set first_name=$2, last_name=$3, email=$4, phone=$5, role=$6, status=$7, brivo_credential_id=$8, mailchimp_contact_id=$9, login_id=$10, is_coach=$11 where id=$1`,
+      [m.id, m.firstName, m.lastName, m.email, m.phone, m.role, m.status, m.brivoCredentialId, m.mailchimpContactId, m.loginId, m.isCoach === true],
     );
   }
   // A household is only marked ended once none of its adults are active, so it is saved after them.
@@ -586,6 +643,48 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
     await run(`insert into club.out_of_service (id, item_id, from_at, until_at, reason, expected_return, created_by_kind, created_by_label, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [p.id, p.itemId, p.from, p.until, p.reason, p.expectedReturn, p.createdBy.kind, p.createdBy.label, p.createdAt]);
   }
   for (const p of oo.updated) await run(`update club.out_of_service set until_at=$2, reason=$3, expected_return=$4 where id=$1`, [p.id, p.until, p.reason, p.expectedReturn]);
+
+  // Practices: set up once and cancelled at most once, never removed. The boats a practice reserves and the seats in its lineup are
+  // only added and ended. Ended lines go first, so a boat or a person put back in the same change never shows up on the list twice.
+  const pr = compare("practices", before.practices, after.practices);
+  for (const x of pr.added) {
+    await run(
+      `insert into club.practices (id, name, notes, starts_at, ends_at, status, coach_id, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      [x.id, x.name, x.notes, x.startsAt, x.endsAt, x.status, x.coachId, x.createdAt, x.createdBy.kind, actorId(x.createdBy), x.createdBy.label, x.statusChangedAt, x.cancelledBy?.kind ?? null, x.cancelledBy ? actorId(x.cancelledBy) : null, x.cancelledBy?.label ?? null, x.cancelReason],
+    );
+  }
+  for (const x of pr.updated) {
+    const old = before.practices.find((p) => p.id === x.id)!;
+    if (!same({ ...old, status: 0, statusChangedAt: 0, cancelledBy: 0, cancelReason: 0 }, { ...x, status: 0, statusChangedAt: 0, cancelledBy: 0, cancelReason: 0 })) {
+      throw new Error("A practice's name, notes, times, coach and maker cannot change. Cancel it and set up a new one.");
+    }
+    await run(`update club.practices set status=$2, status_changed_at=$3, cancelled_by_kind=$4, cancelled_by_id=$5, cancelled_by_label=$6, cancel_reason=$7 where id=$1`, [x.id, x.status, x.statusChangedAt, x.cancelledBy?.kind ?? null, x.cancelledBy ? actorId(x.cancelledBy) : null, x.cancelledBy?.label ?? null, x.cancelReason]);
+  }
+  const pb = compare("practice boat lines", before.practiceBoats, after.practiceBoats);
+  for (const x of pb.updated) {
+    const old = before.practiceBoats.find((l) => l.id === x.id)!;
+    if (!same({ ...old, endedAt: 0, endedBy: 0 }, { ...x, endedAt: 0, endedBy: 0 })) throw new Error("A boat line on a practice can only be ended, never changed.");
+    await run(`update club.practice_boats set ended_at=$2, ended_by_kind=$3, ended_by_id=$4, ended_by_label=$5 where id=$1`, [x.id, x.endedAt, x.endedBy?.kind ?? null, x.endedBy ? actorId(x.endedBy) : null, x.endedBy?.label ?? null]);
+  }
+  for (const x of pb.added) {
+    await run(
+      `insert into club.practice_boats (id, practice_id, item_id, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [x.id, x.practiceId, x.itemId, x.addedAt, x.addedBy.kind, actorId(x.addedBy), x.addedBy.label, x.endedAt, x.endedBy?.kind ?? null, x.endedBy ? actorId(x.endedBy) : null, x.endedBy?.label ?? null],
+    );
+  }
+  const ps = compare("practice seat lines", before.practiceSeats, after.practiceSeats);
+  for (const x of ps.updated) {
+    const old = before.practiceSeats.find((l) => l.id === x.id)!;
+    if (!same({ ...old, endedAt: 0, endedBy: 0, endedReason: 0 }, { ...x, endedAt: 0, endedBy: 0, endedReason: 0 })) throw new Error("A seat line can only be ended, never changed.");
+    await run(`update club.practice_seats set ended_at=$2, ended_by_kind=$3, ended_by_id=$4, ended_by_label=$5, ended_reason=$6 where id=$1`, [x.id, x.endedAt, x.endedBy?.kind ?? null, x.endedBy ? actorId(x.endedBy) : null, x.endedBy?.label ?? null, x.endedReason]);
+  }
+  for (const x of ps.added) {
+    await run(
+      `insert into club.practice_seats (id, practice_id, item_id, seat, side, member_id, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label, ended_reason) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      [x.id, x.practiceId, x.itemId, x.seat, x.side, x.memberId, x.addedAt, x.addedBy.kind, actorId(x.addedBy), x.addedBy.label, x.endedAt, x.endedBy?.kind ?? null, x.endedBy ? actorId(x.endedBy) : null, x.endedBy?.label ?? null, x.endedReason],
+    );
+  }
 
   // Damage reports: filed once, then triaged and closed (never removed), and a log of everything that happened, only ever added to.
   // The log goes in after the reports, because each line points at a report; the database checks the pair at the end of the change.

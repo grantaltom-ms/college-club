@@ -1,0 +1,12 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). A practice is a coached or organized rowing session that reserves its boats and holds a lineup. nameMax and notesMax: the longest name and note, in characters. maxHours: the longest a practice can run. maxBoats: the most boats one practice can reserve. daysAhead: how many days ahead a practice can be set up. reasonMax: the longest reason for cancelling a practice or taking someone out of a seat.",
+  "defaults": {
+    "nameMax": 80,
+    "notesMax": 500,
+    "maxHours": 6,
+    "maxBoats": 20,
+    "daysAhead": 120,
+    "reasonMax": 200
+  }
+}
