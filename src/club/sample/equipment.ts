@@ -3,7 +3,7 @@ import { fullName } from "../engine/queries";
 import { RULE_BOOK } from "../settings/rulebook";
 import type { ClubStore } from "../store/memory";
 import { addDays, pacificDate, pacificWall } from "../time";
-import type { Item, RuleValues } from "../types";
+import type { BoatAccess, Item, RuleValues } from "../types";
 import { SAMPLE_STAFF } from "./club";
 
 /**
@@ -14,6 +14,8 @@ interface SampleItem {
   name: string;
   classCode: string;
   ruleOverrides?: Partial<RuleValues>;
+  /** A privately owned boat, with the members who own it and the members an owner has invited (by full name). No owners: locked. */
+  private?: { owners: string[]; invited: string[] };
 }
 
 export const SAMPLE_ITEMS: SampleItem[] = [
@@ -39,6 +41,11 @@ export const SAMPLE_ITEMS: SampleItem[] = [
   // The two spaces fitness classes use. Members can book them too, when no class is in them.
   { name: "Boathouse gym", classCode: "gym-space" },
   { name: "Clubhouse room", classCode: "room-space" },
+  // Private boats. Only their owners and the people an owner has invited can see or book them, and their skill level is not checked
+  // (Ines Castellanos holds no qualification and can still use Starling). Wren has no owner, so it is locked until staff add one.
+  { name: "Kestrel", classCode: "shell-single", private: { owners: ["Nora Abernathy"], invited: ["Tomas Vandermeer"] } },
+  { name: "Starling", classCode: "shell-double", private: { owners: ["Erik Lindqvist"], invited: ["Ines Castellanos"] } },
+  { name: "Wren", classCode: "shell-single", private: { owners: [], invited: [] } },
 ];
 
 /**
@@ -47,9 +54,18 @@ export const SAMPLE_ITEMS: SampleItem[] = [
  */
 export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<void> {
   await store.transaction(async (s, newId) => {
+    const memberId = (name: string) => {
+      const m = s.members.find((x) => fullName(x) === name);
+      if (!m) throw new Error(`Sample member ${name} is missing.`);
+      return m.id;
+    };
     for (const i of SAMPLE_ITEMS) {
       const item: Item = { id: newId(), name: i.name, classCode: i.classCode, ruleOverrides: i.ruleOverrides ?? {} };
+      if (i.private) item.isPrivate = true;
       s.items.push(item);
+      const line = (name: string, kind: BoatAccess["kind"]): BoatAccess => ({ id: newId(), itemId: item.id, memberId: memberId(name), kind, addedAt: now.toISOString(), addedBy: SAMPLE_STAFF, endedAt: null, endedBy: null, endedReason: null });
+      for (const name of i.private?.owners ?? []) s.boatAccess.push(line(name, "owner"));
+      for (const name of i.private?.invited ?? []) s.boatAccess.push(line(name, "invited"));
     }
   });
 

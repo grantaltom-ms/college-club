@@ -260,6 +260,24 @@ test.describe("the home screen tip", () => {
       await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
       await expect(card(page)).toHaveCount(0);
     });
+
+    test("an install offer that arrives while the page is still starting up is not lost", async ({ page, context }) => {
+      // A slow phone: the browser makes its one-time offer as the page finishes loading, before React has started listening for it.
+      // (Before the sign-in page caught offers itself, this missed the offer in 11 runs of 12.)
+      test.setTimeout(90_000);
+      const cdp = await context.newCDPSession(page);
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate: 60 });
+      await page.addInitScript(() => {
+        window.addEventListener("load", () => {
+          const offer = new Event("beforeinstallprompt", { cancelable: true }) as Event & { prompt: () => Promise<void> };
+          offer.prompt = async () => undefined;
+          window.dispatchEvent(offer);
+        });
+      });
+      await page.goto("/club/sign-in");
+      await expect(card(page)).toBeVisible({ timeout: 45_000 });
+      await expect(card(page)).toContainText("Install it for an icon on your home screen.");
+    });
   });
 });
 

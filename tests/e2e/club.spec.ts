@@ -75,17 +75,18 @@ test("a member can open their own household's address but not anyone else's", as
   const links = await page.getByTestId("household-row").getByRole("link").evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute("href")!));
   expect(links.length).toBeGreaterThanOrEqual(14); // the 14 invented ones, plus any other tests have added
   await actAs(page, "Erik Lindqvist");
-  let own = 0;
-  for (const href of links) {
-    const res = await page.goto(href);
-    if (res?.status() === 200) {
-      own += 1;
-      await expect(page.getByTestId("household-name")).toHaveText("The Lindqvist household");
-    } else {
-      expect(res?.status(), href).toBe(404);
-    }
+  // Every address is asked for directly (with this member's cookie) instead of being opened in the browser. The staff list also holds
+  // every household that other tests have added, hundreds by the end of a full run, and opening each in a browser took almost the
+  // whole time limit. The one that answers is then opened in the browser to check it is the right household.
+  const answers: { href: string; status: number }[] = [];
+  for (let i = 0; i < links.length; i += 10) {
+    answers.push(...(await Promise.all(links.slice(i, i + 10).map(async (href) => ({ href, status: (await page.request.get(href)).status() })))));
   }
-  expect(own).toBe(1);
+  const open = answers.filter((a) => a.status === 200);
+  expect(answers.filter((a) => a.status !== 200 && a.status !== 404), "every address answers 200 or 404").toEqual([]);
+  expect(open).toHaveLength(1);
+  await page.goto(open[0].href);
+  await expect(page.getByTestId("household-name")).toHaveText("The Lindqvist household");
 });
 
 test("switching between test members again and again always shows the right person and household", async ({ page }) => {

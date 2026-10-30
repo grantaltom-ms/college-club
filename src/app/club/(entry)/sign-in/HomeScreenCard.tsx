@@ -1,36 +1,45 @@
 "use client";
 
 import { useRef, useSyncExternalStore } from "react";
+import { INSTALL_OFFER_EVENT } from "@/club/install-offer";
 
 /** The browser's "install this site" offer (Chrome and Edge on Android and desktop). Not in TypeScript's own list of events yet. */
 interface InstallOffer extends Event {
   prompt(): Promise<unknown>;
 }
 
+declare global {
+  interface Window {
+    /** The browser's install offer, kept by the early script in the sign-in layout (see src/club/install-offer.ts) or by this card. */
+    __ccsInstallOffer?: InstallOffer | null;
+  }
+}
+
 /** What the card should show: nothing, the iPhone steps, or an Install button. Kept outside React because the browser decides, and can change its mind. */
-let offer: InstallOffer | null = null;
-const listeners = new Set<() => void>();
-const tell = () => listeners.forEach((l) => l());
+const offerNow = (): InstallOffer | null => (typeof window === "undefined" ? null : (window.__ccsInstallOffer ?? null));
+const changed = () => window.dispatchEvent(new Event(INSTALL_OFFER_EVENT));
 
 function subscribe(onChange: () => void) {
-  listeners.add(onChange);
+  // The page's early script catches an offer that comes while the page loads. These listeners cover the rest (for example a visit
+  // reached without a full page load, where that script does not run), and `INSTALL_OFFER_EVENT` is how either says it changed.
   const onOffer = (event: Event) => {
     event.preventDefault();
-    offer = event as InstallOffer;
-    tell();
+    window.__ccsInstallOffer = event as InstallOffer;
+    onChange();
   };
   const onInstalled = () => {
-    offer = null;
-    tell();
+    window.__ccsInstallOffer = null;
+    onChange();
   };
   window.addEventListener("beforeinstallprompt", onOffer);
   window.addEventListener("appinstalled", onInstalled);
+  window.addEventListener(INSTALL_OFFER_EVENT, onChange);
   const display = window.matchMedia("(display-mode: standalone)");
   display.addEventListener("change", onChange);
   return () => {
-    listeners.delete(onChange);
     window.removeEventListener("beforeinstallprompt", onOffer);
     window.removeEventListener("appinstalled", onInstalled);
+    window.removeEventListener(INSTALL_OFFER_EVENT, onChange);
     display.removeEventListener("change", onChange);
   };
 }
@@ -40,7 +49,7 @@ type Show = "hidden" | "ios" | "install";
 function currentShow(): Show {
   const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
   if (standalone) return "hidden"; // already running like an app: nothing to suggest
-  if (offer) return "install";
+  if (offerNow()) return "install";
   const iPhoneOrIPad = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   return iPhoneOrIPad ? "ios" : "hidden";
 }
@@ -67,14 +76,15 @@ export function HomeScreenCard() {
             className="ds-button ds-button-install"
             data-testid="home-screen-install"
             onClick={async () => {
-              if (!offer || installing.current) return;
+              const current = offerNow();
+              if (!current || installing.current) return;
               installing.current = true;
               try {
-                await offer.prompt();
+                await current.prompt();
               } finally {
-                offer = null;
+                window.__ccsInstallOffer = null;
                 installing.current = false;
-                tell();
+                changed();
               }
             }}
           >

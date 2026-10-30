@@ -37,7 +37,7 @@ export class MemoryClubStore implements ClubStore {
     private newId: () => string = () => crypto.randomUUID(),
     private options: MemoryStoreOptions = {},
   ) {
-    this.state = { households: [], members: [], qualifications: structuredClone(QUALIFICATIONS), memberQualifications: [], history: [], items: [], outOfService: [], bookings: [], classes: [], sessions: [], signups: [], events: [], rsvps: [], attendance: [], charges: [], visitors: [], billingRuns: [], billingLines: [], dataSince: null };
+    this.state = { households: [], members: [], qualifications: structuredClone(QUALIFICATIONS), memberQualifications: [], history: [], items: [], outOfService: [], boatAccess: [], bookings: [], classes: [], sessions: [], signups: [], events: [], rsvps: [], attendance: [], charges: [], visitors: [], billingRuns: [], billingLines: [], dataSince: null };
   }
 
   async read(): Promise<ClubState> {

@@ -2,6 +2,8 @@ import { Pool, types as pgTypes, type PoolClient } from "pg";
 import { assertNotHosted } from "../db/guard";
 import { ClubError } from "../errors";
 import type {
+  BoatAccess,
+  BoatAccessKind,
   Actor,
   AttendanceEntry,
   AttendanceKind,
@@ -100,7 +102,8 @@ interface HouseholdRow { id: string; display_name: string; membership_type: Memb
 interface MemberRow { id: string; household_id: string; first_name: string; last_name: string; email: string; phone: string; role: MemberRole; status: MemberStatus; brivo_credential_id: string | null; mailchimp_contact_id: string | null; login_id: string | null }
 interface MemberQualificationRow { member_id: string; qualification_code: string; granted_by_label: string; granted_at: Date }
 interface HistoryRow { id: string; household_id: string; at: Date; kind: HistoryKind; summary: string; actor_kind: string; actor_id: string | null; actor_label: string; details: HistoryEntry["details"] }
-interface ItemRow { id: string; name: string; class_code: string; rule_overrides: Partial<RuleValues>; qualification_mode: "class" | "none" | "code"; required_qualification: string | null }
+interface ItemRow { id: string; name: string; class_code: string; rule_overrides: Partial<RuleValues>; qualification_mode: "class" | "none" | "code"; required_qualification: string | null; is_private: boolean }
+interface BoatAccessRow { id: string; item_id: string; member_id: string; kind: BoatAccessKind; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null; ended_reason: string | null }
 interface OutOfServiceRow { id: string; item_id: string; from_at: Date; until_at: Date | null; reason: string; expected_return: string | null; created_by_kind: string; created_by_label: string; created_at: Date }
 interface BookingRow { id: string; item_id: string; booker_id: string; starts_at: Date; ends_at: Date; status: BookingStatus; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null; override_reason: string | null; override_by_label: string | null; override_waived: string[] | null }
 interface ClassRow { id: string; name: string; description: string; instructor: string; default_capacity: number; default_minutes: number; room_item_id: string | null; rules: Partial<ClassRuleValues> }
@@ -163,8 +166,21 @@ function toItem(r: ItemRow): Item {
   const item: Item = { id: r.id, name: r.name, classCode: r.class_code, ruleOverrides: r.rule_overrides };
   if (r.qualification_mode === "none") item.requiredQualification = null;
   else if (r.qualification_mode === "code") item.requiredQualification = r.required_qualification;
+  if (r.is_private) item.isPrivate = true;
   return item;
 }
+
+const toBoatAccess = (r: BoatAccessRow): BoatAccess => ({
+  id: r.id,
+  itemId: r.item_id,
+  memberId: r.member_id,
+  kind: r.kind,
+  addedAt: iso(r.added_at),
+  addedBy: actorFrom(r.added_by_kind, r.added_by_id, r.added_by_label),
+  endedAt: r.ended_at ? iso(r.ended_at) : null,
+  endedBy: r.ended_by_kind ? actorFrom(r.ended_by_kind, r.ended_by_id, r.ended_by_label ?? "") : null,
+  endedReason: r.ended_reason,
+});
 
 const toOutOfService = (r: OutOfServiceRow): OutOfServicePeriod => ({
   id: r.id,
@@ -359,7 +375,8 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
   const qualifications = await rows<Qualification>(c, `select code, name, track, rank from club.qualifications order by code`);
   const memberQualifications = await rows<MemberQualificationRow>(c, `select member_id, qualification_code, granted_by_label, granted_at from club.member_qualifications order by seq`);
   const history = await rows<HistoryRow>(c, `select id, household_id, at, kind, summary, actor_kind, actor_id, actor_label, details from club.household_history order by seq`);
-  const items = await rows<ItemRow>(c, `select id, name, class_code, rule_overrides, qualification_mode, required_qualification from club.items order by seq`);
+  const items = await rows<ItemRow>(c, `select id, name, class_code, rule_overrides, qualification_mode, required_qualification, is_private from club.items order by seq`);
+  const access = await rows<BoatAccessRow>(c, `select id, item_id, member_id, kind, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label, ended_reason from club.item_access order by seq`);
   const oos = await rows<OutOfServiceRow>(c, `select id, item_id, from_at, until_at, reason, expected_return, created_by_kind, created_by_label, created_at from club.out_of_service order by seq`);
   const bookingRows = await rows<BookingRow>(
     c,
@@ -436,6 +453,7 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
     history: history.map(toHistory),
     items: items.map(toItem),
     outOfService: oos.map(toOutOfService),
+    boatAccess: access.map(toBoatAccess),
     bookings: bookingRows.map((b) => toBooking(b, crew)),
     classes: classes.map(toClass),
     sessions: sessionRows.map(toSession),
@@ -504,10 +522,23 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
     await run(`insert into club.household_history (id, household_id, at, kind, summary, actor_kind, actor_id, actor_label, details) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [e.id, e.householdId, e.at, e.kind, e.summary, e.actor.kind, actorId(e.actor), e.actor.label, JSON.stringify(e.details)]);
   }
 
-  const itemSql = (i: Item) => [i.name, i.classCode, JSON.stringify(i.ruleOverrides), i.requiredQualification === undefined ? "class" : i.requiredQualification === null ? "none" : "code", i.requiredQualification ?? null];
+  const itemSql = (i: Item) => [i.name, i.classCode, JSON.stringify(i.ruleOverrides), i.requiredQualification === undefined ? "class" : i.requiredQualification === null ? "none" : "code", i.requiredQualification ?? null, i.isPrivate === true];
   const ii = compare("items", before.items, after.items);
-  for (const i of ii.added) await run(`insert into club.items (id, name, class_code, rule_overrides, qualification_mode, required_qualification) values ($1,$2,$3,$4,$5,$6)`, [i.id, ...itemSql(i)]);
-  for (const i of ii.updated) await run(`update club.items set name=$2, class_code=$3, rule_overrides=$4, qualification_mode=$5, required_qualification=$6 where id=$1`, [i.id, ...itemSql(i)]);
+  for (const i of ii.added) await run(`insert into club.items (id, name, class_code, rule_overrides, qualification_mode, required_qualification, is_private) values ($1,$2,$3,$4,$5,$6,$7)`, [i.id, ...itemSql(i)]);
+  for (const i of ii.updated) await run(`update club.items set name=$2, class_code=$3, rule_overrides=$4, qualification_mode=$5, required_qualification=$6, is_private=$7 where id=$1`, [i.id, ...itemSql(i)]);
+
+  // Who may use each private boat. Lines are only added and ended, never removed. They go in before any booking that relies on them.
+  const aa = compare("boat access lines", before.boatAccess, after.boatAccess);
+  // Lines are ended before new ones go in, so someone made an owner in the same change that ends their invitation is never on the list twice.
+  for (const a of aa.updated) {
+    await run(`update club.item_access set ended_at=$2, ended_by_kind=$3, ended_by_id=$4, ended_by_label=$5, ended_reason=$6 where id=$1`, [a.id, a.endedAt, a.endedBy?.kind ?? null, a.endedBy ? actorId(a.endedBy) : null, a.endedBy?.label ?? null, a.endedReason]);
+  }
+  for (const a of aa.added) {
+    await run(
+      `insert into club.item_access (id, item_id, member_id, kind, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label, ended_reason) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [a.id, a.itemId, a.memberId, a.kind, a.addedAt, a.addedBy.kind, actorId(a.addedBy), a.addedBy.label, a.endedAt, a.endedBy?.kind ?? null, a.endedBy ? actorId(a.endedBy) : null, a.endedBy?.label ?? null, a.endedReason],
+    );
+  }
 
   const oo = compare("out-of-service entries", before.outOfService, after.outOfService);
   for (const p of oo.added) {

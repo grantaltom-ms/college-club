@@ -78,6 +78,22 @@
       "seats": 1,
       "requiredQualification": null,
       "rules": {}
+    },
+    {
+      "code": "kayak-double",
+      "type": "Kayak",
+      "name": "Double kayak",
+      "seats": 2,
+      "requiredQualification": null,
+      "rules": {}
+    },
+    {
+      "code": "work-space",
+      "type": "Work Space",
+      "name": "Work space",
+      "seats": 1,
+      "requiredQualification": null,
+      "rules": {}
     }
   ]
 }

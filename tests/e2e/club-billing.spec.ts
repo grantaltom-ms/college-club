@@ -370,6 +370,8 @@ test.describe("visitors, signed in on the front-desk iPad", () => {
     await page.goto(`${address}/visitors?q=Pemberton`);
     await noSideScroll(page);
     await page.getByRole("link", { name: "Walter Pemberton" }).click();
+    // Wait for the next screen before measuring it: measuring in the middle of the move finds no page yet.
+    await expect(page.getByRole("button", { name: "Sign in my visitors" })).toBeVisible();
     await noSideScroll(page);
     for (const label of await page.locator(".ipad-count").all()) {
       const box = await label.boundingBox();

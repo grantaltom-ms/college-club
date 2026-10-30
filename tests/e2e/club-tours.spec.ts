@@ -25,6 +25,17 @@ async function request(page: Page, who: { name?: string; email?: string; phone?:
   await page.getByRole("button", { name: "Send request" }).click();
 }
 
+/**
+ * What the staff list says about the open requests, read from one moment of the page: the sentence's own count and how many
+ * cards say "New". The list is shared by every test running at once, so a count can only be compared with the cards beside it,
+ * never with an earlier visit.
+ */
+const openCounts = (page: Page) =>
+  page.evaluate(() => ({
+    said: Number((document.querySelector('[data-testid="tour-counts"]')?.textContent ?? "").split(" ")[0]),
+    cards: [...document.querySelectorAll('[data-testid="tour-status"]')].filter((el) => el.textContent === "New").length,
+  }));
+
 const cardFor = (page: Page, name: string) => page.getByTestId("tour-request").filter({ has: page.getByRole("heading", { level: 3, name }) });
 
 test.describe("the Request a tour page", () => {
@@ -95,8 +106,10 @@ test.describe("the Request a tour page", () => {
     expect(await card.locator("p", { hasText: "Two of us." }).evaluate((el) => getComputedStyle(el).whiteSpace)).toBe("pre-wrap");
     await expect(card).toContainText("Received Oct 28, 2026");
     await expect(card.getByTestId("tour-status")).toHaveText("New");
-    const countBefore = await staff.getByTestId("tour-counts").innerText();
-    expect(countBefore).toMatch(/^\d+ to follow up, \d+ in all\.$/);
+    await expect(staff.getByTestId("tour-counts")).toHaveText(/^\d+ to follow up, \d+ in all\.$/);
+    const before = await openCounts(staff);
+    expect(before.said).toBe(before.cards);
+    expect(before.cards).toBeGreaterThanOrEqual(1);
 
     // The membership office is told (in a test build the "email" is on the test outbox page).
     await staff.goto("/club/outbox");
@@ -109,12 +122,15 @@ test.describe("the Request a tour page", () => {
     // Marking it followed up happens once, says who, and takes the button away.
     await staff.goto("/club/admin/tours");
     await cardFor(staff, name).getByRole("button", { name: `Mark ${name} as followed up` }).click();
-    await expect(cardFor(staff, name).getByTestId("action-ok")).toHaveText(`${name} is marked as followed up.`);
+    // The list refreshes by itself and the button, with its little "marked" note, goes with it, so wait for the end state
+    // rather than for a note that can already be gone.
+    await expect(cardFor(staff, name).getByTestId("tour-status")).toHaveText(/^Followed up by Test staff on Oct 28, 2026/);
     await staff.goto("/club/admin/tours");
     await expect(cardFor(staff, name).getByTestId("tour-status")).toHaveText(/^Followed up by Test staff on Oct 28, 2026/);
     await expect(cardFor(staff, name).getByRole("button")).toHaveCount(0);
-    const [before, after] = [countBefore, await staff.getByTestId("tour-counts").innerText()].map((t) => Number(t.split(" ")[0]));
-    expect(after).toBe(before - 1);
+    // The count leaves this one out: it still equals the cards that say "New" (others may be saving at the same time).
+    const after = await openCounts(staff);
+    expect(after.said).toBe(after.cards);
     await staffContext.close();
   });
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
+import { accessKind, itemVisibleTo } from "@/club/engine/boat-access";
 import { checkBooking, type Reason } from "@/club/engine/bookings";
 import { describeRules } from "@/club/engine/describe";
 import { meetsQualification } from "@/club/engine/eligibility";
@@ -12,7 +13,7 @@ import { RULE_BOOK, rulesFor } from "@/club/settings/rulebook";
 import { getClubStore } from "@/club/store/instance";
 import { formatDayLong, formatRange, pacificDate } from "@/club/time";
 import { idParam, idsParam, intParam, lengthChoices, momentParam, NOTICES } from "@/club/web";
-import { blockedReason } from "@/club/web-actor";
+import { blockedReason, viewerOf } from "@/club/web-actor";
 import { PlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
 
@@ -29,6 +30,8 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   const item = state.items.find((i) => i.id === idParam(params.item));
   const start = momentParam(params.start);
   if (!item || !start) notFound();
+  // A private boat is not shown to anyone who is not on its list, so it is not found for them either.
+  if (!itemVisibleTo(state, item, viewerOf(actor))) notFound();
 
   const { cls, rules, requiredQualification } = rulesFor(RULE_BOOK, item);
   const lengths = lengthChoices(rules);
@@ -62,7 +65,11 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   const canBook = reasons !== null && blocking.length === 0 && !problem && !(wantsOverride && !reason);
 
   // Who can sit in the other seats: active members who hold the qualification.
-  const crewChoices = cls.seats > 1 ? activeMembers.filter((m) => m.id !== forId && meetsQualification(state, m.id, requiredQualification)) : [];
+  // On a private boat the other seats go to its owners and the people they invited instead.
+  const crewChoices =
+    cls.seats > 1
+      ? activeMembers.filter((m) => m.id !== forId && (item.isPrivate ? accessKind(state, item.id, m.id) !== null : meetsQualification(state, m.id, requiredQualification)))
+      : [];
   const explained = describeRules(state, RULE_BOOK, item);
   const memberBlocked = blockedReason(actor);
   const notice = NOTICES[one(params.notice) ?? ""];
@@ -96,7 +103,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
             <label htmlFor="for">Booking for</label>
             <select id="for" name="for" defaultValue={forId ?? ""}>
               <option value="">Choose a member</option>
-              {activeMembers.map((m) => (
+              {activeMembers.filter((m) => !item.isPrivate || accessKind(state, item.id, m.id) !== null).map((m) => (
                 <option key={m.id} value={m.id}>
                   {fullName(m)} ({householdOf(state, m.householdId)?.displayName})
                 </option>
@@ -119,7 +126,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
             <legend>
               Crew (up to {cls.seats - 1} other{cls.seats === 2 ? "" : "s"})
             </legend>
-            {crewChoices.length === 0 && <p className="club-meta">No other member holds the qualification this boat needs.</p>}
+            {crewChoices.length === 0 && <p className="club-meta">{item.isPrivate ? "No other owner or invited member can crew this boat." : "No other member holds the qualification this boat needs."}</p>}
             {crewChoices.map((m) => (
               <label key={m.id} className="club-check">
                 <input type="checkbox" name="crew" value={m.id} defaultChecked={crewIds.includes(m.id)} /> {fullName(m)}

@@ -752,3 +752,16 @@ details summary {
 .club-radios legend {
   padding: 0;
 }
+
+/* A small label next to a heading, for example "Locked" or "Private" on a boat. */
+.club-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--sun-tint);
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
