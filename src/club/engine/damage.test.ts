@@ -428,6 +428,8 @@ for (const kind of STORE_KINDS) {
         const f = await fixture();
         const lateEvening = new Date("2026-10-29T05:30:00Z"); // 10:30 pm Pacific, Oct 28
         const report = await file(f, "Ada", "Heron", {}, lateEvening);
+        // It is already Oct 29 in UTC, but still Oct 28 on the Pacific clock, so Oct 29 is tomorrow and cannot be a repair date.
+        expect((await refusedWith(markDamageRepaired(f.store, asStaff(lateEvening), DAMAGE_RULES, { reportId: report.id, repairedOn: "2026-10-29", repairedBy: "Sam" })))?.message).toBe("The repair date cannot be in the future.");
         await markDamageRepaired(f.store, asStaff(lateEvening), DAMAGE_RULES, { reportId: report.id, repairedOn: "2026-10-28", repairedBy: "Sam" });
         expect((await state(f)).damageReports[0].repairedOn).toBe("2026-10-28");
       });
