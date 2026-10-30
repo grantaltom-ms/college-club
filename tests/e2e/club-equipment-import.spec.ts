@@ -195,6 +195,17 @@ test.describe("checking and adding", () => {
     await expect(equipmentRow(page, first.toLowerCase())).toHaveCount(0);
   });
 
+  test("a file with nothing to add says so and offers no Add button", async ({ page }) => {
+    const t = tag();
+    await openUpload(page);
+    // Only a private boat and a pool: both wait for later steps, so there is nothing to load now.
+    await check(page, csv(row(`Playwright Private ${t}`, "Shell", "1", "", "Private"), row(`Playwright Docks ${t}`, "Dock Space", "", "", "Club", "", "60")), "waiting.csv");
+    await expect(page.getByTestId("equip-summary")).toHaveText("There is nothing to add: everything in the file is already here or waiting for a later step.");
+    await expect(page.getByTestId("equip-private")).toBeVisible();
+    await expect(page.getByTestId("equip-pools")).toBeVisible();
+    await expect(page.getByTestId("equip-add")).toHaveCount(0);
+  });
+
   test("choosing a different file after a check clears the old preview, so only a file that was checked can be added", async ({ page }) => {
     const t = tag();
     await openUpload(page);
