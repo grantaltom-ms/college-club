@@ -178,12 +178,14 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         takeOffBoat: "/club/admin/boats",
         fileDamage: "/club/damage",
         addDamageNoteAction: "/club/damage",
-        assignReport: "/club/admin/damage",
-        changePriority: "/club/admin/damage",
-        startReport: "/club/admin/damage",
-        outOfServiceForReport: "/club/admin/damage",
-        repairedReport: "/club/admin/damage",
-        dismissReport: "/club/admin/damage",
+        // The six staff buttons on a damage report are used only by one report's own page, and Next.js knows an action only on the pages
+        // that use it, so they are called there.
+        assignReport: `/club/admin/damage/${FIRST_HOUSEHOLD}`,
+        changePriority: `/club/admin/damage/${FIRST_HOUSEHOLD}`,
+        startReport: `/club/admin/damage/${FIRST_HOUSEHOLD}`,
+        outOfServiceForReport: `/club/admin/damage/${FIRST_HOUSEHOLD}`,
+        repairedReport: `/club/admin/damage/${FIRST_HOUSEHOLD}`,
+        dismissReport: `/club/admin/damage/${FIRST_HOUSEHOLD}`,
         markFollowedUp: "/club/admin/tours",
         // The public Request a tour form is a server action too, on the public site, which has its own switch (see site-hidden.spec.ts).
         requestTour: "/site/request-a-tour",
