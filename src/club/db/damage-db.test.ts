@@ -225,10 +225,12 @@ describe.skipIf(!ADMIN_URL)("damage reports", () => {
       // Priority.
       expect((await change(id, `priority = 1, updated_at = $2`, [T(11)]))?.message).toMatch(/priority cannot change without a matching "priority_changed" line/);
       expect((await change(id, `priority = 1, updated_at = $2`, [T(11)], staffLine(id, "assigned", T(11))))?.message).toMatch(/priority_changed/);
+      expect((await change(id, `priority = 1, updated_at = $2`, [T(11)], staffLine(id, "priority_changed", T(12))))?.message).toMatch(/matching "priority_changed" line/);
       expect(await change(id, `priority = 1, updated_at = $2`, [T(11)], staffLine(id, "priority_changed", T(11)))).toBeNull();
       // Assignee.
       expect((await change(id, `assigned_to = 'Sam', updated_at = $2`, [T(12)]))?.message).toMatch(/assigned to cannot change without a matching "assigned" line/);
       expect((await change(id, `assigned_to = 'Sam', updated_at = $2`, [T(12)], staffLine(id, "priority_changed", T(12))))?.message).toMatch(/matching "assigned" line/);
+      expect((await change(id, `assigned_to = 'Sam', updated_at = $2`, [T(12)], staffLine(id, "assigned", T(13))))?.message).toMatch(/matching "assigned" line/);
       expect(await change(id, `assigned_to = 'Sam', updated_at = $2`, [T(12)], staffLine(id, "assigned", T(12)))).toBeNull();
       // Closing needs the closing line, and the right one.
       expect((await change(id, `status = 'repaired', updated_at = $2, closed_at = $2, repaired_on = '2026-10-29', repaired_by = 'Sam'`, [T(13)], staffLine(id, "dismissed", T(13))))?.message).toMatch(/matching "repaired" line/);
