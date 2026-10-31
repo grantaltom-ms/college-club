@@ -110,7 +110,8 @@ test.describe("a pool of places", () => {
   test("the booking form says in words that the pool is shared and counted, and that it is one place at a time", async ({ page }) => {
     await actAs(page, "Alex Brooks");
     await bookPage(page, "Dock Space");
-    await slot(page, DOCK, "9:00 to 9:30 am", "4 of 4 places left").click();
+    // 2 pm: no other test in this file books it. (A booking now starts at 90 minutes, so the 8:00 bookings next door also hold 9:00.)
+    await slot(page, DOCK, "2:00 to 2:30 pm", "4 of 4 places left").click();
     await expect(page.getByText(`${DOCK} has 4 places, shared by everyone. You book a time and the club counts how many places are left; you are not given a place number. You can hold one place at a time.`)).toBeVisible();
   });
 
