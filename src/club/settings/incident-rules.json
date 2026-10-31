@@ -1,0 +1,20 @@
+{
+  "placeholder": true,
+  "about": "EVERY NUMBER IN THIS FILE IS A PLACEHOLDER until club staff confirm the real values (see CLAUDE.md). maxDaysBack: how many days back an incident can be dated (a write-up a few days late is normal; this stops a wrong year). maxPeople and maxBoats: the most people and boats one report can name. The rest are the longest text, in characters, each box takes: whatHappenedMax, locationMax, conditionsMax (water and weather), firstAidMax, emergencyMax and personNameMax are on the form the person on the scene fills in; causeMax, changeMax (what will change), followUpByMax, noteMax and closingNoteMax are staff's.",
+  "defaults": {
+    "maxDaysBack": 90,
+    "maxPeople": 20,
+    "maxBoats": 10,
+    "whatHappenedMax": 1500,
+    "locationMax": 200,
+    "conditionsMax": 300,
+    "firstAidMax": 300,
+    "emergencyMax": 200,
+    "personNameMax": 120,
+    "causeMax": 1000,
+    "changeMax": 1000,
+    "followUpByMax": 80,
+    "noteMax": 1000,
+    "closingNoteMax": 1000
+  }
+}

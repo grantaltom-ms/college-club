@@ -517,6 +517,111 @@ export interface DamageLogEntry {
   text: string;
 }
 
+/* ---------- Incident reports ---------- */
+
+/** The numbers behind incident reports. Every value lives in settings/incident-rules.json, never in code. */
+export interface IncidentRuleValues {
+  /** How many days back an incident can be dated (a write-up a few days late is normal; this stops a wrong year). */
+  maxDaysBack: number;
+  /** The most people and boats one report can name. */
+  maxPeople: number;
+  maxBoats: number;
+  /** Longest text, in characters, for each box. */
+  whatHappenedMax: number;
+  locationMax: number;
+  conditionsMax: number;
+  firstAidMax: number;
+  emergencyMax: number;
+  personNameMax: number;
+  causeMax: number;
+  changeMax: number;
+  followUpByMax: number;
+  noteMax: number;
+  closingNoteMax: number;
+}
+
+export interface IncidentRules {
+  /** True while the numbers are placeholders. */
+  placeholder: boolean;
+  defaults: IncidentRuleValues;
+}
+
+/** An incident report is open until staff close it; a closed report never changes. */
+export const INCIDENT_STATUSES = ["open", "closed"] as const;
+export type IncidentStatus = (typeof INCIDENT_STATUSES)[number];
+
+/**
+ * One incident report: a capsize, an injury or a near-miss, written up by staff or a coach. The building comparison: the incident
+ * log in the manager's office. The person on the scene writes down what happened; the office adds what caused it and what will
+ * change, and files it away. What the person wrote is never rewritten, and every step is a line in the report's own log.
+ */
+export interface Incident {
+  id: string;
+  /** Club staff, or a member who is a coach. */
+  reportedBy: Actor;
+  reportedAt: string;
+  /** The moment it happened. Never after the report was filed. */
+  occurredAt: string;
+  whatHappened: string;
+  location: string;
+  onTheWater: boolean;
+  /** Water and weather. */
+  conditions: string;
+  firstAidGiven: boolean;
+  /** Who gave it and what was done. Empty unless first aid was given. */
+  firstAidNotes: string;
+  emergencyCalled: boolean;
+  /** Which services. Empty unless they were called. */
+  emergencyNotes: string;
+  status: IncidentStatus;
+  /** When the report last changed (a review, or closing). */
+  updatedAt: string;
+  /** Staff add these when they review it. */
+  cause: string | null;
+  whatWillChange: string | null;
+  /** Who is following up, in words. */
+  followUpBy: string | null;
+  /** A damage report this incident led to, if staff linked one. */
+  damageReportId: string | null;
+  /** Set exactly when the report is closed, together with what was done. */
+  closedAt: string | null;
+  closedNote: string | null;
+}
+
+/** Someone involved: a member picked from the list, or a name typed in. Added when the report is filed and never changed. */
+export interface IncidentPerson {
+  id: string;
+  incidentId: string;
+  /** Set for a member; null for someone typed in (a guest, someone from another club). */
+  memberId: string | null;
+  /** The name as it was when the report was filed. */
+  name: string;
+  injured: boolean;
+  /** Whether a parent or guardian was told. */
+  parentTold: boolean;
+}
+
+/** A boat or space involved. Added when the report is filed and never changed. */
+export interface IncidentBoat {
+  id: string;
+  incidentId: string;
+  itemId: string;
+}
+
+export const INCIDENT_LOG_KINDS = ["filed", "note", "reviewed", "closed"] as const;
+export type IncidentLogKind = (typeof INCIDENT_LOG_KINDS)[number];
+
+/** One line in an incident's log. Lines are only ever added, never changed or removed. */
+export interface IncidentLogEntry {
+  id: string;
+  incidentId: string;
+  at: string;
+  kind: IncidentLogKind;
+  by: Actor;
+  /** The line in words, or for a note, the note itself. */
+  text: string;
+}
+
 /* ---------- Check-ins and attendance (step 5) ---------- */
 
 /** The house rules for checking in. Every value lives in settings/attendance-rules.json, never in code. */
@@ -771,6 +876,11 @@ export interface ClubState {
   /** Every damage report ever filed, and the log of what happened to each. Reports are never removed. */
   damageReports: DamageReport[];
   damageLog: DamageLogEntry[];
+  /** Every incident report ever filed, who was involved, which boats, and the log of what happened to each. Never removed. */
+  incidents: Incident[];
+  incidentPeople: IncidentPerson[];
+  incidentBoats: IncidentBoat[];
+  incidentLog: IncidentLogEntry[];
   bookings: Booking[];
   classes: ClassTemplate[];
   sessions: ClassSession[];

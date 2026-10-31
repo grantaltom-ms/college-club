@@ -59,9 +59,9 @@ export function repairTimeWords(minutes: number): string {
 /* ---------- Cleaning what people type ---------- */
 
 /** One line: control characters and runs of spaces become a single space. */
-const oneLine = (v: unknown): string => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim() : "");
+export const oneLine = (v: unknown): string => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim() : "");
 /** Several lines allowed: line breaks stay, other control characters go. */
-const manyLines = (v: unknown): string =>
+export const manyLines = (v: unknown): string =>
   typeof v === "string" ? v.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f]+/g, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim() : "";
 
 interface TextOptions {
@@ -77,7 +77,7 @@ function clean(value: unknown, label: string, max: number, options: TextOptions 
   return text;
 }
 
-const shorten = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 3).trimEnd()}...`);
+export const shorten = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 3).trimEnd()}...`);
 
 /* ---------- Helpers ---------- */
 

@@ -5,6 +5,7 @@ import { holdExpired, placesTaken } from "./events";
 import { lockedBoats } from "./boat-access";
 import { outOfServiceAt } from "./bookings";
 import { officeDamage, type OfficeDamage } from "./damage";
+import { officeIncidents, type OfficeIncidents } from "./incidents";
 
 /**
  * What staff see first thing: what needs a look, what is on today, what is out of service and what has people waiting.
@@ -33,6 +34,8 @@ export interface OfficeSummary {
   lockedBoats: { itemId: string; name: string; upcoming: number }[];
   /** Damage reports still to fix, most pressing first. */
   damage: OfficeDamage;
+  /** Incident reports still open, anyone hurt first. */
+  incidents: OfficeIncidents;
   /** Classes and events in the next week with people waiting. */
   waiting: OfficeWaiting[];
 }
@@ -80,6 +83,7 @@ export function officeSummary(state: ClubState, now: Date, rules: AttendanceRule
     outOfService,
     lockedBoats: lockedBoats(state, now),
     damage: officeDamage(state, now),
+    incidents: officeIncidents(state, now),
     waiting,
   };
 }
