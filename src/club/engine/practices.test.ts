@@ -12,6 +12,7 @@ import { clubLedger } from "./ledger";
 import {
   PracticeRefused,
   activeCoach,
+  activeCoaches,
   addPracticeBoat,
   canEditPractice,
   canRunPractices,
@@ -26,6 +27,7 @@ import {
   practiceList,
   practiceNoticeFor,
   removePracticeBoat,
+  reservableBoats,
   seatMember,
   setCoach,
   sideWords,
@@ -271,6 +273,19 @@ for (const kind of STORE_KINDS) {
         expect(await reasonsOf(make(f, { itemIds: [f.i.Loon, f.i.Loon] }))).toEqual(["The same boat is listed twice."]);
         expect(await reasonsOf(make(f, { itemIds: ["00000000-0000-4000-8000-0000000fffff"] }))).toEqual(["That boat no longer exists."]);
         expect((await state(f)).practices).toEqual([]);
+      });
+
+      it("is not put off by an out-of-service period that is over before the practice, or begins after it", async () => {
+        const f = await fixture();
+        await takeOutOfService(f.store, staffCtx(), f.i.Heron, { from: at(2, 6), until: at(2, 10), reason: "Rigger repair" });
+        const outOfService = ["Heron is out of service (Rigger repair)."];
+        // Inside the period, or overlapping either edge of it, the boat is out of service.
+        expect(await reasonsOf(make(f, { startsAt: at(2, 7), endsAt: at(2, 9), itemIds: [f.i.Heron] }))).toEqual(outOfService);
+        expect(await reasonsOf(make(f, { startsAt: at(2, 9), endsAt: at(2, 11), itemIds: [f.i.Heron] }))).toEqual(outOfService);
+        expect(await reasonsOf(make(f, { startsAt: at(2, 5), endsAt: at(2, 7), itemIds: [f.i.Heron] }))).toEqual(outOfService);
+        // Starting just as it comes back, or ending just as it goes out, is fine.
+        expect((await make(f, { name: "After", startsAt: at(2, 10), endsAt: at(2, 12), itemIds: [f.i.Heron] })).practice.status).toBe("scheduled");
+        expect((await make(f, { name: "Before", startsAt: at(2, 4), endsAt: at(2, 6), itemIds: [f.i.Heron] })).practice.status).toBe("scheduled");
       });
 
       it("reserves kayaks and paddle boards too, and counts the boats against the most one practice may reserve", async () => {
@@ -554,6 +569,13 @@ for (const kind of STORE_KINDS) {
         expect((await seat(f, practice.id, "Albatross", 1, "Ada")).memberId).toBe(f.m.Ada);
       });
 
+      it("a dock booking at the same time does not keep someone out of a seat: only a boat puts a person in one place", async () => {
+        const f = await fixture();
+        await bookAs(f, "Ada", "Dock slip A", at(2, 7), at(2, 8));
+        const { practice } = await make(f);
+        expect((await seat(f, practice.id, "Albatross", 1, "Ada")).memberId).toBe(f.m.Ada);
+      });
+
       it("a booking on a different day, or touching the practice at its edge, does not keep someone out", async () => {
         const f = await fixture();
         await bookAs(f, "Ada", "Heron", at(3, 7), at(3, 8));
@@ -822,6 +844,8 @@ for (const kind of STORE_KINDS) {
         const afterSooner = new Date(at(1, 9).getTime() + 1);
         expect(practiceList(s, f.book, staffViewer, afterSooner, "upcoming").map((r) => r.name)).toEqual(["Later"]);
         expect(practiceList(s, f.book, staffViewer, afterSooner, "past").map((r) => r.name)).toEqual(["Cancelled", "Sooner"]);
+        // Once a practice is over, or cancelled, the list stops offering changes to anyone, staff included.
+        expect(practiceList(s, f.book, staffViewer, afterSooner, "past").map((r) => [r.name, r.canEdit])).toEqual([["Cancelled", false], ["Sooner", false]]);
         // A coach sees the list but can only change the one they run.
         const ben = practiceList(s, f.book, memberViewer(f, "Ben"), NOW, "upcoming");
         expect(ben.map((r) => [r.name, r.canEdit])).toEqual([["Sooner", true], ["Later", false]]);
@@ -846,10 +870,36 @@ for (const kind of STORE_KINDS) {
           ["Second", "Pelican", 2, "starboard", ["Dee Reed"], "Staff"],
         ]);
         expect(myPractices(s, f.m.Ada, new Date(at(1, 9).getTime() + 1)).map((x) => x.name)).toEqual(["Second"]);
+        // The very moment the first practice ends it leaves the list; a moment before, it is still there.
+        expect(myPractices(s, f.m.Ada, at(1, 9)).map((x) => x.name)).toEqual(["Second"]);
+        expect(myPractices(s, f.m.Ada, new Date(at(1, 9).getTime() - 1)).map((x) => x.name)).toEqual(["First", "Second"]);
         expect(myPractices(s, f.m.Eli, NOW)).toEqual([]);
         expect(sideWords("port")).toBe("Port");
         expect(sideWords("starboard")).toBe("Starboard");
         expect(sideWords(null)).toBe("No side");
+      });
+
+      it("lists a member's crew in seat order, whatever order they were seated in", async () => {
+        const f = await fixture();
+        const { practice } = await make(f);
+        await seat(f, practice.id, "Albatross", 4, "Eli", "starboard");
+        await seat(f, practice.id, "Albatross", 2, "Dee", "starboard");
+        await seat(f, practice.id, "Albatross", 3, "Cy", "port");
+        await seat(f, practice.id, "Albatross", 1, "Ben", "port");
+        const [mine] = myPractices(await state(f), f.m.Ben, NOW);
+        expect(mine.crew).toEqual(["Dee Reed", "Cy Quill", "Eli Reed"]);
+      });
+
+      it("shows only the latest 50 past practices, newest first", async () => {
+        const f = await fixture();
+        const base = at(3, 0).getTime();
+        for (let n = 1; n <= 51; n++) {
+          await make(f, { name: `P${String(n).padStart(2, "0")}`, startsAt: new Date(base + n * 30 * 60000), endsAt: new Date(base + (n * 30 + 20) * 60000), itemIds: [] });
+        }
+        const past = practiceList(await state(f), f.book, staffViewer, at(8, 0), "past");
+        expect(past).toHaveLength(50);
+        expect(past[0].name).toBe("P51");
+        expect(past[49].name).toBe("P02");
       });
 
       it("does not show a seat on a boat that came off the practice", async () => {
@@ -868,6 +918,29 @@ for (const kind of STORE_KINDS) {
         expect(practiceClashes(await state(f), practice.id).map((c) => c.bookingId)).toEqual([first.booking.id, second.booking.id]);
         await cancelPractice(f.store, PRACTICE_RULES, staffCtx(), practice.id);
         expect(practiceClashes(await state(f), practice.id)).toEqual([]);
+      });
+    });
+
+    describe("what a coach can pick from", () => {
+      it("offers club boats, kayaks and paddle boards by name, never a private boat, a dock slip or a pool", async () => {
+        const f = await fixture();
+        await privateBoat(f, "Wren", "Ada");
+        await f.store.transaction(async (s, newId) => {
+          s.items.push({ id: newId(), name: "Dock berths", classCode: "dock-space", ruleOverrides: {}, places: 4 });
+        });
+        const boats = reservableBoats(await state(f), f.book);
+        expect(boats.map((b) => b.name)).toEqual(["Albatross", "Heron", "Kingfisher", "Loon", "Osprey", "Otter", "Pelican", "Skimmer"]);
+        expect(boats.find((b) => b.name === "Albatross")).toMatchObject({ className: "Quad or four", seats: 4 });
+        expect(boats.find((b) => b.name === "Otter")).toMatchObject({ seats: 1 });
+      });
+
+      it("lists the coaches still in the club by last name, not one who has left or was never marked", async () => {
+        const f = await fixture();
+        await makeCoach(f, "Eli");
+        await makeCoach(f, "Ben");
+        await makeCoach(f, "Cy");
+        await removeMember(f.store, clubLedger, staffCtx(), f.m.Ben);
+        expect(activeCoaches(await state(f)).map((c) => c.name)).toEqual(["Cy Quill", "Eli Reed"]);
       });
     });
 
