@@ -43,7 +43,7 @@ export function chargeRows(s: ClubState, limit = 100): ChargeRowView[] {
         amountCents: c.amountCents,
         description: c.description,
         memberName: member ? fullName(member) : null,
-        enteredBy: c.createdBy.label,
+        enteredBy: c.createdBy.kind === "member" ? `${c.createdBy.label} on the snack bar iPad` : c.createdBy.label,
         status: c.status,
         voidReason: c.voidReason,
         billedIn: billed ? monthLabel(monthOf(c.day)) : null,

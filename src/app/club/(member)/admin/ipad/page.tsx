@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { ipadCode, ipadPath } from "@/club/engine/ipad-address";
+import { ipadCode, ipadPath, snackCode, snackPath } from "@/club/engine/ipad-address";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { getIpadSecret } from "@/club/ipad-secret";
@@ -22,6 +22,7 @@ export default async function IpadSetup() {
   const host = asked.get("x-forwarded-host") ?? asked.get("host") ?? "";
   const proto = asked.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
   const path = secret ? ipadPath(ipadCode(secret)) : null;
+  const snackAddress = secret ? snackPath(snackCode(secret)) : null;
   const permanent = !!process.env.CLUB_IPAD_SECRET;
 
   return (
@@ -64,6 +65,30 @@ export default async function IpadSetup() {
           <p>
             Anyone who has the address can use the iPad screens. If it leaks, change CLUB_IPAD_SECRET where this site is run: the old address stops working at once and this page shows the new one.
           </p>
+          {snackAddress && (
+            <>
+              <h2>The honor snack bar iPad</h2>
+              <p>
+                The snack bar has its own address, so it can sit on its own iPad. A member types their name, says how many snacks they took, and taps once: it goes on their household&apos;s account for the month, and the screen goes back to its start for the next person.
+              </p>
+              <p>
+                <a href={snackAddress} data-testid="snack-link">
+                  Open the snack bar screen
+                </a>
+              </p>
+              <p>
+                <code data-testid="snack-address">{host ? `${proto}://${host}${snackAddress}` : snackAddress}</code>
+              </p>
+              <ol>
+                <li>On the snack bar iPad, open the address above in Safari and tap Share, then &ldquo;Add to Home Screen&rdquo;.</li>
+                <li>Leave it on the start screen. It goes back there by itself after every purchase, and after a quiet spell.</li>
+                <li>
+                  Every purchase is on the <a href="/club/admin/charges">Charges</a> screen as &ldquo;entered on the snack bar iPad&rdquo;. A wrong one is voided there, with a reason.
+                </li>
+              </ol>
+              <p>Changing CLUB_IPAD_SECRET switches off this address too, and this page shows the new one. It is a different address from the check-in iPad, so one leaking does not open the other.</p>
+            </>
+          )}
         </>
       )}
     </section>

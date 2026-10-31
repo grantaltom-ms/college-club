@@ -798,3 +798,51 @@ details summary {
 .club-damage p {
   margin: 4px 0;
 }
+
+/* The honor snack bar iPad: a big minus and plus, the count, and the total. */
+.snack-label {
+  margin: 16px 0 8px;
+  color: var(--slate);
+}
+
+.snack-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin: 8px 0;
+}
+
+.snack-step {
+  width: 96px;
+  height: 96px;
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--hairline);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.snack-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.snack-step:active:not(:disabled),
+.snack-step:focus-visible {
+  border-color: var(--ink);
+}
+
+.snack-count {
+  min-width: 96px;
+  font-size: 4rem;
+  text-align: center;
+}
+
+.snack-total {
+  margin: 8px 0 16px;
+  font-size: 1.6rem;
+  text-align: center;
+}

@@ -3,7 +3,7 @@ import { clubNow } from "./clock";
 import { clubEnabled, outboxEnabled, pickerEnabled } from "./enabled";
 import { ClubError } from "./errors";
 import { fullName, memberById } from "./engine/queries";
-import { getCurrentActor, getRsvpLinkActor, ipadCodeIsGenuine, toEngineActor, type CurrentActor } from "./identity";
+import { getCurrentActor, getRsvpLinkActor, ipadCodeIsGenuine, snackCodeIsGenuine, toEngineActor, type CurrentActor } from "./identity";
 import { getClubStore } from "./store/instance";
 import type { Ctx } from "./engine/households";
 
@@ -73,7 +73,7 @@ export async function startLinkPost(request: NextRequest): Promise<{ response: N
  * private iPad code must be genuine; the person is whoever was picked on the iPad. Anything else answers "not found" and
  * does nothing: the same answer for every wrong address. The iPad signs nobody in and sets no cookie.
  */
-export async function startIpadPost(request: NextRequest): Promise<{ response: NextResponse } | { ctx: Ctx; form: FormData; store: Awaited<ReturnType<typeof getClubStore>>; code: string; memberId: string }> {
+export async function startIpadPost(request: NextRequest, which: "ipad" | "snacks" = "ipad"): Promise<{ response: NextResponse } | { ctx: Ctx; form: FormData; store: Awaited<ReturnType<typeof getClubStore>>; code: string; memberId: string }> {
   const notFound = { response: new NextResponse(null, { status: 404 }) };
   if (!clubEnabled()) return notFound;
   let form: FormData;
@@ -84,7 +84,8 @@ export async function startIpadPost(request: NextRequest): Promise<{ response: N
   }
   const code = field(form, "code", 100);
   const memberId = /^[0-9a-f-]{36}$/.test(field(form, "member")) ? field(form, "member") : "";
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(code) || !memberId || !ipadCodeIsGenuine(code)) return notFound;
+  const genuine = which === "snacks" ? snackCodeIsGenuine : ipadCodeIsGenuine;
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(code) || !memberId || !genuine(code)) return notFound;
   const store = await getClubStore();
   const member = memberById(await store.read(), memberId);
   if (!member) return notFound;

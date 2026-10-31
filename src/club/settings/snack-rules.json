@@ -1,0 +1,11 @@
+{
+  "placeholder": true,
+  "about": "The honor snack bar iPad. priceCents is the price of every snack in cents (150 is $1.50): Grant, Oct 31, 2026. The other numbers are PLACEHOLDERS until club staff confirm them (see CLAUDE.md). itemsPerEntryMax: the most snacks one press of the button can record (a typo guard). itemsPerDayMax: the most snacks one member can have recorded on the iPad in a day. thankYouSeconds: how long the thank-you shows before the iPad goes back to its start for the next person. idleSeconds: how long the iPad waits, untouched, on any other screen before it goes back to the start.",
+  "defaults": {
+    "priceCents": 150,
+    "itemsPerEntryMax": 20,
+    "itemsPerDayMax": 40,
+    "thankYouSeconds": 8,
+    "idleSeconds": 30
+  }
+}

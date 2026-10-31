@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
 import { chargeRows, householdChoices } from "@/club/engine/billing-views";
 import { formatMoney } from "@/club/engine/billing-words";
+import { snackBarMonth, snackCountWords } from "@/club/engine/snacks";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { getClubStore } from "@/club/store/instance";
@@ -19,12 +20,18 @@ export default async function ChargesPage() {
   if (actor.kind !== "staff") notFound();
   const state = await (await getClubStore()).read();
   const rows = chargeRows(state);
+  const snacks = snackBarMonth(state, pacificDate(clubNow()));
   return (
     <section>
       <h1>Charges</h1>
       <p>
         Bar and snack-bar sales, and adjustments (a credit, or an extra charge), go on a household&apos;s account here. Each is billed in the month of the day it happened, on that household&apos;s invoice for the month.
         Once a month is closed, nothing can be dated in it: put a mistake right with an adjustment dated today. <Link href="/club/admin/billing">Monthly billing</Link>
+      </p>
+      <p data-testid="snack-month">
+        {snacks.purchases === 0
+          ? `Snack bar iPad, ${snacks.label}: nothing has been put on accounts yet.`
+          : `Snack bar iPad, ${snacks.label}: ${snackCountWords(snacks.items)} in ${snacks.purchases} ${snacks.purchases === 1 ? "purchase" : "purchases"}, ${formatMoney(snacks.totalCents)}. Members add these themselves; void a wrong one below.`}
       </p>
       <h2>Add a charge</h2>
       <ChargeForm households={householdChoices(state)} today={pacificDate(clubNow())} />

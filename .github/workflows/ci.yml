@@ -7,7 +7,9 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The whole job takes about 15 minutes (the browser tests are about 10 of them) and grows with every feature, so 15 cancelled
+    # healthy runs (Oct 31). Thirty leaves room; a run that hangs is still stopped.
+    timeout-minutes: 30
     # A free, throwaway Postgres for the member system's database tests. It lives only for this run.
     services:
       postgres:
