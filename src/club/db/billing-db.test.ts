@@ -156,10 +156,10 @@ describe.skipIf(!ADMIN_URL)("charges", () => {
     expect(Number((await q(`select count(*) from club.charges where household_id = $1`, [hh])).rows[0].count)).toBe(0);
   });
 
-  it("refuses a description that is empty, and a charge by anyone but staff", async () => {
+  it("refuses a description that is empty, and a charge by anyone but staff or a member (the snack bar iPad has its own tests)", async () => {
     const { hh } = await household();
     expect((await change([insert(hh, { description: "" })]))?.message).toMatch(/charges_description_check/);
-    const failed = await change([[`insert into club.charges (household_id, day, category, adjustment, amount_cents, description, created_at, created_by_kind, created_by_label) values ($1, '2026-09-10', 'bar', false, 100, 'x', now(), 'member', 'Ada')`, [hh]]]);
+    const failed = await change([[`insert into club.charges (household_id, day, category, adjustment, amount_cents, description, created_at, created_by_kind, created_by_label) values ($1, '2026-09-10', 'bar', false, 100, 'x', now(), 'system', 'The system')`, [hh]]]);
     expect(failed?.message).toMatch(/charges_created_by_kind_check/);
   });
 
