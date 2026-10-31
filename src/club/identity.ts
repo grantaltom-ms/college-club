@@ -4,7 +4,7 @@ import { resolveSession } from "./auth/login";
 import { clubNow } from "./clock";
 import { clubEnabled, pickerEnabled } from "./enabled";
 import { fullName, householdOf, memberById } from "./engine/queries";
-import { verifyIpadCode } from "./engine/ipad-address";
+import { verifyIpadCode, verifySnackCode } from "./engine/ipad-address";
 import { verifyRsvpLinkToken } from "./engine/rsvp-links";
 import { getIpadSecret } from "./ipad-secret";
 import { getLinkSecret } from "./link-secret";
@@ -111,4 +111,10 @@ export async function getRsvpLinkActor(link: { eventId: string; memberId: string
 export function ipadCodeIsGenuine(code: string): boolean {
   const secret = clubEnabled() ? getIpadSecret() : null;
   return secret !== null && verifyIpadCode(secret, code);
+}
+
+/** Whether the code in the honor snack bar iPad's address is genuine. Same rules as the front-desk iPad: it signs nobody in and sets no cookie. */
+export function snackCodeIsGenuine(code: string): boolean {
+  const secret = clubEnabled() ? getIpadSecret() : null;
+  return secret !== null && verifySnackCode(secret, code);
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { ipadCode } from "../../src/club/engine/ipad-address";
+import { ipadCode, snackCode } from "../../src/club/engine/ipad-address";
 
 // Port 3101: a production build with the sample-data switch off, like the live site by default.
 // Port 3102: the switch is on by mistake, but the deployment says it is the live production site.
@@ -14,6 +14,8 @@ const HIDDEN = {
 const FIRST_HOUSEHOLD = "00000000-0000-4000-8000-000000000001";
 // Both servers are given this iPad secret on purpose: even with the right secret, the front-desk iPad must not exist here.
 const IPAD_CODE = ipadCode("playwright-only-ipad-secret-0001");
+// The honor snack bar iPad's own address, made from the same secret.
+const SNACK_CODE = snackCode("playwright-only-ipad-secret-0001");
 
 for (const [name, base] of Object.entries(HIDDEN)) {
   test.describe(name, () => {
@@ -94,6 +96,11 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         `/club/ipad/${IPAD_CODE}/visitors?q=smith`,
         `/club/ipad/${IPAD_CODE}/visitors/${FIRST_HOUSEHOLD}`,
         `/club/ipad/${"A".repeat(43)}/visitors`,
+        `/club/snacks/${SNACK_CODE}`,
+        `/club/snacks/${SNACK_CODE}?q=smith`,
+        `/club/snacks/${SNACK_CODE}/${FIRST_HOUSEHOLD}`,
+        `/club/snacks/${SNACK_CODE}/${FIRST_HOUSEHOLD}?done=${FIRST_HOUSEHOLD}`,
+        `/club/snacks/${"A".repeat(43)}`,
         `/club/ipad/${IPAD_CODE}?notice=forbidden`,
         `/club/ipad/${IPAD_CODE}/${FIRST_HOUSEHOLD}`,
         `/club/ipad/${"A".repeat(43)}`,
@@ -108,7 +115,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Mark as being fixed|Set up a practice|Seat someone|Boats and lineup|Sunday technique|Back to practices|Practices you are in|Mark as a coach|Take out of seat|Report an incident|Incident reports|Who was involved|A parent was told|Close the report|Save what we found|Water and weather/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Mark as being fixed|Set up a practice|Seat someone|Boats and lineup|Sunday technique|Back to practices|Practices you are in|Mark as a coach|Take out of seat|Report an incident|Incident reports|Who was involved|A parent was told|Close the report|Save what we found|Water and weather|Honor snack bar|Every snack is|Add to my account|snack bar iPad/i);
       }
     });
 
@@ -152,6 +159,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         ["/api/club/sign-out", {}],
         ["/api/club/ipad/check-in", { code: IPAD_CODE, member: FIRST_HOUSEHOLD, kind: "booking", id: FIRST_HOUSEHOLD }],
         ["/api/club/ipad/visitors", { code: IPAD_CODE, member: FIRST_HOUSEHOLD, visitors: "2" }],
+        ["/api/club/snacks", { code: SNACK_CODE, member: FIRST_HOUSEHOLD, items: "2", token: "A".repeat(32) }],
         ["/api/club/households/create", { name: "Test", type: "Resident", joined: "2026-10-22", firstName: "A", lastName: "B", email: "a@example.com" }],
         ["/api/club/households/add-member", { household: FIRST_HOUSEHOLD, firstName: "A", lastName: "B", email: "a@example.com" }],
         ["/api/club/households/remove-member", { household: FIRST_HOUSEHOLD, member: FIRST_HOUSEHOLD }],

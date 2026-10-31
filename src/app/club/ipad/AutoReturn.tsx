@@ -4,9 +4,9 @@ import { useEffect } from "react";
 
 /**
  * Sends the iPad back to its start screen after a quiet spell, so the next person never sees the last person's bookings.
- * Touching the screen or typing starts the wait again.
+ * Touching the screen or typing starts the wait again, unless `strict` is set (a thank-you that must always clear itself).
  */
-export function AutoReturn({ href, seconds }: { href: string; seconds: number }) {
+export function AutoReturn({ href, seconds, strict = false }: { href: string; seconds: number; strict?: boolean }) {
   useEffect(() => {
     let timer = 0;
     const go = () => window.location.assign(href);
@@ -15,14 +15,16 @@ export function AutoReturn({ href, seconds }: { href: string; seconds: number })
       timer = window.setTimeout(go, seconds * 1000);
     };
     restart();
-    window.addEventListener("pointerdown", restart);
-    window.addEventListener("keydown", restart);
+    if (!strict) {
+      window.addEventListener("pointerdown", restart);
+      window.addEventListener("keydown", restart);
+    }
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("pointerdown", restart);
       window.removeEventListener("keydown", restart);
     };
-  }, [href, seconds]);
+  }, [href, seconds, strict]);
   return (
     <p className="club-meta" data-testid="auto-return">
       This screen goes back to the start after {seconds} seconds.
