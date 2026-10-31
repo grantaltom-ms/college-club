@@ -723,12 +723,38 @@ export interface Charge {
   adjustment: boolean;
   amountCents: number;
   description: string;
+  /** How many snacks, for a purchase on the snack bar iPad. Null for everything staff typed in. */
+  quantity: number | null;
+  /** The price of one snack in cents, as it was when it was bought. Null whenever `quantity` is. */
+  unitCents: number | null;
+  /** A random token the iPad screen carried when it was drawn. The same token is recorded once, so a double tap is one purchase. Null for everything staff typed in. */
+  entryToken: string | null;
   createdAt: string;
+  /** Staff for a charge typed in at the desk; the member themselves for a purchase on the snack bar iPad. */
   createdBy: Actor;
   status: ChargeStatus;
   voidedAt: string | null;
   voidedBy: Actor | null;
   voidReason: string | null;
+}
+
+export interface SnackRuleValues {
+  /** The price of one snack, in cents. Every snack costs the same. */
+  priceCents: number;
+  /** The most snacks one purchase (one press of the button) can record. */
+  itemsPerEntryMax: number;
+  /** The most snacks one member can have recorded on the iPad in one day. */
+  itemsPerDayMax: number;
+  /** How long the thank-you stays up before the iPad goes back to its start for the next person. */
+  thankYouSeconds: number;
+  /** How long the iPad waits, untouched, on any other screen before it goes back to the start. */
+  idleSeconds: number;
+}
+
+export interface SnackRules {
+  /** True while the numbers other than the price are placeholders. */
+  placeholder: boolean;
+  defaults: SnackRuleValues;
 }
 
 export const VISIT_VIA = ["ipad", "staff"] as const;

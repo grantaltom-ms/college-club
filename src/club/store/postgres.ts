@@ -137,7 +137,7 @@ interface SignUpRow { id: string; session_id: string; member_id: string; status:
 interface EventRow { id: string; title: string; description: string; location: string; starts_at: Date; ends_at: Date; capacity: number | null; price_cents: number | null; reply_by: Date | null; status: ClubEvent["status"]; created_at: Date; created_by_kind: string; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface RsvpRow { id: string; event_id: string; member_id: string; guests: number; status: RsvpStatus; price_cents: number | null; via: RsvpVia; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; promoted_at: Date | null; hold_until: Date | null; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface AttendanceRow { id: string; kind: AttendanceKind; booking_id: string | null; signup_id: string | null; rsvp_id: string | null; member_id: string; at: Date; outcome: AttendanceOutcome; previous_outcome: AttendanceOutcome | null; by_kind: string; by_id: string | null; by_label: string; via: AttendanceVia; note: string | null }
-interface ChargeRow { id: string; household_id: string; member_id: string | null; day: string; category: BillingKind; adjustment: boolean; amount_cents: number; description: string; created_at: Date; created_by_label: string; status: ChargeStatus; voided_at: Date | null; voided_by_label: string | null; void_reason: string | null }
+interface ChargeRow { id: string; household_id: string; member_id: string | null; day: string; category: BillingKind; adjustment: boolean; amount_cents: number; description: string; quantity: number | null; unit_cents: number | null; entry_token: string | null; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status: ChargeStatus; voided_at: Date | null; voided_by_label: string | null; void_reason: string | null }
 interface VisitorRow { id: string; member_id: string; day: string; visitors: number; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; via: VisitVia; status: VisitStatus; voided_at: Date | null; voided_by_label: string | null; void_reason: string | null }
 interface RunRow { id: string; month: string; created_at: Date; created_by_label: string; invoice_count: number; total_cents: string | number }
 interface LineRow { id: string; run_id: string; household_id: string; invoice_no: string; kind: BillingKind; description: string; quantity: number; unit_cents: number; amount_cents: number; taxable: boolean; adjustment: boolean }
@@ -434,8 +434,11 @@ const toCharge = (r: ChargeRow): Charge => ({
   adjustment: r.adjustment,
   amountCents: r.amount_cents,
   description: r.description,
+  quantity: r.quantity,
+  unitCents: r.unit_cents,
+  entryToken: r.entry_token,
   createdAt: iso(r.created_at),
-  createdBy: { kind: "staff", label: r.created_by_label },
+  createdBy: actorFrom(r.created_by_kind, r.created_by_id, r.created_by_label),
   status: r.status,
   voidedAt: r.voided_at ? iso(r.voided_at) : null,
   voidedBy: r.voided_by_label ? { kind: "staff", label: r.voided_by_label } : null,
@@ -568,7 +571,7 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
         );
   const chargeRows = await rows<ChargeRow>(
     c,
-    `select id, household_id, member_id, day, category, adjustment, amount_cents, description, created_at, created_by_label, status, voided_at, voided_by_label, void_reason
+    `select id, household_id, member_id, day, category, adjustment, amount_cents, description, quantity, unit_cents, entry_token, created_at, created_by_kind, created_by_id, created_by_label, status, voided_at, voided_by_label, void_reason
        from club.charges where day >= $1 order by seq`,
     [sinceDay],
   );
@@ -908,9 +911,9 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
   const ch = compare("charges", before.charges, after.charges);
   for (const x of ch.added) {
     await run(
-      `insert into club.charges (id, household_id, member_id, day, category, adjustment, amount_cents, description, created_at, created_by_kind, created_by_label, status, voided_at, voided_by_label, void_reason)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'staff',$10,$11,$12,$13,$14)`,
-      [x.id, x.householdId, x.memberId, x.day, x.category, x.adjustment, x.amountCents, x.description, x.createdAt, x.createdBy.label, x.status, x.voidedAt, x.voidedBy?.label ?? null, x.voidReason],
+      `insert into club.charges (id, household_id, member_id, day, category, adjustment, amount_cents, description, quantity, unit_cents, entry_token, created_at, created_by_kind, created_by_id, created_by_label, status, voided_at, voided_by_label, void_reason)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+      [x.id, x.householdId, x.memberId, x.day, x.category, x.adjustment, x.amountCents, x.description, x.quantity, x.unitCents, x.entryToken, x.createdAt, x.createdBy.kind, actorId(x.createdBy), x.createdBy.label, x.status, x.voidedAt, x.voidedBy?.label ?? null, x.voidReason],
     );
   }
   for (const x of ch.updated) await run(`update club.charges set status=$2, voided_at=$3, voided_by_label=$4, void_reason=$5 where id=$1`, [x.id, x.status, x.voidedAt, x.voidedBy?.label ?? null, x.voidReason]);
