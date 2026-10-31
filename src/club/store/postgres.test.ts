@@ -4,6 +4,7 @@ import { SignUpRefused, createClass, leaveClass, scheduleSessions, signUp } from
 import { recordCharge, runBilling } from "../engine/billing";
 import { linesComplete } from "../engine/billing-views";
 import { assignDamageReport, fileDamageReport, markDamageRepaired } from "../engine/damage";
+import { closeIncident, fileIncident, reviewIncident } from "../engine/incidents";
 import { RsvpRefused, cancelRsvp, createEvent, placesTaken, rsvp } from "../engine/events";
 import { PracticeRefused, addPracticeBoat, cancelPractice, clearSeat, createPractice, removePracticeBoat, seatMember, setCoach } from "../engine/practices";
 import { createHousehold, endHousehold, setQuickbooksId } from "../engine/households";
@@ -16,6 +17,7 @@ import { BILLING_RULES } from "../settings/billing-rules";
 import { CLASS_RULES } from "../settings/class-rules";
 import { DAMAGE_RULES } from "../settings/damage-rules";
 import { EVENT_RULES } from "../settings/event-rules";
+import { INCIDENT_RULES } from "../settings/incident-rules";
 import { PRACTICE_RULES } from "../settings/practice-rules";
 import { RULE_BOOK } from "../settings/rulebook";
 import { addDays, pacificDate } from "../time";
@@ -471,6 +473,61 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       await expect(f.store.transaction(async (s) => void s.damageReports.splice(0, 1))).rejects.toThrow("never deletes damage reports");
       await expect(f.store.transaction(async (s) => void (s.damageLog[0].text = "Rewritten."))).rejects.toThrow("can only be added to");
       expect((await f.store.read()).damageLog[0].text).toBe("Reported by Ada Quill as major damage.");
+    });
+
+    it("keeps every field of an incident report, its people, its boats and its log through a round trip, and never deletes or rewrites them", async () => {
+      const f = await fixture();
+      await setCoach(f.store, staffCtx(), f.m.Ben, true);
+      const damage = await fileDamageReport(f.store, staffCtx(), DAMAGE_RULES, { itemId: f.i.Heron, description: "Cracked bow.", major: true });
+      const filed = await fileIncident(f.store, memberCtx(f.m.Ben, "Ben Quill"), INCIDENT_RULES, {
+        occurredAt: new Date(NOW.getTime() - 3600000),
+        whatHappened: "Capsized.\nTwo people in the water.",
+        location: "East dock",
+        onTheWater: true,
+        conditions: "Chop, 12 knots",
+        boatIds: [f.i.Heron, f.i.Loon],
+        people: [{ memberId: f.m.Ada, injured: true, parentTold: false }, { name: "Jordan Example", injured: false, parentTold: true }],
+        firstAidGiven: true,
+        firstAidNotes: "Cleaned a cut.",
+        emergencyCalled: true,
+        emergencyNotes: "Fire department boat",
+      });
+      await reviewIncident(f.store, staffCtx(), INCIDENT_RULES, { incidentId: filed.id, cause: "A gust.", whatWillChange: "Wind check.", followUpBy: "Sam", damageReportId: damage.id });
+      await closeIncident(f.store, staffCtx(), INCIDENT_RULES, { incidentId: filed.id, outcome: "Rules posted." });
+      const read = await f.store.read();
+      expect(read.incidents).toEqual([
+        {
+          ...filed,
+          cause: "A gust.",
+          whatWillChange: "Wind check.",
+          followUpBy: "Sam",
+          damageReportId: damage.id,
+          status: "closed",
+          updatedAt: NOW.toISOString(),
+          closedAt: NOW.toISOString(),
+          closedNote: "Rules posted.",
+        },
+      ]);
+      expect(read.incidents[0].reportedBy).toEqual({ kind: "member", memberId: f.m.Ben, label: "Ben Quill" });
+      expect(read.incidentPeople.map((p) => ({ incidentId: p.incidentId, memberId: p.memberId, name: p.name, injured: p.injured, parentTold: p.parentTold }))).toEqual([
+        { incidentId: filed.id, memberId: f.m.Ada, name: "Ada Quill", injured: true, parentTold: false },
+        { incidentId: filed.id, memberId: null, name: "Jordan Example", injured: false, parentTold: true },
+      ]);
+      expect(read.incidentBoats.map((b) => b.itemId)).toEqual([f.i.Heron, f.i.Loon]);
+      expect(read.incidentLog.map((l) => [l.kind, l.by.kind, l.by.label])).toEqual([
+        ["filed", "member", "Ben Quill"],
+        ["reviewed", "staff", "Test staff"],
+        ["closed", "staff", "Test staff"],
+      ]);
+      await expect(f.store.transaction(async (s) => void s.incidents.splice(0, 1))).rejects.toThrow("never deletes incident reports");
+      await expect(f.store.transaction(async (s) => void s.incidentPeople.splice(0, 1))).rejects.toThrow("never deletes incident people");
+      await expect(f.store.transaction(async (s) => void s.incidentBoats.splice(0, 1))).rejects.toThrow("never deletes incident boats");
+      await expect(f.store.transaction(async (s) => void s.incidentLog.splice(0, 1))).rejects.toThrow("never deletes incident report log lines");
+      await expect(f.store.transaction(async (s) => void (s.incidentLog[0].text = "Rewritten."))).rejects.toThrow("can only be added to");
+      await expect(f.store.transaction(async (s) => void (s.incidentPeople[0].injured = false))).rejects.toThrow("can only be added when it is filed");
+      await expect(f.store.transaction(async (s) => void (s.incidentBoats[0].itemId = f.i.Osprey))).rejects.toThrow("can only be added when it is filed");
+      await expect(f.store.transaction(async (s) => void (s.incidents[0].whatHappened = "Rewritten."))).rejects.toThrow("cannot be changed");
+      expect((await f.store.read()).incidentLog[0].text).toMatch(/^Reported by Ben Quill\./);
     });
 
     it("keeps every field of a practice, its boats, its seats and the coach flag through a round trip, and never deletes or rewrites them", async () => {

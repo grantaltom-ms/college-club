@@ -26,6 +26,12 @@ import type {
   DamagePriority,
   DamageReport,
   DamageStatus,
+  Incident,
+  IncidentBoat,
+  IncidentLogEntry,
+  IncidentLogKind,
+  IncidentPerson,
+  IncidentStatus,
   HistoryEntry,
   HistoryKind,
   Household,
@@ -116,6 +122,10 @@ interface ItemRow { id: string; name: string; class_code: string; rule_overrides
 interface BoatAccessRow { id: string; item_id: string; member_id: string; kind: BoatAccessKind; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null; ended_reason: string | null }
 interface DamageReportRow { id: string; item_id: string; reported_by_kind: string; reported_by_id: string | null; reported_by_label: string; reported_at: Date; description: string; location: string; how_it_happened: string; major: boolean; priority: number; status: DamageStatus; updated_at: Date; assigned_to: string | null; closed_at: Date | null; repaired_on: string | null; repaired_by: string | null; repair_minutes: number | null; cost_cents: number | null; repair_notes: string | null; dismissed_reason: string | null }
 interface DamageLogRow { id: string; report_id: string; at: Date; kind: DamageLogKind; by_kind: string; by_id: string | null; by_label: string; text: string }
+interface IncidentRow { id: string; reported_by_kind: string; reported_by_id: string | null; reported_by_label: string; reported_at: Date; occurred_at: Date; what_happened: string; location: string; on_the_water: boolean; conditions: string; first_aid_given: boolean; first_aid_notes: string; emergency_called: boolean; emergency_notes: string; status: IncidentStatus; updated_at: Date; cause: string | null; what_will_change: string | null; follow_up_by: string | null; damage_report_id: string | null; closed_at: Date | null; closed_note: string | null }
+interface IncidentPersonRow { id: string; incident_id: string; member_id: string | null; name: string; injured: boolean; parent_told: boolean }
+interface IncidentBoatRow { id: string; incident_id: string; item_id: string }
+interface IncidentLogRow { id: string; incident_id: string; at: Date; kind: IncidentLogKind; by_kind: string; by_id: string | null; by_label: string; text: string }
 interface PracticeRow { id: string; name: string; notes: string; starts_at: Date; ends_at: Date; status: PracticeStatus; coach_id: string | null; created_at: Date; created_by_kind: string; created_by_id: string | null; created_by_label: string; status_changed_at: Date; cancelled_by_kind: string | null; cancelled_by_id: string | null; cancelled_by_label: string | null; cancel_reason: string | null }
 interface PracticeBoatRow { id: string; practice_id: string; item_id: string; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null }
 interface PracticeSeatRow { id: string; practice_id: string; item_id: string; seat: number; side: SeatSide | null; member_id: string; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null; ended_reason: string | null }
@@ -264,6 +274,35 @@ const toDamageReport = (r: DamageReportRow): DamageReport => ({
 });
 
 const toDamageLog = (r: DamageLogRow): DamageLogEntry => ({ id: r.id, reportId: r.report_id, at: iso(r.at), kind: r.kind, by: actorFrom(r.by_kind, r.by_id, r.by_label), text: r.text });
+
+const toIncident = (r: IncidentRow): Incident => ({
+  id: r.id,
+  reportedBy: actorFrom(r.reported_by_kind, r.reported_by_id, r.reported_by_label),
+  reportedAt: iso(r.reported_at),
+  occurredAt: iso(r.occurred_at),
+  whatHappened: r.what_happened,
+  location: r.location,
+  onTheWater: r.on_the_water,
+  conditions: r.conditions,
+  firstAidGiven: r.first_aid_given,
+  firstAidNotes: r.first_aid_notes,
+  emergencyCalled: r.emergency_called,
+  emergencyNotes: r.emergency_notes,
+  status: r.status,
+  updatedAt: iso(r.updated_at),
+  cause: r.cause,
+  whatWillChange: r.what_will_change,
+  followUpBy: r.follow_up_by,
+  damageReportId: r.damage_report_id,
+  closedAt: r.closed_at ? iso(r.closed_at) : null,
+  closedNote: r.closed_note,
+});
+
+const toIncidentPerson = (r: IncidentPersonRow): IncidentPerson => ({ id: r.id, incidentId: r.incident_id, memberId: r.member_id, name: r.name, injured: r.injured, parentTold: r.parent_told });
+
+const toIncidentBoat = (r: IncidentBoatRow): IncidentBoat => ({ id: r.id, incidentId: r.incident_id, itemId: r.item_id });
+
+const toIncidentLog = (r: IncidentLogRow): IncidentLogEntry => ({ id: r.id, incidentId: r.incident_id, at: iso(r.at), kind: r.kind, by: actorFrom(r.by_kind, r.by_id, r.by_label), text: r.text });
 
 const toOutOfService = (r: OutOfServiceRow): OutOfServicePeriod => ({
   id: r.id,
@@ -470,6 +509,15 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
        from club.damage_reports order by seq`,
   );
   const damageLog = await rows<DamageLogRow>(c, `select id, report_id, at, kind, by_kind, by_id, by_label, text from club.damage_log order by seq`);
+  const incidentRows = await rows<IncidentRow>(
+    c,
+    `select id, reported_by_kind, reported_by_id, reported_by_label, reported_at, occurred_at, what_happened, location, on_the_water, conditions, first_aid_given, first_aid_notes,
+            emergency_called, emergency_notes, status, updated_at, cause, what_will_change, follow_up_by, damage_report_id, closed_at, closed_note
+       from club.incidents order by seq`,
+  );
+  const incidentPersonRows = await rows<IncidentPersonRow>(c, `select id, incident_id, member_id, name, injured, parent_told from club.incident_people order by seq`);
+  const incidentBoatRows = await rows<IncidentBoatRow>(c, `select id, incident_id, item_id from club.incident_boats order by seq`);
+  const incidentLogRows = await rows<IncidentLogRow>(c, `select id, incident_id, at, kind, by_kind, by_id, by_label, text from club.incident_log order by seq`);
   const oos = await rows<OutOfServiceRow>(c, `select id, item_id, from_at, until_at, reason, expected_return, created_by_kind, created_by_label, created_at from club.out_of_service order by seq`);
   const bookingRows = await rows<BookingRow>(
     c,
@@ -552,6 +600,10 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
     practiceSeats: practiceSeatRows.map(toPracticeSeat),
     damageReports: damage.map(toDamageReport),
     damageLog: damageLog.map(toDamageLog),
+    incidents: incidentRows.map(toIncident),
+    incidentPeople: incidentPersonRows.map(toIncidentPerson),
+    incidentBoats: incidentBoatRows.map(toIncidentBoat),
+    incidentLog: incidentLogRows.map(toIncidentLog),
     bookings: bookingRows.map((b) => toBooking(b, crew)),
     classes: classes.map(toClass),
     sessions: sessionRows.map(toSession),
@@ -707,6 +759,39 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
   if (dl.updated.length > 0) throw new Error("A damage report's log can only be added to, never changed.");
   for (const l of dl.added) {
     await run(`insert into club.damage_log (id, report_id, at, kind, by_kind, by_id, by_label, text) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [l.id, l.reportId, l.at, l.kind, l.by.kind, actorId(l.by), l.by.label, l.text]);
+  }
+
+  // Incident reports: filed once, then reviewed and closed (never removed). The people and boats are added with the report and never
+  // changed. The log goes in last, because each line points at a report; the database checks the pair at the end of the change.
+  const ir = compare("incident reports", before.incidents, after.incidents);
+  for (const x of ir.added) {
+    await run(
+      `insert into club.incidents (id, reported_by_kind, reported_by_id, reported_by_label, reported_at, occurred_at, what_happened, location, on_the_water, conditions, first_aid_given, first_aid_notes,
+                                   emergency_called, emergency_notes, status, updated_at, cause, what_will_change, follow_up_by, damage_report_id, closed_at, closed_note)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+      [x.id, x.reportedBy.kind, actorId(x.reportedBy), x.reportedBy.label, x.reportedAt, x.occurredAt, x.whatHappened, x.location, x.onTheWater, x.conditions, x.firstAidGiven, x.firstAidNotes, x.emergencyCalled, x.emergencyNotes, x.status, x.updatedAt, x.cause, x.whatWillChange, x.followUpBy, x.damageReportId, x.closedAt, x.closedNote],
+    );
+  }
+  for (const x of ir.updated) {
+    const old = before.incidents.find((i) => i.id === x.id)!;
+    const changeable = { status: 0, updatedAt: 0, cause: 0, whatWillChange: 0, followUpBy: 0, damageReportId: 0, closedAt: 0, closedNote: 0 };
+    if (!same({ ...old, ...changeable }, { ...x, ...changeable })) throw new Error("What was written when an incident report was filed cannot be changed.");
+    await run(`update club.incidents set status=$2, updated_at=$3, cause=$4, what_will_change=$5, follow_up_by=$6, damage_report_id=$7, closed_at=$8, closed_note=$9 where id=$1`, [x.id, x.status, x.updatedAt, x.cause, x.whatWillChange, x.followUpBy, x.damageReportId, x.closedAt, x.closedNote]);
+  }
+  const ip = compare("incident people", before.incidentPeople, after.incidentPeople);
+  if (ip.updated.length > 0) throw new Error("The people on an incident report can only be added when it is filed, never changed.");
+  for (const x of ip.added) {
+    await run(`insert into club.incident_people (id, incident_id, member_id, name, injured, parent_told) values ($1,$2,$3,$4,$5,$6)`, [x.id, x.incidentId, x.memberId, x.name, x.injured, x.parentTold]);
+  }
+  const ib = compare("incident boats", before.incidentBoats, after.incidentBoats);
+  if (ib.updated.length > 0) throw new Error("The boats on an incident report can only be added when it is filed, never changed.");
+  for (const x of ib.added) {
+    await run(`insert into club.incident_boats (id, incident_id, item_id) values ($1,$2,$3)`, [x.id, x.incidentId, x.itemId]);
+  }
+  const il = compare("incident report log lines", before.incidentLog, after.incidentLog);
+  if (il.updated.length > 0) throw new Error("An incident report's log can only be added to, never changed.");
+  for (const l of il.added) {
+    await run(`insert into club.incident_log (id, incident_id, at, kind, by_kind, by_id, by_label, text) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [l.id, l.incidentId, l.at, l.kind, l.by.kind, actorId(l.by), l.by.label, l.text]);
   }
 
   const bb = compare("bookings", before.bookings, after.bookings);

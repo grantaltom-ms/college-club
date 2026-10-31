@@ -3,10 +3,12 @@ import { ATTENDANCE_RULES } from "../settings/attendance-rules";
 import { CLASS_RULES } from "../settings/class-rules";
 import { DAMAGE_RULES } from "../settings/damage-rules";
 import { EVENT_RULES } from "../settings/event-rules";
+import { INCIDENT_RULES } from "../settings/incident-rules";
 import { cancelBooking, takeOutOfService } from "./bookings";
 import { createClass, scheduleSessions, signUp } from "./classes";
 import { dismissDamageReport, fileDamageReport } from "./damage";
 import { createEvent, rsvp } from "./events";
+import { closeIncident, fileIncident } from "./incidents";
 import { officeSummary } from "./office";
 import { NOW, STORE_KINDS, at, bookAs, buildFixtureSettling, memberCtx, staffCtx } from "./testkit";
 
@@ -85,5 +87,18 @@ describe.each(STORE_KINDS)("the staff board on the %s store", (kind) => {
     const damage = officeSummary(await f.store.read(), NOW, ATTENDANCE_RULES).damage;
     expect(damage).toMatchObject({ open: 2, major: 1, majorInService: 1 });
     expect(damage.top.map((r) => r.reportId)).toEqual([major.id, minor.id]);
+  });
+  it("puts the incident board on the staff page: what is open, how many have someone hurt or an emergency call, and the most pressing first", async () => {
+    const f = await buildFixtureSettling(kind, () => NOW);
+    const file = (change: { whatHappened: string; people?: { name: string; injured: boolean }[]; emergencyCalled?: boolean }) =>
+      fileIncident(f.store, staffCtx(), INCIDENT_RULES, { occurredAt: NOW, onTheWater: true, firstAidGiven: false, emergencyCalled: false, ...change });
+    expect(officeSummary(await f.store.read(), NOW, ATTENDANCE_RULES).incidents).toEqual({ open: 0, hurt: 0, emergency: 0, top: [] });
+    const plain = await file({ whatHappened: "Near miss." });
+    const hurt = await file({ whatHappened: "Capsize.", people: [{ name: "Jordan Example", injured: true }], emergencyCalled: true });
+    const closed = await file({ whatHappened: "Old one.", people: [{ name: "Pat Example", injured: true }] });
+    await closeIncident(f.store, staffCtx(), INCIDENT_RULES, { incidentId: closed.id, outcome: "Done." });
+    const incidents = officeSummary(await f.store.read(), NOW, ATTENDANCE_RULES).incidents;
+    expect(incidents).toMatchObject({ open: 2, hurt: 1, emergency: 1 });
+    expect(incidents.top.map((r) => r.incidentId)).toEqual([hurt.id, plain.id]);
   });
 });

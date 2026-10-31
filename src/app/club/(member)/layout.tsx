@@ -31,6 +31,7 @@ export default async function MemberLayout({ children }: { children: React.React
             {actor && <Link href="/club/events">Events</Link>}
             {actor?.kind === "member" && <Link href="/club/my-classes">My classes</Link>}
             {(actor?.kind === "staff" || (actor?.kind === "member" && actor.member.isCoach === true)) && <Link href="/club/practices">Practices</Link>}
+            {actor?.kind === "member" && actor.member.isCoach === true && <Link href="/club/incidents">Report an incident</Link>}
             {actor?.kind === "staff" && <Link href="/club/admin">Staff office</Link>}
             {actor?.kind === "staff" && <Link href="/club/equipment">Equipment</Link>}
             {actor === null && <Link href="/club/sign-in">Sign in</Link>}

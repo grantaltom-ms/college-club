@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
 import { describeAttendanceRules } from "@/club/engine/attendance";
+import { shorten } from "@/club/engine/damage";
 import { officeSummary } from "@/club/engine/office";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
@@ -118,6 +119,27 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
         </>
       )}
 
+      <h2>Incident reports</h2>
+      {summary.incidents.open === 0 ? (
+        <p data-testid="incident-board">No incident reports are open. <Link href="/club/admin/incidents">Incident reports</Link></p>
+      ) : (
+        <>
+          <p data-testid="incident-board">
+            {summary.incidents.open} open{summary.incidents.hurt > 0 ? `, ${summary.incidents.hurt} with someone hurt` : ""}
+            {summary.incidents.emergency > 0 ? `, ${summary.incidents.emergency} where emergency services were called` : ""}. <Link href="/club/admin/incidents">Incident reports</Link>
+          </p>
+          <ul className="club-list" data-testid="incident-top">
+            {summary.incidents.top.map((r) => (
+              <li key={r.incidentId}>
+                <Link href={`/club/admin/incidents/${r.incidentId}`}>{shorten(r.whatHappened, 90)}</Link>
+                {r.hurtCount > 0 ? ` · ${r.hurtCount === 1 ? "1 person hurt" : `${r.hurtCount} people hurt`}` : ""}
+                {r.emergencyCalled ? " · emergency services called" : ""} &middot; filed by {r.reporter}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       {summary.lockedBoats.length > 0 && (
         <>
           <h2>Private boats with no owner</h2>
@@ -155,7 +177,7 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
           <Link href="/club/admin/check-in">Check someone in</Link> · <Link href="/club/admin/ipad">Front-desk iPad</Link>
         </li>
         <li>
-          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link> · <Link href="/club/admin/equipment-import">Load the equipment list</Link> · <Link href="/club/admin/boats">Private boats</Link> · <Link href="/club/admin/damage">Damage reports</Link> · <Link href="/club/practices">Practices</Link>
+          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link> · <Link href="/club/admin/equipment-import">Load the equipment list</Link> · <Link href="/club/admin/boats">Private boats</Link> · <Link href="/club/admin/damage">Damage reports</Link> · <Link href="/club/admin/incidents">Incident reports</Link> · <Link href="/club/incidents">Report an incident</Link> · <Link href="/club/practices">Practices</Link>
         </li>
         <li>
           <Link href="/club/classes/manage">Add a class or schedule sessions</Link> · <Link href="/club/events/manage">Add an event</Link>
