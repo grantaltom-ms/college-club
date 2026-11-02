@@ -1,5 +1,6 @@
 import { Pool, types as pgTypes, type PoolClient } from "pg";
 import { assertNotHosted } from "../db/guard";
+import { autoMigrateRequested, ensureMigrated } from "./migrate";
 import { ClubError } from "../errors";
 import type {
   BoatAccess,
@@ -109,7 +110,28 @@ export function createClubPool(url: string, max = 4): Pool {
     },
   });
   pool.on("error", (e) => console.error("Club database connection problem:", e.message));
+  if (autoMigrateRequested()) afterSetUp(pool, url);
   return pool;
+}
+
+/**
+ * Makes a pool wait for the one-time database set-up (CLUB_AUTO_MIGRATE, previews only) before its first connection. Every
+ * query goes through `connect`, so the stores need no change and a request that arrives first simply waits its turn.
+ */
+function afterSetUp(pool: Pool, url: string): void {
+  const loose = pool as unknown as { connect: (cb?: (err: Error | undefined, ...rest: unknown[]) => void) => unknown };
+  const original = loose.connect.bind(pool);
+  loose.connect = (cb) => {
+    const ready = ensureMigrated(url);
+    if (typeof cb === "function") {
+      ready.then(
+        () => original(cb),
+        (e: unknown) => cb(e instanceof Error ? e : new Error(String(e))),
+      );
+      return undefined;
+    }
+    return ready.then(() => original());
+  };
 }
 
 /* ---------- Rows <-> records ---------- */
