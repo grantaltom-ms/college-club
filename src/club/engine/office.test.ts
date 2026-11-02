@@ -65,7 +65,7 @@ describe.each(STORE_KINDS)("the staff board on the %s store", (kind) => {
     const waiting = officeSummary(await f.store.read(), NOW, ATTENDANCE_RULES).waiting;
     expect(waiting.map((w) => [w.kind, w.title, w.fullness, w.waiting])).toEqual([
       ["event", "Dinner", "2 of 2 spots", 2],
-      ["class", "Yoga", "1 of 1 chairs", 1],
+      ["class", "Yoga", "1 of 1 places", 1],
     ]);
   });
 

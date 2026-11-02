@@ -23,7 +23,7 @@ const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
 const CLASS_NOTICES: Record<string, string> = {
   ...NOTICES,
-  capacity: "Chairs cannot go below the number of people who already have one. Cancel some sign-ups first, or choose a bigger number.",
+  capacity: "Places cannot go below the number of people who already have one. Cancel some sign-ups first, or choose a bigger number.",
   started: "That class has already started, so this can no longer be done here.",
 };
 
@@ -78,7 +78,7 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
       </p>
       {template.description && <p>{template.description}</p>}
       <p className="club-meta" data-testid="class-chairs">
-        {chairsText(view)} ({session.capacity} chairs{view.waiting > 0 ? `, ${view.waiting} waiting` : ""})
+        {chairsText(view)} ({session.capacity} places{view.waiting > 0 ? `, ${view.waiting} waiting` : ""})
       </p>
 
       {session.status === "cancelled" && (
@@ -88,7 +88,7 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
       )}
       {joined && (
         <p className="club-success" role="status" data-testid="joined-note">
-          {joined.status === "enrolled" ? (staff ? "Signed up with a chair." : "You are in. You have a chair.") : `On the waiting list, ${ordinal(joinedPlace)} in line. If a chair frees up, the first in line gets it at once.`}
+          {joined.status === "enrolled" ? (staff ? "Signed up with a place." : "You are in. You have a place.") : `On the waiting list, ${ordinal(joinedPlace)} in line. If a place frees up, the first in line gets it at once.`}
         </p>
       )}
       {one(query.changed) && (
@@ -127,15 +127,15 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
             <>
               <p data-testid="your-place">
                 {staff ? `${fullName(people.find((m) => m.id === forId)!)}: ` : ""}
-                {forLine.status === "enrolled" ? (staff ? "has a chair." : "You have a chair.") : `${staff ? "is" : "You are"} on the waiting list, ${ordinal(forLine.place ?? 1)} in line.`}
+                {forLine.status === "enrolled" ? (staff ? "has a place." : "You have a place.") : `${staff ? "is" : "You are"} on the waiting list, ${ordinal(forLine.place ?? 1)} in line.`}
               </p>
               {claim && (
                 <form method="post" action="/api/club/classes/sign-up">
                   <input type="hidden" name="session" value={session.id} />
                   {staff && <input type="hidden" name="for" value={forId!} />}
-                  <p className="club-meta">A chair is free, and the automatic move-up has ended, so it goes to whoever asks first.</p>
+                  <p className="club-meta">A place is free, and the automatic move-up has ended, so it goes to whoever asks first.</p>
                   <button type="submit" className="club-button">
-                    Take the free chair
+                    Take the free place
                   </button>
                 </form>
               )}
@@ -163,7 +163,7 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
             <form method="post" action="/api/club/classes/sign-up">
               <input type="hidden" name="session" value={session.id} />
               {staff && <input type="hidden" name="for" value={forId} />}
-              <p className="club-meta">{view.full ? `This class is full. You can join the waiting list; the first in line gets a chair the moment one frees up.` : "There is a chair for you."}</p>
+              <p className="club-meta">{view.full ? `This class is full. You can join the waiting list; the first in line gets a place the moment one frees up.` : "There is a place for you."}</p>
               <button type="submit" className="club-button">
                 {view.full ? "Join the waiting list" : "Sign up"}
               </button>
@@ -219,13 +219,13 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
               <form method="post" action="/api/club/classes/capacity" className="club-form">
                 <input type="hidden" name="session" value={session.id} />
                 <p>
-                  <label htmlFor="capacity">Chairs</label>
+                  <label htmlFor="capacity">Places</label>
                   <input id="capacity" name="capacity" type="number" min={Math.max(1, view.enrolled)} max={200} defaultValue={session.capacity} required />{" "}
                   <button type="submit" className="club-button">
-                    Change chairs
+                    Change places
                   </button>
                 </p>
-                <p className="club-meta">Adding chairs moves people up from the waiting list at once. Chairs cannot go below the people who already have one.</p>
+                <p className="club-meta">Adding places moves people up from the waiting list at once. Places cannot go below the people who already have one.</p>
               </form>
               <form method="post" action="/api/club/classes/cancel-session" className="club-form">
                 <input type="hidden" name="session" value={session.id} />

@@ -161,8 +161,8 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
         <ul className="club-list" data-testid="waiting">
           {summary.waiting.map((w) => (
             <li key={`${w.kind}-${w.id}`}>
-              <Link href={w.kind === "class" ? `/club/classes/${w.id}` : `/club/events/${w.id}`}>{w.title}</Link>, {formatDayLong(pacificDate(new Date(w.startsAt)))}, {formatClock(w.startsAt)}
-                            · {w.fullness} · {w.waiting} waiting
+              <Link href={w.kind === "class" ? `/club/classes/${w.id}` : `/club/events/${w.id}`}>{w.title}</Link>, {formatDayLong(pacificDate(new Date(w.startsAt)))}, {formatClock(w.startsAt)}{" "}
+              &middot; {w.fullness} &middot; {w.waiting} waiting
             </li>
           ))}
         </ul>

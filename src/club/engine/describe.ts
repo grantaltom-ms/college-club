@@ -54,7 +54,7 @@ export function describeClassRules(classRules: ClassRules, template: ClassTempla
     `Sign up to ${days} ahead. A new day opens at ${opens} Pacific time.`,
     `Sign-up closes ${formatMinutes(r.closeMinutesBefore)} before the start.`,
     r.waitlistMax > 0
-      ? `When a class is full you can join the waiting list (up to ${r.waitlistMax} ${r.waitlistMax === 1 ? "person" : "people"}). Whoever is first in line gets a chair the moment one frees up, until ${formatMinutes(r.promoteUntilMinutesBefore)} before the start. After that, a free chair goes to whoever asks first.`
+      ? `When a class is full you can join the waiting list (up to ${r.waitlistMax} ${r.waitlistMax === 1 ? "person" : "people"}). Whoever is first in line gets a place the moment one frees up, until ${formatMinutes(r.promoteUntilMinutesBefore)} before the start. After that, a free chair goes to whoever asks first.`
       : "When a class is full there is no waiting list.",
     `You can hold ${r.maxUpcomingPerMember} upcoming class place${r.maxUpcomingPerMember === 1 ? "" : "s"} at once (a waiting-list spot counts), and sign up for ${r.maxPerDayPerMember} class${r.maxPerDayPerMember === 1 ? "" : "es"} a day.`,
     `Leave at least ${formatMinutes(r.cancelCutoffMinutes)} before the start, or it counts as a late cancellation. Leaving a waiting list is never late.`,

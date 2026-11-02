@@ -4,7 +4,7 @@ import { findBoatPeople, myInvitedBoats, myOwnedBoats } from "@/club/engine/boat
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { RULE_BOOK } from "@/club/settings/rulebook";
-import { getClubStore } from "@/club/store/instance";
+import { readClubOnce } from "@/club/store/read-once";
 import { formatDay } from "@/club/time";
 import { idParam } from "@/club/web";
 import { AddToBoatButton, RemoveFromBoatButton } from "../BoatButtons";
@@ -33,7 +33,7 @@ export default async function MyBoatsPage({ searchParams }: { searchParams: Prom
     );
   }
   const params = await searchParams;
-  const state = await (await getClubStore()).read();
+  const state = await readClubOnce();
   const now = clubNow();
   const owned = myOwnedBoats(state, RULE_BOOK, actor.member.id, now);
   const invited = myInvitedBoats(state, RULE_BOOK, actor.member.id);

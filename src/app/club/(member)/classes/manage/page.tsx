@@ -107,7 +107,7 @@ export default async function ManageClasses({ searchParams }: { searchParams: Pr
           <input id="weeks" name="weeks" type="number" min={1} max={52} defaultValue={weeks} />
         </p>
         <p>
-          <label htmlFor="sched-chairs">Chairs (leave empty to use the class&rsquo;s usual number)</label>
+          <label htmlFor="sched-chairs">Places (leave empty to use the class&rsquo;s usual number)</label>
           <input id="sched-chairs" name="chairs" type="number" min={1} max={200} defaultValue={chairs || ""} />
         </p>
         <p>
@@ -152,7 +152,7 @@ export default async function ManageClasses({ searchParams }: { searchParams: Pr
           <input id="instructor" name="instructor" type="text" maxLength={120} />
         </p>
         <p>
-          <label htmlFor="chairs">Usual number of chairs</label>
+          <label htmlFor="chairs">Usual number of places</label>
           <input id="chairs" name="chairs" type="number" min={1} max={200} defaultValue={10} required />
         </p>
         <p>
@@ -183,7 +183,7 @@ export default async function ManageClasses({ searchParams }: { searchParams: Pr
             <li key={c.id} className="club-card" data-testid="class-template" data-class={c.name}>
               <h3>{c.name}</h3>
               <p className="club-meta">
-                {c.defaultCapacity} chairs · {c.defaultMinutes} minutes
+                {c.defaultCapacity} places · {c.defaultMinutes} minutes
                 {c.roomItemId ? ` · ${state.items.find((i) => i.id === c.roomItemId)?.name}` : ""}
                 {c.instructor ? ` · ${c.instructor}` : ""}
               </p>

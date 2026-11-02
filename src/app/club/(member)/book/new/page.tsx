@@ -160,7 +160,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
         )}
         {reasons && blocking.length > 0 && (
           <>
-            <h2>This cannot be booked yet</h2>
+            <h2>This booking cannot go ahead as chosen</h2>
             <ul data-testid="refusal-reasons">
               {blocking.map((r) => (
                 <li key={r.code + r.message} data-code={r.code}>
@@ -168,6 +168,9 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
                 </li>
               ))}
             </ul>
+            <p className="club-meta" data-testid="refusal-help">
+              Change your choices above and check again. Skill levels are granted by club staff, so if one of these looks wrong, ask them to check your record.
+            </p>
           </>
         )}
         {wantsOverride && !reason && <p role="alert">Say why the rules are being set aside; the reason is kept in the record.</p>}

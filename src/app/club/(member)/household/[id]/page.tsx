@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { householdOf } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { canViewHousehold, getCurrentActor } from "@/club/identity";
-import { getClubStore } from "@/club/store/instance";
+import { readClubOnce } from "@/club/store/read-once";
 import { HOUSEHOLD_CHANGES, NOTICES } from "@/club/web";
 import { HouseholdDesk } from "../../admin/HouseholdDesk";
 import { HouseholdView } from "../../HouseholdView";
@@ -14,7 +14,7 @@ export default async function HouseholdPage({ params, searchParams }: { params: 
   const { id } = await params;
   const query = await searchParams;
   const actor = await getCurrentActor();
-  const state = await (await getClubStore()).read();
+  const state = await readClubOnce();
   const household = householdOf(state, id);
   // A household you may not see looks exactly like one that does not exist.
   if (!household || !canViewHousehold(actor, household.id)) notFound();

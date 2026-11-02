@@ -34,24 +34,24 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
   await page.goto("/club/classes?day=2026-10-30");
   await expect(page.getByTestId("day-heading")).toHaveText("Friday, Oct 30");
   await expect(page.getByTestId("placeholder-note")).toBeVisible();
-  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("10 chairs left");
+  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("10 places left");
   await card(page, "Stretch & Mobility").getByRole("link", { name: "Stretch & Mobility" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Stretch & Mobility" })).toBeVisible();
   await expect(page.getByTestId("class-when")).toContainText("Friday, Oct 30, 12:00 to 12:30 pm");
   await expect(page.getByRole("heading", { name: "Rules for Stretch & Mobility" })).toBeVisible();
   await page.getByRole("button", { name: "Sign up", exact: true }).click();
-  await expect(page.getByTestId("joined-note")).toHaveText("You are in. You have a chair.");
+  await expect(page.getByTestId("joined-note")).toHaveText("You are in. You have a place.");
 
   await page.goto("/club/my-classes");
   const row = upcomingRows(page).filter({ hasText: "Stretch & Mobility" });
   await expect(row).toContainText("Friday, Oct 30, 12:00 to 12:30 pm");
-  await expect(row.getByTestId("class-status")).toHaveText("You have a chair");
+  await expect(row.getByTestId("class-status")).toHaveText("You have a place");
 
   // Anyone else sees one fewer chair, and not the name.
   await actAs(page, "Walter Pemberton");
   await page.goto("/club/classes?day=2026-10-30");
-  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("9 chairs left");
+  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("9 places left");
   await page.goto(await card(page, "Stretch & Mobility").getByRole("link", { name: "Stretch & Mobility" }).getAttribute("href").then((h) => h!));
   await expect(page.locator("body")).not.toContainText("Castellanos");
 
@@ -61,7 +61,7 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
   await expect(page.getByTestId("left-note")).toContainText("Your place is free for others.");
   await expect(page.getByTestId("no-upcoming-classes")).toBeVisible();
   await page.goto("/club/classes?day=2026-10-30");
-  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("10 chairs left");
+  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("10 places left");
 });
 
 test("a full class: join the waiting list, and when someone leaves the first in line gets the chair at once", async ({ page, browser }) => {
@@ -96,7 +96,7 @@ test("a full class: join the waiting list, and when someone leaves the first in 
   const lars = await as("Lars Eriksen");
   await open(lars);
   await lars.getByRole("button", { name: "Sign up", exact: true }).click();
-  await expect(lars.getByTestId("joined-note")).toHaveText("You are in. You have a chair.");
+  await expect(lars.getByTestId("joined-note")).toHaveText("You are in. You have a place.");
 
   const britta = await as("Britta Eriksen");
   await open(britta);
@@ -117,7 +117,7 @@ test("a full class: join the waiting list, and when someone leaves the first in 
   await upcomingRows(lars).filter({ hasText: name }).getByRole("button", { name: /^Leave / }).click();
   await expect(lars.getByTestId("left-note")).toBeVisible();
   await britta.goto("/club/my-classes");
-  await expect(upcomingRows(britta).filter({ hasText: name }).getByTestId("class-status")).toHaveText("You have a chair");
+  await expect(upcomingRows(britta).filter({ hasText: name }).getByTestId("class-status")).toHaveText("You have a place");
   await expect(upcomingRows(britta).filter({ hasText: name })).toContainText("moved up from the waiting list");
   await declan.goto("/club/my-classes");
   await expect(upcomingRows(declan).filter({ hasText: name })).toContainText("1st in line");

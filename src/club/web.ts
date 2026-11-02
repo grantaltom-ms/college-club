@@ -1,4 +1,4 @@
-import { pacificMinutes } from "./time";
+import { formatDayLong, pacificMinutes } from "./time";
 import { BOOKING_TYPES, type BookingType, type RuleValues } from "./types";
 
 /** Helpers for reading the address and form fields of the member pages. Anything unexpected falls back to a safe default. */
@@ -6,10 +6,22 @@ import { BOOKING_TYPES, type BookingType, type RuleValues } from "./types";
 type Param = string | string[] | undefined;
 const first = (p: Param) => (Array.isArray(p) ? p[0] : p);
 
-/** A day from the address, if it is one of the days on offer. */
-export function dayParam(value: Param, allowed: string[], fallback: string): string {
-  const v = first(value);
-  return v && allowed.includes(v) ? v : fallback;
+/**
+ * The day to show, plus a sentence when the address asked for a day that is not on offer (too far ahead, or already gone),
+ * so the page never quietly shows a different day than the one that was asked for.
+ */
+export function pickDay(value: Param, allowed: string[]): { day: string; note: string | null } {
+  const asked = dateParam(value);
+  if (asked && allowed.includes(asked)) return { day: asked, note: null };
+  if (!asked) return { day: allowed[0], note: null };
+  const beyond = asked > allowed[allowed.length - 1];
+  const day = beyond ? allowed[allowed.length - 1] : allowed[0];
+  return {
+    day,
+    note: beyond
+      ? `${formatDayLong(asked)} is further ahead than you can book yet. Showing ${formatDayLong(day)}, the last day open.`
+      : `${formatDayLong(asked)} has already passed. Showing ${formatDayLong(day)}.`,
+  };
 }
 
 export function typeParam(value: Param): BookingType | null {
@@ -112,7 +124,7 @@ export const HOUSEHOLD_CHANGES: Record<string, string> = {
   removed: "Adult removed from the household. Their future bookings, class places and event RSVPs were cancelled.",
   type: "Membership type changed.",
   granted: "Qualification granted.",
-  ended: "Membership ended. Every adult in the household can no longer book, and their future bookings, class places and event RSVPs were cancelled.",
+  ended: "Membership ended. The adults in this household can no longer book, and their future bookings, class places and event RSVPs were cancelled.",
 };
 
 /** Plain-language messages for the few things a form post can come back with. Never echoes anything from the address. */

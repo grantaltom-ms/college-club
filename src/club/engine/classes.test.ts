@@ -86,7 +86,7 @@ describe.each(STORE_KINDS)("classes on the %s store", (kind) => {
       const { f } = await classClub(kind);
       await expect(createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "yoga", defaultCapacity: 3, defaultMinutes: 60 })).rejects.toThrow('There is already a class called "yoga".');
       await expect(createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "Row", defaultCapacity: 3, defaultMinutes: 60, roomItemId: f.i.Heron })).rejects.toThrow("Heron is not a gym or room, so a class cannot use it.");
-      await expect(createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "Row", defaultCapacity: 0, defaultMinutes: 60 })).rejects.toThrow("Chairs must be a whole number from 1 to 200.");
+      await expect(createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "Row", defaultCapacity: 0, defaultMinutes: 60 })).rejects.toThrow("Places must be a whole number from 1 to 200.");
       await expect(createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "Row", defaultCapacity: 5, defaultMinutes: 5 })).rejects.toThrow("Length in minutes must be a whole number from 15 to 480.");
       await expect(createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "Row", defaultCapacity: 5, defaultMinutes: 60, rules: { waitlistMax: -1 } })).rejects.toBeInstanceOf(ClubError);
     });
@@ -365,7 +365,7 @@ describe.each(STORE_KINDS)("classes on the %s store", (kind) => {
       for (let d = 1; d <= 7; d++) days.push((await schedule(f, { classId: yoga.id, startsAt: at(d, 9) }))[0]);
       const held = [];
       for (const s of days.slice(0, 5)) held.push(await join(f, "Ada", s.id));
-      expect(await refusedWords(join(f, "Ada", days[5].id))).toEqual(["You already hold 5 class places (chairs and waiting-list spots), the most allowed at once. Leave one or wait until a class is done."]);
+      expect(await refusedWords(join(f, "Ada", days[5].id))).toEqual(["You already hold 5 class places (including waiting-list spots), the most allowed at once. Leave one or wait until a class is done."]);
       for (let round = 0; round < 6; round++) {
         // Leave the oldest place, take a different day, and the limit is exactly full again.
         await leave(f, "Ada", held.shift()!.signUp.id);
@@ -521,11 +521,11 @@ describe.each(STORE_KINDS)("classes on the %s store", (kind) => {
       const [s] = await schedule(f, { classId: yoga.id, startsAt: at(1, 9) });
       await join(f, "Ada", s.id);
       await join(f, "Ben", s.id);
-      await expect(setCapacity(f.store, CLASS_RULES, staffCtx(), s.id, 1)).rejects.toThrow("2 people already have chairs, so chairs cannot go below 2. Cancel some sign-ups first.");
-      await expect(setCapacity(f.store, CLASS_RULES, staffCtx(), s.id, 0)).rejects.toThrow("Chairs must be a whole number from 1 to 200.");
-      await expect(setCapacity(f.store, CLASS_RULES, staffCtx(at(1, 10, 5)), s.id, 5)).rejects.toThrow("That class is over, so its chairs cannot change.");
+      await expect(setCapacity(f.store, CLASS_RULES, staffCtx(), s.id, 1)).rejects.toThrow("2 people already have places, so places cannot go below 2. Cancel some sign-ups first.");
+      await expect(setCapacity(f.store, CLASS_RULES, staffCtx(), s.id, 0)).rejects.toThrow("Places must be a whole number from 1 to 200.");
+      await expect(setCapacity(f.store, CLASS_RULES, staffCtx(at(1, 10, 5)), s.id, 5)).rejects.toThrow("That class is over, so its places cannot change.");
       await cancelSession(f.store, staffCtx(), s.id, { reason: "Instructor is ill" });
-      await expect(setCapacity(f.store, CLASS_RULES, staffCtx(), s.id, 5)).rejects.toThrow("That class was cancelled, so its chairs cannot change.");
+      await expect(setCapacity(f.store, CLASS_RULES, staffCtx(), s.id, 5)).rejects.toThrow("That class was cancelled, so its places cannot change.");
     });
   });
 
@@ -538,7 +538,7 @@ describe.each(STORE_KINDS)("classes on the %s store", (kind) => {
       await expect(mark(f.store, staffCtx(at(1, 8)), "class", ada.signUp.id, "attended")).rejects.toThrow("opens at 8:30 am, 30 minutes before the start");
       await expect(mark(f.store, staffCtx(at(1, 8, 45)), "class", ada.signUp.id, "no_show")).rejects.toThrow("has not started yet, so it cannot be a no-show");
       await expect(mark(f.store, memberCtx(f.m.Ada, "Ada", at(1, 9, 30)), "class", ada.signUp.id, "attended")).rejects.toMatchObject({ code: "forbidden" });
-      await expect(mark(f.store, staffCtx(at(1, 9, 30)), "class", ben.signUp.id, "attended")).rejects.toThrow(/waiting list without a chair/);
+      await expect(mark(f.store, staffCtx(at(1, 9, 30)), "class", ben.signUp.id, "attended")).rejects.toThrow(/waiting list without a place/);
       expect(await mark(f.store, staffCtx(at(1, 9, 30)), "class", ada.signUp.id, "attended")).toMatchObject({ outcome: "attended", previous: null, via: "staff" });
       expect((await f.store.read()).signups.find((g) => g.id === ada.signUp.id)!.status).toBe("attended");
       // A mistake can be put right, and the correction is a new line, not an erased one.

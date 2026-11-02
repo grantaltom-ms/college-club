@@ -18,7 +18,7 @@ export interface OfficeWaiting {
   id: string;
   title: string;
   startsAt: string;
-  /** "4 of 4 chairs" or "40 of 40 spots". */
+  /** "4 of 4 places" or "40 of 40 spots". */
   fullness: string;
   waiting: number;
 }
@@ -63,7 +63,7 @@ export function officeSummary(state: ClubState, now: Date, rules: AttendanceRule
     const queue = lines.filter((g) => g.status === "waitlisted").length;
     if (queue === 0) continue;
     const taken = lines.filter((g) => g.status === "enrolled").length;
-    waiting.push({ kind: "class", id: session.id, title: state.classes.find((c) => c.id === session.classId)?.name ?? "A class", startsAt: session.startsAt, fullness: `${taken} of ${session.capacity} chairs`, waiting: queue });
+    waiting.push({ kind: "class", id: session.id, title: state.classes.find((c) => c.id === session.classId)?.name ?? "A class", startsAt: session.startsAt, fullness: `${taken} of ${session.capacity} places`, waiting: queue });
   }
   for (const event of state.events) {
     if (event.status !== "scheduled" || !withinWeek(event.startsAt)) continue;

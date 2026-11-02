@@ -111,7 +111,7 @@ function signUpTarget(s: ClubState, g: SignUp): Target | null {
     status: g.status,
     blocked:
       g.status === "waitlisted"
-        ? "That person is on the waiting list without a chair, so there is nothing to check in."
+        ? "That person is on the waiting list without a place, so there is nothing to check in."
         : g.status === "cancelled" || g.status === "late_cancelled"
           ? "That sign-up was cancelled, so there is nothing to check in."
           : session.status === "cancelled"
@@ -534,8 +534,8 @@ export function describeAttendanceRules(rules: AttendanceRules): string[] {
   return [
     opens > 0 ? `Check-in opens ${formatMinutes(opens)} before the start.` : "Check-in opens at the start.",
     grace > 0
-      ? `A boat or space booking, or a class chair, that nobody checked in for becomes a no-show ${formatMinutes(grace)} after it ends.`
-      : "A boat or space booking, or a class chair, that nobody checked in for becomes a no-show the moment it ends.",
+      ? `A boat or space booking, or a class place, that nobody checked in for becomes a no-show ${formatMinutes(grace)} after it ends.`
+      : "A boat or space booking, or a class place, that nobody checked in for becomes a no-show the moment it ends.",
     ...(rules.defaults.checkInNotNeededFor.length > 0 ? [`${listOf(rules.defaults.checkInNotNeededFor)} reservations do not need a check-in: they are never marked a no-show.`] : []),
     "Members can check themselves in on the front-desk iPad or on their own phone while check-in is open; the record shows which. Events are not checked in by members.",
     "Events are not marked automatically; staff mark who came.",

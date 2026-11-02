@@ -192,6 +192,17 @@
   outline-offset: 2px;
 }
 
+.club-button:disabled {
+  background: var(--oyster-50);
+  border-color: var(--oyster);
+  color: var(--slate);
+  cursor: not-allowed;
+}
+
+.club-button:disabled:hover {
+  background: var(--oyster-50);
+}
+
 .club-button-quiet {
   background: transparent;
   color: var(--waterloo);

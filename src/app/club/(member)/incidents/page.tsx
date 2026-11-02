@@ -30,7 +30,7 @@ export default async function IncidentsPage() {
     <section>
       <h1>Report an incident</h1>
       <p>
-        Use this when someone is hurt, a boat capsizes, or something nearly goes wrong. Club staff read every report. If anyone needs help right now, call first and fill this in afterwards.
+        Use this when someone is hurt, a boat capsizes, or something nearly goes wrong. Club staff read every report. If anyone needs help right now, call 911 first and fill this in afterwards.
         {actor.kind === "staff" && (
           <>
             {" "}

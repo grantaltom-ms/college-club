@@ -41,7 +41,7 @@ export async function seedSamplePractices(store: ClubStore, now: Date): Promise<
   await setCoach(store, staff, coach.id, true);
   const coachCtx = { actor: { kind: "member" as const, memberId: coach.id, label: fullName(coach) }, now };
   const { practice } = await createPractice(store, RULE_BOOK, PRACTICE_RULES, coachCtx, {
-    name: "Sunday technique session",
+    name: "Morning technique session",
     notes: "Drills first, then two pieces. Bring a water bottle.",
     startsAt: at(11, 7),
     endsAt: at(11, 9),

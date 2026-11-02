@@ -6,7 +6,7 @@ import type { ClubState } from "@/club/types";
 
 /**
  * The practice buttons, called directly with who is signed in, whether the member area is on, and the club's records replaced by
- * the invented sample (a coach, Kenji Tanaka, who runs "Sunday technique session" eleven days from today (Sunday Nov 8), 7 to 9 am, with
+ * the invented sample (a coach, Kenji Tanaka, who runs "Morning technique session" eleven days from today (Sunday Nov 8), 7 to 9 am, with
  * Albatross, Pelican and Kingfisher reserved, six people seated, and Sasha Bellweather's earlier booking on Kingfisher flagged).
  * Anybody signed in may press them; the engine decides who may change what, and answers in its own words.
  */
@@ -46,7 +46,7 @@ const signInAs = async (name: string) => {
   h.actor = { kind: "member", label: name, member: m, source: "login" };
 };
 const sampleItem = async (name: string) => (await state()).items.find((i) => i.name === name)!.id;
-const samplePractice = async () => (await state()).practices.find((p) => p.name === "Sunday technique session")!;
+const samplePractice = async () => (await state()).practices.find((p) => p.name === "Morning technique session")!;
 const records = async () => {
   const s = await state();
   return JSON.stringify([s.practices, s.practiceBoats, s.practiceSeats, s.members.filter((m) => m.isCoach), s.history]);
@@ -149,7 +149,7 @@ describe("setting a practice up", () => {
   it("says when a boat is already reserved by another practice", async () => {
     staff();
     const result = await setUpPractice(form({ name: "Clash", day: "2026-11-08", start: "07:00", end: "09:00", boat: await sampleItem("Albatross") }));
-    expect(result).toEqual({ kind: "error", message: "Albatross is already reserved for Sunday technique session from 7:00 to 9:00 am." });
+    expect(result).toEqual({ kind: "error", message: "Albatross is already reserved for Morning technique session from 7:00 to 9:00 am." });
   });
 });
 

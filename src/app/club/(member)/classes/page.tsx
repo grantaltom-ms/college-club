@@ -7,7 +7,7 @@ import { getCurrentActor } from "@/club/identity";
 import { CLASS_RULES } from "@/club/settings/class-rules";
 import { getClubStore } from "@/club/store/instance";
 import { addDays, formatDay, formatDayLong, formatRange, pacificDate, weekdayName } from "@/club/time";
-import { dayParam } from "@/club/web";
+import { pickDay } from "@/club/web";
 import { viewerOf } from "@/club/web-actor";
 import { ClassPlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
@@ -24,7 +24,7 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const today = pacificDate(now);
   const days = Array.from({ length: CLASS_RULES.defaults.signUpDaysAhead + 1 }, (_, n) => addDays(today, n));
-  const day = dayParam(params.day, days, days[0]);
+  const { day, note: dayNote } = pickDay(params.day, days);
   const viewer = viewerOf(actor);
   const sessions = state.sessions.filter((x) => pacificDate(new Date(x.startsAt)) === day).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const busyDays = new Set(state.sessions.filter((x) => x.status === "scheduled").map((x) => pacificDate(new Date(x.startsAt))));
@@ -33,6 +33,11 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
     <section>
       <h1>Fitness classes</h1>
       <ClassPlaceholderNote />
+      {dayNote && (
+        <p className="club-alert" role="status" data-testid="day-note">
+          {dayNote}
+        </p>
+      )}
       {actor.kind === "staff" && (
         <p>
           <Link href="/club/classes/manage">Set up classes and sessions</Link>

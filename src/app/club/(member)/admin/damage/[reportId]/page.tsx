@@ -73,7 +73,7 @@ export default async function DamageReportPage({ params }: { params: Promise<{ r
       {oos && (
         <p className="club-alert" role="note" data-testid="boat-out-of-service">
           {detail.itemName} is out of service: {oos.reason}
-          {oos.expectedReturn ? ` · expected back ${formatDay(oos.expectedReturn)}` : ""}. <Link href="/club/equipment">Equipment</Link>
+          {oos.expectedReturn ? ` · expected back ${formatDay(oos.expectedReturn)}` : ""}. <Link href={`/club/equipment?affected=${oos.id}`}>See who has it booked, to tell them</Link>
         </p>
       )}
       {detail.upcomingBookings > 0 && (

@@ -6,10 +6,10 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { clubNow } from "@/club/clock";
 import { RULE_BOOK, classOf } from "@/club/settings/rulebook";
-import { getClubStore } from "@/club/store/instance";
+import { readClubOnce } from "@/club/store/read-once";
 import { formatClock, formatDay, formatDayLong, formatRange, pacificDate, weekdayName } from "@/club/time";
 import { BOOKING_TYPES } from "@/club/types";
-import { bookingFormHref, dayParam, typeParam } from "@/club/web";
+import { bookingFormHref, pickDay, typeParam } from "@/club/web";
 import { blockedReason, viewerOf } from "@/club/web-actor";
 import { PlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
@@ -33,10 +33,10 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   if (!actor) return <SignedOut />;
 
   const now = clubNow();
-  const state = await (await getClubStore()).read();
+  const state = await readClubOnce();
   const params = await searchParams;
   const days = pickableDays(state, RULE_BOOK, now);
-  const day = dayParam(params.day, days, days[0]);
+  const { day, note: dayNote } = pickDay(params.day, days);
   const viewer = viewerOf(actor);
   const present = new Set(state.items.filter((i) => itemVisibleTo(state, i, viewer)).map((i) => classOf(RULE_BOOK, i).type));
   const types = BOOKING_TYPES.filter((t) => present.has(t));
@@ -59,6 +59,12 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
       {actor.kind === "member" && state.boatAccess.some((a) => a.memberId === actor.member.id && a.endedAt === null) && (
         <p className="club-meta" data-testid="my-boats-link">
           You can use private boats. <Link href="/club/my-boats">My boats</Link>
+        </p>
+      )}
+
+      {dayNote && (
+        <p className="club-alert" role="status" data-testid="day-note">
+          {dayNote}
         </p>
       )}
 

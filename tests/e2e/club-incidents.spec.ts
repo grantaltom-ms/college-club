@@ -287,6 +287,7 @@ test.describe("who can open what", () => {
     await page.goto("/club");
     await expect(page.getByRole("navigation", { name: "Member area" }).getByRole("link", { name: "Report an incident" })).toBeVisible();
     expect((await page.goto("/club/incidents"))?.status()).toBe(200);
+    await expect(page.getByRole("main")).toContainText("call 911 first and fill this in afterwards");
     expect((await page.goto("/club/admin/incidents"))?.status()).toBe(404);
     expect((await page.goto("/club/admin/incidents/00000000-0000-4000-8000-0000000000ff"))?.status()).toBe(404);
     await actAs(page, "Test staff");

@@ -185,7 +185,7 @@ describe.each(STORE_KINDS)("members checking themselves in on the %s store", (ki
       const chair = (await signUp(f.store, f.book, CLASS_RULES, memberCtx(f.m.Ada, "Ada"), { sessionId: session.id, memberId: f.m.Ada })).signUp;
       const waiting = (await signUp(f.store, f.book, CLASS_RULES, memberCtx(f.m.Ben, "Ben"), { sessionId: session.id, memberId: f.m.Ben })).signUp;
       expect((await refusal(tap(f, "Ada", chair.id, at(0, 14, 29), "ipad", ATTENDANCE_RULES, "class"))).at(0)).toBe("not_open");
-      expect(await refusal(tap(f, "Ben", waiting.id, at(0, 15), "phone", ATTENDANCE_RULES, "class"))).toEqual(["conflict", "That person is on the waiting list without a chair, so there is nothing to check in."]);
+      expect(await refusal(tap(f, "Ben", waiting.id, at(0, 15), "phone", ATTENDANCE_RULES, "class"))).toEqual(["conflict", "That person is on the waiting list without a place, so there is nothing to check in."]);
       expect(await refusal(tap(f, "Cy", chair.id, at(0, 15), "phone", ATTENDANCE_RULES, "class"))).toEqual(["forbidden", "That is not your reservation."]);
       const line = await tap(f, "Ada", chair.id, at(0, 14, 30), "ipad", ATTENDANCE_RULES, "class");
       expect(line).toMatchObject({ kind: "class", recordId: chair.id, memberId: f.m.Ada, via: "ipad", outcome: "attended", previous: null });

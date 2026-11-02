@@ -95,7 +95,7 @@ test.describe("on a member's own phone", () => {
     await actAs(page, "Camille Moreau");
     await page.goto("/club/my-classes");
     const row = classRow(page, "Lunchtime Mobility");
-    await expect(row.getByTestId("class-status")).toHaveText("You have a chair");
+    await expect(row.getByTestId("class-status")).toHaveText("You have a place");
     await row.getByRole("button", { name: "Check in for Lunchtime Mobility" }).click();
     await expect(page.getByTestId("checkedin-note")).toContainText("You are checked in for Lunchtime Mobility");
     await expect(classRow(page, "Lunchtime Mobility").getByTestId("class-status")).toHaveText("Checked in");

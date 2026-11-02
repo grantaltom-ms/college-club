@@ -42,7 +42,7 @@ export function DeparturePreviewView({ preview, limit }: { preview: DeparturePre
       <Group title="Seats on other people's boats given up (those bookings stay)" lines={preview.crewSeats} testId="preview-crew" limit={limit} />
       <Group title="Class places cancelled" lines={preview.signUps} testId="preview-classes" limit={limit} />
       <Group title="Event RSVPs cancelled" lines={preview.rsvps} testId="preview-events" limit={limit} />
-      <p className="club-meta">Waiting lists move up behind anyone who gives up a chair or spots. Nothing in the past is touched.</p>
+      <p className="club-meta">Waiting lists move up behind anyone who gives up a place or spots. Nothing in the past is touched.</p>
     </div>
   );
 }

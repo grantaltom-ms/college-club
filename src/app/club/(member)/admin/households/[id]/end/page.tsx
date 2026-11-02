@@ -47,7 +47,7 @@ export default async function EndMembership({ params, searchParams }: { params: 
         </p>
       )}
       <p>
-        Ending a membership is final. Today is its last day. {adults.length === 1 ? "The adult in it" : `All ${adults.length} adults in it`} can no longer book:{" "}
+        Ending a membership is final. Today is its last day. {adults.length === 1 ? "The adult in this household" : `All ${adults.length} adults in this household`} will no longer be able to book:{" "}
         {adults.map((a) => fullName(a)).join(", ")}. A household that comes back later is added as a new household.
       </p>
       <DeparturePreviewView preview={preview} />
