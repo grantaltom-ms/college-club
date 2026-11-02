@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { ClubError } from "../errors";
+import { ATTENDANCE_RULES } from "../settings/attendance-rules";
 import { CLASS_RULES } from "../settings/class-rules";
 import { PRACTICE_RULES } from "../settings/practice-rules";
 import type { Item } from "../types";
 import { dayView } from "./availability";
 import { addBoatOwner, itemVisibleTo, lockedBoats, privateBoats } from "./boat-access";
 import { cancelBooking, createBooking, takeOutOfService } from "./bookings";
-import { createClass, scheduleSessions } from "./classes";
+import { cancelSession, createClass, scheduleSessions } from "./classes";
+import { officeSummary } from "./office";
 import {
   ItemEditRefused,
   MAX_ITEM_NAME,
@@ -15,14 +17,15 @@ import {
   itemPage,
   planItemEdit,
   restoreItem,
+  retireEffects,
   retireItem,
   skillWords,
   updateItem,
   type ItemEdit,
 } from "./equipment-edit";
-import { cancelPractice, createPractice, reservableBoats, seatMember } from "./practices";
+import { cancelPractice, createPractice, removePracticeBoat, reservableBoats, seatMember } from "./practices";
 import { placesOf } from "./pools";
-import { NOW, STORE_KINDS, at, bookAs, fixtureFor, memberCtx, refusedFor, request, staffCtx, type Fixture } from "./testkit";
+import { NOW, STORE_KINDS, at, bookAs, buildFixtureSettling, fixtureFor, memberCtx, refusedFor, request, staffCtx, type Fixture } from "./testkit";
 
 const state = (f: Fixture) => f.store.read();
 const edit = (f: Fixture, item: string, change: ItemEdit, ctx = staffCtx()) => updateItem(f.store, f.book, ctx, f.i[item], change);
@@ -215,6 +218,25 @@ for (const kind of STORE_KINDS) {
         expect((await itemOf(f, "Albatross II")).classCode).toBe("shell-double");
       });
 
+      it("lets a smaller boat go ahead when everyone in a lineup sits in a seat it still has", async () => {
+        const f = await fixture();
+        const { practice } = await createPractice(f.store, f.book, PRACTICE_RULES, staffCtx(), { name: "Morning session", startsAt: at(2, 7), endsAt: at(2, 9), itemIds: [f.i.Albatross] });
+        await seatMember(f.store, f.book, staffCtx(), { practiceId: practice.id, itemId: f.i.Albatross, seat: 2, side: null, memberId: f.m.Ben });
+        // A double has seats 1 and 2, so seat 2 is still there; it is seat 3 and 4 that would be lost.
+        await edit(f, "Albatross", { seats: 2 });
+        expect((await itemOf(f, "Albatross")).classCode).toBe("shell-double");
+      });
+
+      it("does not mind a lineup whose practice is over, even in a seat the smaller boat lacks", async () => {
+        const f = await fixture();
+        const { practice } = await createPractice(f.store, f.book, PRACTICE_RULES, staffCtx(), { name: "Morning session", startsAt: at(2, 7), endsAt: at(2, 9), itemIds: [f.i.Albatross] });
+        await seatMember(f.store, f.book, staffCtx(), { practiceId: practice.id, itemId: f.i.Albatross, seat: 3, side: null, memberId: f.m.Ben });
+        // The same change refused before the practice (above) goes through once its time has run out.
+        expect(await problemsOf(edit(f, "Albatross", { seats: 2 }))).toHaveLength(1);
+        await edit(f, "Albatross", { seats: 2 }, staffCtx(at(2, 12)));
+        expect((await itemOf(f, "Albatross")).classCode).toBe("shell-double");
+      });
+
       it("does not mind a past booking with a crowd in it", async () => {
         const f = await fixture();
         await bookAs(f, "Ada", "Loon", at(1, 7), at(1, 8), ["Ben"]);
@@ -332,6 +354,18 @@ for (const kind of STORE_KINDS) {
         await updateItem(f.store, f.book, staffCtx(), pool, { places: 2 });
         expect(placesOf(await itemOf(f, "Dock berths"))).toBe(2);
       });
+
+      it("does not count a booking that is already over, however busy that moment was", async () => {
+        const clock = { now: NOW };
+        const f = await buildFixtureSettling(kind, () => clock.now);
+        const pool = await addPool(f, "Dock berths", 4);
+        for (const who of ["Ada", "Ben", "Dee", "Eli"]) await holdPlace(f, pool, who, 8);
+        expect(await problemsOf(updateItem(f.store, f.book, staffCtx(), pool, { places: 2 }))).toHaveLength(1);
+        // Two days later those four bookings are long over, so the pool can go down to two places.
+        clock.now = at(3, 12);
+        await updateItem(f.store, f.book, staffCtx(clock.now), pool, { places: 2 });
+        expect(placesOf(await itemOf(f, "Dock berths"))).toBe(2);
+      });
     });
 
     describe("everything at once", () => {
@@ -446,6 +480,33 @@ for (const kind of STORE_KINDS) {
         const { effects } = await retireItem(f.store, staffCtx(), f.i.Loon, { reason: "Sold" });
         expect(effects).toEqual({ bookings: [], sessions: [], practices: [] });
       });
+
+      it("does not count a class that was cancelled, a class or practice whose time has run out, or a boat taken off a practice", async () => {
+        const f = await fixture();
+        await f.store.transaction(async (s, newId) => {
+          s.items.push({ id: newId(), name: "Boathouse gym", classCode: "gym-space", ruleOverrides: {} });
+        });
+        const gym = (await itemOf(f, "Boathouse gym")).id;
+        const yoga = await createClass(f.store, f.book, CLASS_RULES, staffCtx(), { name: "Yoga", defaultCapacity: 3, defaultMinutes: 60, roomItemId: gym });
+        const [cancelled, second] = await scheduleSessions(f.store, f.book, staffCtx(), { classId: yoga.id, startsAt: at(2, 8), weeks: 2 });
+        await cancelSession(f.store, staffCtx(), cancelled.id, { reason: "Teacher is away" });
+        // A practice that will be over by the time of the retirement, and one whose boat was taken off before it.
+        const over = await createPractice(f.store, f.book, PRACTICE_RULES, staffCtx(), { name: "Early session", startsAt: at(2, 5), endsAt: at(2, 6), itemIds: [f.i.Pelican] });
+        const dropped = await createPractice(f.store, f.book, PRACTICE_RULES, staffCtx(), { name: "Late session", startsAt: at(2, 18), endsAt: at(2, 19), itemIds: [f.i.Pelican] });
+        await removePracticeBoat(f.store, staffCtx(), dropped.practice.id, f.i.Pelican);
+
+        // Before anything runs out: the class that is still on and the early practice are the only things left in place.
+        const first = retireEffects(await state(f), NOW, gym);
+        expect(first.sessions.map((x) => x.id)).toEqual([second.id]);
+        expect(retireEffects(await state(f), NOW, f.i.Pelican).practices.map((x) => x.id)).toEqual([over.practice.id]);
+
+        // A week later the second class is over too, and so is the early practice.
+        const later = at(20, 12);
+        expect(retireEffects(await state(f), later, gym).sessions).toEqual([]);
+        expect(retireEffects(await state(f), later, f.i.Pelican).practices).toEqual([]);
+        const done = await retireItem(f.store, staffCtx(later), gym, { reason: "Gym closed" });
+        expect(done.effects.sessions).toEqual([]);
+      });
     });
 
     describe("while it is retired", () => {
@@ -471,6 +532,15 @@ for (const kind of STORE_KINDS) {
         expect(itemVisibleTo(s, osprey, { kind: "member", memberId: f.m.Ada })).toBe(false);
         expect(reservableBoats(s, f.book).map((b) => b.name)).not.toContain("Osprey");
         expect(reservableBoats(s, f.book).map((b) => b.name)).toContain("Heron");
+      });
+
+      it("is left off the staff board's out-of-service list, even when it was out of service when it was retired", async () => {
+        const f = await fixture();
+        await takeOutOfService(f.store, staffCtx(), f.i.Osprey, { reason: "Oar damage" });
+        const board = async () => officeSummary(await state(f), NOW, ATTENDANCE_RULES).outOfService.map((x) => x.name);
+        expect(await board()).toEqual(["Osprey"]);
+        await retireItem(f.store, staffCtx(), f.i.Osprey, { reason: "Sold" });
+        expect(await board()).toEqual([]);
       });
 
       it("is left off the private boats lists and the locked boats to-do", async () => {
@@ -517,6 +587,16 @@ for (const kind of STORE_KINDS) {
         await restoreItem(f.store, staffCtx(), f.i.Loon);
         await edit(f, "Loon", { seats: 1 });
         expect((await itemOf(f, "Loon (sold)")).classCode).toBe("shell-single");
+      });
+
+      it("keeps a retired pool's number of places as it was", async () => {
+        const f = await fixture();
+        const pool = await addPool(f, "Dock berths", 4);
+        await retireItem(f.store, staffCtx(), pool, { reason: "Dock removed" });
+        expect(await problemsOf(updateItem(f.store, f.book, staffCtx(), pool, { places: 6 }))).toEqual([
+          "Dock berths has been retired, so only its name can be changed. Bring it back to change anything else.",
+        ]);
+        expect(placesOf(await itemOf(f, "Dock berths"))).toBe(4);
       });
 
       it("frees nothing in the name: a new item cannot take a retired item's name", async () => {
@@ -613,6 +693,15 @@ for (const kind of STORE_KINDS) {
       const live = itemPage(await state(f), f.book, NOW, f.i.Pelican);
       expect(live.file).toEqual([]);
       expect(live.line.status).toBe("in_service");
+    });
+
+    it("counts only the bookings that still reach an item, never a cancelled one", async () => {
+      const f = await fixture();
+      const { booking } = await bookAs(f, "Ada", "Loon", at(1, 7), at(1, 8));
+      await bookAs(f, "Ada", "Loon", at(2, 7), at(2, 8));
+      expect(equipmentList(await state(f), f.book, NOW).active.find((l) => l.name === "Loon")?.upcoming).toBe(2);
+      await cancelBooking(f.store, f.book, staffCtx(), booking.id);
+      expect(equipmentList(await state(f), f.book, NOW).active.find((l) => l.name === "Loon")?.upcoming).toBe(1);
     });
 
     it("shows what retiring an item in use would leave in place", async () => {

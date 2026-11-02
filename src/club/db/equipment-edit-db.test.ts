@@ -123,6 +123,8 @@ describe.skipIf(!ADMIN_URL)("equipment edit", () => {
       for (const reason of ["   ", "", "x".repeat(201)]) {
         const failure = await attempt(`update club.items set retired_at = now(), retired_by_label = 'Test staff', retired_reason = $2 where id = $1`, [id, reason]);
         expect(failure?.code).toBe(CHECK_VIOLATION);
+        // The reason's own rule refused it, not one of the other rules that also guard a retirement.
+        expect(failure?.message).toMatch(/items_retired_reason_check/);
       }
       expect(await change([retire(id), retiredLine(id)])).toBeNull();
       expect((await row(id)).retired_reason).toBe("Sold");
