@@ -140,6 +140,24 @@ for (const [name, base] of Object.entries(HIDDEN)) {
       }
     });
 
+    test("an address written with escapes is 'not found' too, in the same way as an address that is not there, never a server error", async () => {
+      const unknown = await fetch(`${base}/this-address-is-not-there`, { redirect: "manual" });
+      expect(unknown.status).toBe(404);
+      const leaks = /Test member view|Abernathy|Staff office|Try the club system|Open the demo|Demo password|Request a tour|Act as|Lindqvist/i;
+      const spellings = ["/%63lub", "/%63lub/start", "/%63lub/admin", "/%2563lub/start", "/Club/start", "/CLUB", "/%73ite", "/%73ite/request-a-tour", "/SITE", "/%64emo", "/%64emo?next=/club/start", "/Demo", "/api/%63lub/act-as", "/api/%64emo/unlock", "//club/start", "/club//start", "/./club/start"];
+      for (const path of spellings) {
+        // The framework tidies doubled slashes and dot segments with its own redirect to the plain address, which is then not found.
+        const tidied = path.startsWith("//") || path.includes("//") || path.includes("/./");
+        const res = await fetch(`${base}${path}`, { redirect: tidied ? "follow" : "manual" });
+        expect(res.status, path).toBe(404);
+        if (!tidied) expect(res.headers.get("location"), path).toBeNull();
+        expect(res.headers.get("set-cookie"), path).toBeNull();
+        // The same kind of page as an unknown address gets, so the two cannot be told apart by their type.
+        expect(res.headers.get("content-type"), path).toBe(unknown.headers.get("content-type"));
+        expect(await res.text(), path).not.toMatch(leaks);
+      }
+    });
+
     test("with the demo password set, the member area still answers 'not found' and never sends anyone to a keypad", async () => {
       for (const path of ["/club", "/club/start", "/club/admin", "/site", "/site/request-a-tour", "/api/club/import/template"]) {
         const res = await fetch(`${base}${path}`, { redirect: "manual" });
