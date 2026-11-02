@@ -308,7 +308,7 @@ test.describe("on a phone", () => {
     const t = tag();
     const name = `Pw phone ${t} ${"WM".repeat(18)}`;
     await addItems(page, row(name, "Shell", "1"));
-    await openItem(page, name, t);
+    const path = await openItem(page, name, t);
     const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(wide).toBeLessThanOrEqual(0);
     for (const button of [page.getByRole("button", { name: "Save changes" }), page.getByRole("button", { name: /^Retire / })]) {
@@ -317,5 +317,16 @@ test.describe("on a phone", () => {
     }
     await page.goto(`/club/equipment?find=${t}`);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+
+    // The boat is a club boat, so a coach's set-up form offers it with a tick box: that page must wrap the name too.
+    await page.goto("/club/practices/new");
+    await expect(page.getByTestId("practice-boats").getByText(name)).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+
+    // Leave the shared server as it was: a boat with a name like that must not stay on other specs' pages.
+    await page.goto(path);
+    await page.getByTestId("retire-form").getByLabel("Why is it being retired?").fill("Test clean-up");
+    await page.getByRole("button", { name: /^Retire / }).click();
+    await expect(page.getByTestId("item-summary")).toHaveAttribute("data-status", "retired");
   });
 });

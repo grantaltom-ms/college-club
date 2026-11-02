@@ -369,6 +369,8 @@ a.slot-free:focus-visible {
   border-radius: 4px;
   margin: 12px 0;
   padding: 8px 12px;
+  /* A fieldset will not shrink below its widest word unless told it may. */
+  min-width: 0;
 }
 
 .club-check {
@@ -377,6 +379,8 @@ a.slot-free:focus-visible {
   gap: 8px;
   min-height: 44px;
   font-weight: 400 !important;
+  /* A tick box often sits beside a boat's or a person's name. One very long word must wrap, not push the page sideways. */
+  overflow-wrap: anywhere;
 }
 
 .club-check input {
