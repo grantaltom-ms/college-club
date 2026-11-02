@@ -1,0 +1,28 @@
+name: Keep the demo branch level with main
+
+# The demo (a test version of the reservation system, with invented people, behind a demo password) runs from the `demo` branch, so
+# it has one steady web address that always shows the latest merged code. Vercel makes a test version for every branch, and the
+# address of a branch's latest test version never changes: for this repository it is
+#   https://college-club-git-demo-grantaltom-ms-projects.vercel.app
+# This job copies main onto `demo` after every merge. Nothing is ever written to `demo` by hand; it is thrown away and remade each time.
+# (A push made with this job's own token does not start the CI workflow again, so the browser tests do not run twice.)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: demo-branch
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Point the demo branch at this commit of main
+        run: git push --force origin HEAD:refs/heads/demo

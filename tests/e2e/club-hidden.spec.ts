@@ -114,13 +114,40 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         "/club/outbox",
         "/club/start",
         "/club/start?from=dashboard",
+        // The demo keypad does not exist here either, even with the demo password set on these servers.
+        "/demo",
+        "/demo?next=/club/start",
+        "/demo?wrong=1",
+        "/demo?locked=1",
       ];
       for (const path of paths) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Mark as being fixed|Set up a practice|Seat someone|Boats and lineup|Sunday technique|Back to practices|Practices you are in|Mark as a coach|Take out of seat|Report an incident|Incident reports|Who was involved|A parent was told|Close the report|Save what we found|Water and weather|Honor snack bar|Every snack is|Add to my account|snack bar iPad|Fix its details|Retire it|Bring it back|Edit or retire|Find by name|CCS System|Test member view|Test staff view|Open member view|Open staff view|Open snack bar screen|Open check-in screen|try the system/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Mark as being fixed|Set up a practice|Seat someone|Boats and lineup|Sunday technique|Back to practices|Practices you are in|Mark as a coach|Take out of seat|Report an incident|Incident reports|Who was involved|A parent was told|Close the report|Save what we found|Water and weather|Honor snack bar|Every snack is|Add to my account|snack bar iPad|Fix its details|Retire it|Bring it back|Edit or retire|Find by name|CCS System|Test member view|Test staff view|Open member view|Open staff view|Open snack bar screen|Open check-in screen|try the system|Try the club system|Open the demo|Type the demo password|Lock the demo|Demo password|demo is locked/i);
       }
+    });
+
+    test("the demo keypad's handlers do nothing, set no cookie and do not point anywhere", async () => {
+      for (const path of ["/api/demo/unlock", "/api/demo/lock"]) {
+        const bodies: Record<string, string>[] = [{}, { password: "playwright-only-demo-0001", next: "/club/admin" }];
+        for (const fields of bodies) {
+          const res = await fetch(`${base}${path}`, { method: "POST", redirect: "manual", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(fields) });
+          expect(res.status, path).toBe(404);
+          expect(res.headers.get("set-cookie"), path).toBeNull();
+          expect(res.headers.get("location"), path).toBeNull();
+        }
+      }
+    });
+
+    test("with the demo password set, the member area still answers 'not found' and never sends anyone to a keypad", async () => {
+      for (const path of ["/club", "/club/start", "/club/admin", "/site", "/site/request-a-tour", "/api/club/import/template"]) {
+        const res = await fetch(`${base}${path}`, { redirect: "manual" });
+        expect(res.status, path).toBe(404);
+        expect(res.headers.get("location"), path).toBeNull();
+      }
+      const posted = await fetch(`${base}/api/club/act-as`, { method: "POST", redirect: "manual", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ actor: "staff" }) });
+      expect(posted.status).toBe(404);
     });
 
     test("the picker's request handler does nothing and sets no cookie", async () => {
