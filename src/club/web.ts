@@ -132,6 +132,7 @@ export const NOTICES: Record<string, string> = {
   already_recorded: "That is already checked in.",
   too_late: "The time for that has passed, so it counts as a no-show. Ask club staff to put it right.",
   visitors: "Those visitors could not be signed in. Check the number, or ask club staff for help.",
-  snacks: "Those snacks could not be added. Check the number, or ask club staff for help.",
+  snacks: "Those snacks could not be added. Please start again, or ask club staff for help.",
+  snacks_day: "That is the most snacks one person can add in a day, so these were not added. Please ask club staff.",
   limit: "The limit cannot go below the number of people already going. Cancel some RSVPs first, or choose a bigger number.",
 };

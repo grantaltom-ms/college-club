@@ -26,7 +26,7 @@ export function AutoReturn({ href, seconds, strict = false }: { href: string; se
     };
   }, [href, seconds, strict]);
   return (
-    <p className="club-meta" data-testid="auto-return">
+    <p className="club-meta ipad-meta" data-testid="auto-return">
       This screen goes back to the start after {seconds} seconds.
     </p>
   );

@@ -539,7 +539,8 @@ details summary {
 .ipad-search-label {
   display: block;
   margin: 8px 0 6px;
-  color: var(--slate);
+  font-size: 1.25rem;
+  color: var(--cyberspace);
 }
 
 .ipad-search {
@@ -618,13 +619,29 @@ details summary {
 .ipad-none {
   margin: 24px 0;
   font-size: 1.3rem;
-  color: var(--slate);
+  color: var(--cyberspace);
 }
 
+/* The quiet line at the foot of every iPad screen: dark enough and big enough to read across a counter. */
+.ipad-meta {
+  margin: 20px 0 8px;
+  font-size: 1.15rem;
+  color: var(--cyberspace);
+}
+
+/* "That is not me" and the other ways back are real buttons, not small links, so a finger can hit them. */
 .ipad-back {
-  display: inline-block;
-  padding: 14px 0;
-  font-size: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 28px;
+  font-size: 1.3rem;
+  color: var(--cyberspace);
+  text-decoration: none;
+  background: var(--card);
+  border: 2px solid var(--waterloo);
+  border-radius: 12px;
 }
 
 /* Sign-in: the test outbox shows plain-text emails, and Sign out sits in the menu like a link. */
@@ -802,7 +819,8 @@ details summary {
 /* The honor snack bar iPad: a big minus and plus, the count, and the total. */
 .snack-label {
   margin: 16px 0 8px;
-  color: var(--slate);
+  font-size: 1.25rem;
+  color: var(--cyberspace);
 }
 
 .snack-stepper {
