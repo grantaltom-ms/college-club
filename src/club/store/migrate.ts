@@ -80,6 +80,45 @@ export async function applyMigrations(pool: Pool, dir: string = MIGRATIONS_DIR):
   return applied;
 }
 
+/** Where a database address points: the host, port and database name, never the user name or the password. Safe for a log or an error. */
+export function describeTarget(url: string): string {
+  try {
+    const u = new URL(url);
+    const database = u.pathname.replace(/^\//, "");
+    return `${u.hostname}${u.port ? `:${u.port}` : ""}${database ? `/${database}` : ""}`;
+  } catch {
+    return "an address that could not be read";
+  }
+}
+
+/** Every reason an error gives, once each: its words, or its code when it has no words, and those of the errors inside an AggregateError. */
+function reasonsOf(e: unknown): string[] {
+  if (!(e instanceof Error)) return [String(e)];
+  const { code, errors } = e as Error & { code?: unknown; errors?: unknown };
+  const own = e.message.trim() || (typeof code === "string" ? code : "");
+  const inner = Array.isArray(errors) ? errors.flatMap(reasonsOf) : [];
+  return [...new Set([own, ...inner].filter((r) => r !== ""))];
+}
+
+/**
+ * The words for a set-up that could not finish: which database it was trying (host, port and name, no user and no password)
+ * and why. Node gives a bare AggregateError with no message when a host has several addresses and none answer, which leaves
+ * a server log saying nothing; this names the host and every reason instead. The password is scrubbed even if an error
+ * message happened to repeat it.
+ */
+export function explainSetupFailure(url: string, e: unknown): Error {
+  let words = reasonsOf(e).join("; ") || "no reason was given";
+  const secrets: string[] = [url];
+  try {
+    const u = new URL(url);
+    if (u.password) secrets.push(u.password, decodeURIComponent(u.password));
+  } catch {
+    /* an address that cannot be read has nothing more to scrub */
+  }
+  for (const s of secrets) if (s) words = words.split(s).join("[hidden]");
+  return new Error(`The club database at ${describeTarget(url)} could not be set up: ${words}`);
+}
+
 const g = globalThis as unknown as { __ccsMigrated?: Map<string, Promise<void>> };
 
 /**
@@ -103,6 +142,8 @@ export function ensureMigrated(url: string, env: Env = process.env): Promise<voi
       try {
         const applied = await applyMigrations(pool);
         if (applied.length > 0) console.log(`Club database set up: applied ${applied.length} migration file${applied.length === 1 ? "" : "s"}.`);
+      } catch (e) {
+        throw explainSetupFailure(url, e);
       } finally {
         await pool.end();
       }

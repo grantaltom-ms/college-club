@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Client, Pool } from "pg";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { createScratchDb } from "../db/testdb";
-import { applyMigrations, assertMayAutoMigrate, autoMigrateRequested, ensureMigrated, MIGRATIONS_DIR } from "./migrate";
+import { applyMigrations, assertMayAutoMigrate, autoMigrateRequested, describeTarget, ensureMigrated, explainSetupFailure, MIGRATIONS_DIR } from "./migrate";
 import { createClubPool } from "./postgres";
 
 /**
@@ -45,6 +45,61 @@ describe("when the database may set itself up", () => {
   it("refuses, before it connects to anything, on the live site and for a hosted Supabase address", async () => {
     await expect(ensureMigrated("postgresql://nobody@127.0.0.1:1/none", { ...PREVIEW, VERCEL_ENV: "production" })).rejects.toThrow("live production site");
     await expect(ensureMigrated("postgresql://postgres:x@db.hgjcnuwxhemynnvsnmou.supabase.co:5432/postgres", PREVIEW)).rejects.toThrow("hosted Supabase");
+  });
+});
+
+describe("saying which database could not be set up, and why, without the password", () => {
+  const url = "postgresql://club_owner:s3cret-pass@ep-example-123.us-east-1.aws.neon.tech/neondb?sslmode=require";
+
+  it("names the host, port and database, never the user or the password", () => {
+    expect(describeTarget(url)).toBe("ep-example-123.us-east-1.aws.neon.tech/neondb");
+    expect(describeTarget("postgresql://u:p@127.0.0.1:5432/club")).toBe("127.0.0.1:5432/club");
+    expect(describeTarget("postgresql://u:p@db.example.org")).toBe("db.example.org");
+    for (const t of [describeTarget(url), describeTarget("postgresql://u:p@127.0.0.1:5432/club")]) expect(t).not.toMatch(/club_owner|s3cret|:p@|u:/);
+    expect(describeTarget("not an address")).toBe("an address that could not be read");
+  });
+
+  it("turns Node's empty AggregateError into every address's reason, with the host named", () => {
+    const refused = Object.assign(new Error("connect ETIMEDOUT 216.150.16.1:5432"), { code: "ETIMEDOUT" });
+    const refusedToo = Object.assign(new Error("connect ETIMEDOUT 216.150.1.193:5432"), { code: "ETIMEDOUT" });
+    const bare = Object.assign(new AggregateError([refused, refusedToo], ""), { code: "ETIMEDOUT" });
+    expect(bare.message).toBe("");
+    expect(explainSetupFailure(url, bare).message).toBe(
+      "The club database at ep-example-123.us-east-1.aws.neon.tech/neondb could not be set up: ETIMEDOUT; connect ETIMEDOUT 216.150.16.1:5432; connect ETIMEDOUT 216.150.1.193:5432",
+    );
+  });
+
+  it("gives an ordinary error's words, or says plainly that none were given", () => {
+    expect(explainSetupFailure(url, new Error('database "club" does not exist')).message).toBe(
+      'The club database at ep-example-123.us-east-1.aws.neon.tech/neondb could not be set up: database "club" does not exist',
+    );
+    expect(explainSetupFailure(url, new Error("")).message).toMatch(/: no reason was given$/);
+    expect(explainSetupFailure(url, "something odd").message).toMatch(/: something odd$/);
+  });
+
+  it("scrubs the password and the whole address even if an error repeats them, in either spelling", () => {
+    const leaky = new Error(`could not connect with ${url}, password s3cret-pass`);
+    expect(explainSetupFailure(url, leaky).message).not.toContain("s3cret-pass");
+    expect(explainSetupFailure(url, leaky).message).not.toContain("club_owner:");
+    expect(explainSetupFailure(url, leaky).message).toContain("[hidden]");
+    const encoded = "postgresql://owner:p%40ss%2Fword@db.example.org/club";
+    const inner = new Error("bad login p@ss/word and p%40ss%2Fword");
+    const said = explainSetupFailure(encoded, inner).message;
+    expect(said).not.toContain("p@ss/word");
+    expect(said).not.toContain("p%40ss%2Fword");
+  });
+
+  it("makes a failed set-up say where it was trying, so a server log is enough to diagnose it", async () => {
+    // Nothing listens on port 1, so the connection is refused at once; the password in the address must not come back.
+    const unreachable = "postgresql://nobody:topsecret99@127.0.0.1:1/none";
+    const said = await ensureMigrated(unreachable, PREVIEW).then(
+      () => "",
+      (e: Error) => e.message,
+    );
+    expect(said).toContain("The club database at 127.0.0.1:1/none could not be set up");
+    expect(said).toMatch(/ECONNREFUSED/);
+    expect(said).not.toContain("topsecret99");
+    expect(said).not.toContain("nobody");
   });
 });
 
