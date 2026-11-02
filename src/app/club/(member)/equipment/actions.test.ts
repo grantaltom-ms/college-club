@@ -109,6 +109,9 @@ describe("fixing an item", () => {
     expect(await changeItem(form({ item: heron.id, seats: "1.5" }))).toEqual({ kind: "error", message: "Seats must be a whole number." });
     expect(await changeItem(form({ item: berths.id, places: "six" }))).toEqual({ kind: "error", message: "Places must be a whole number." });
     expect(await changeItem(form({ item: berths.id, places: "-3" }))).toEqual({ kind: "error", message: "Places must be a whole number." });
+    // Scientific notation is a number to JavaScript but not a number a person types into a whole-number box.
+    expect(await changeItem(form({ item: heron.id, seats: "1e0" }))).toEqual({ kind: "error", message: "Seats must be a whole number." });
+    expect(await changeItem(form({ item: berths.id, places: "6e0" }))).toEqual({ kind: "error", message: "Places must be a whole number." });
     expect((await state()).itemLog).toHaveLength(1); // only the sample's own retirement line
   });
 
