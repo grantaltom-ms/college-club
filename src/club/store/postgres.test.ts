@@ -4,6 +4,7 @@ import { SignUpRefused, createClass, leaveClass, scheduleSessions, signUp } from
 import { recordCharge, runBilling } from "../engine/billing";
 import { linesComplete } from "../engine/billing-views";
 import { assignDamageReport, fileDamageReport, markDamageRepaired } from "../engine/damage";
+import { restoreItem, retireItem, updateItem } from "../engine/equipment-edit";
 import { closeIncident, fileIncident, reviewIncident } from "../engine/incidents";
 import { RsvpRefused, cancelRsvp, createEvent, placesTaken, rsvp } from "../engine/events";
 import { PracticeRefused, addPracticeBoat, cancelPractice, clearSeat, createPractice, removePracticeBoat, seatMember, setCoach } from "../engine/practices";
@@ -473,6 +474,46 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       await expect(f.store.transaction(async (s) => void s.damageReports.splice(0, 1))).rejects.toThrow("never deletes damage reports");
       await expect(f.store.transaction(async (s) => void (s.damageLog[0].text = "Rewritten."))).rejects.toThrow("can only be added to");
       expect((await f.store.read()).damageLog[0].text).toBe("Reported by Ada Quill as major damage.");
+    });
+
+    it("keeps an item's name, size, skill level, places and retirement, and every line of its file, through a round trip, and never deletes or rewrites them", async () => {
+      const f = await fixture();
+      await f.store.transaction(async (s, newId) => {
+        s.items.push({ id: newId(), name: "Dock berths", classCode: "dock-space", ruleOverrides: {}, places: 6 });
+      });
+      const pool = (await f.store.read()).items.find((i) => i.name === "Dock berths")!;
+      await updateItem(f.store, f.book, staffCtx(), pool.id, { name: "Dock berths A", places: 9 });
+      await updateItem(f.store, f.book, staffCtx(), f.i.Heron, { name: "Heron II", seats: 2, skill: { mode: "none" } });
+      await updateItem(f.store, f.book, staffCtx(), f.i.Osprey, { skill: { mode: "code", code: "scull-3" } });
+      const sam = { actor: { kind: "staff" as const, label: "Sam Staffer" }, now: new Date(NOW.getTime() + 60000) };
+      await retireItem(f.store, sam, f.i.Kingfisher, { reason: "Sold to a club in Tacoma" });
+      await retireItem(f.store, staffCtx(), f.i.Loon, { reason: "Cracked beyond repair" });
+      await restoreItem(f.store, staffCtx(), f.i.Loon);
+
+      const read = await f.store.read();
+      const by = (name: string) => read.items.find((i) => i.name === name)!;
+      expect(by("Dock berths A")).toMatchObject({ classCode: "dock-space", places: 9 });
+      expect(by("Heron II")).toMatchObject({ classCode: "shell-double", requiredQualification: null });
+      expect(by("Osprey").requiredQualification).toBe("scull-3");
+      expect(by("Kingfisher").retired).toEqual({ at: sam.now.toISOString(), by: { kind: "staff", label: "Sam Staffer" }, reason: "Sold to a club in Tacoma" });
+      // Brought back: no trace of the retirement on the item itself, only in its file.
+      expect("retired" in by("Loon")).toBe(false);
+      expect("requiredQualification" in by("Pelican")).toBe(false);
+      expect(read.itemLog.map((l) => [read.items.find((i) => i.id === l.itemId)!.name, l.kind, l.by.kind, l.by.label])).toEqual([
+        ["Dock berths A", "changed", "staff", "Test staff"],
+        ["Heron II", "changed", "staff", "Test staff"],
+        ["Osprey", "changed", "staff", "Test staff"],
+        ["Kingfisher", "retired", "staff", "Sam Staffer"],
+        ["Loon", "retired", "staff", "Test staff"],
+        ["Loon", "restored", "staff", "Test staff"],
+      ]);
+      expect(read.itemLog[0]).toMatchObject({ text: 'Changed by Test staff: name from "Dock berths" to "Dock berths A"; places from 6 to 9.', details: { nameFrom: "Dock berths", nameTo: "Dock berths A", placesFrom: 6, placesTo: 9 } });
+      expect(read.itemLog[3]).toMatchObject({ at: sam.now.toISOString(), details: { reason: "Sold to a club in Tacoma" } });
+
+      await expect(f.store.transaction(async (s) => void s.itemLog.splice(0, 1))).rejects.toThrow("never deletes item file lines");
+      await expect(f.store.transaction(async (s) => void (s.itemLog[0].text = "Rewritten."))).rejects.toThrow("can only be added to");
+      await expect(f.store.transaction(async (s) => void s.items.splice(0, 1))).rejects.toThrow("never deletes items");
+      expect((await f.store.read()).itemLog[0].text).toMatch(/^Changed by Test staff: name from "Dock berths"/);
     });
 
     it("keeps every field of an incident report, its people, its boats and its log through a round trip, and never deletes or rewrites them", async () => {

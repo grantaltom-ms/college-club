@@ -2,7 +2,7 @@ import { addDays, pacificDate } from "../time";
 import type { AttendanceRules, ClubState } from "../types";
 import { needsALook, type AttendanceRow } from "./attendance";
 import { holdExpired, placesTaken } from "./events";
-import { lockedBoats } from "./boat-access";
+import { isRetired, lockedBoats } from "./boat-access";
 import { outOfServiceAt } from "./bookings";
 import { officeDamage, type OfficeDamage } from "./damage";
 import { officeIncidents, type OfficeIncidents } from "./incidents";
@@ -51,6 +51,7 @@ export function officeSummary(state: ClubState, now: Date, rules: AttendanceRule
   };
 
   const outOfService = state.items
+    .filter((item) => !isRetired(item))
     .map((item) => ({ item, period: outOfServiceAt(state, item.id, now) }))
     .filter((x): x is { item: (typeof state.items)[number]; period: NonNullable<ReturnType<typeof outOfServiceAt>> } => x.period !== undefined)
     .map(({ item, period }) => ({ itemId: item.id, name: item.name, reason: period.reason, expectedReturn: period.expectedReturn, since: period.from }))

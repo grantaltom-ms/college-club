@@ -18,6 +18,8 @@ interface SampleItem {
   private?: { owners: string[]; invited: string[] };
   /** A pool: how many people can hold it at once. Counted, not numbered. Leave it out for a single item. */
   places?: number;
+  /** Retired from the start, with this reason: nobody sees it but staff, on the Equipment page's retired list. */
+  retired?: string;
 }
 
 export const SAMPLE_ITEMS: SampleItem[] = [
@@ -51,6 +53,8 @@ export const SAMPLE_ITEMS: SampleItem[] = [
   { name: "Kestrel", classCode: "shell-single", private: { owners: ["Nora Abernathy"], invited: ["Tomas Vandermeer"] } },
   { name: "Starling", classCode: "shell-double", private: { owners: ["Erik Lindqvist"], invited: ["Ines Castellanos"] } },
   { name: "Wren", classCode: "shell-single", private: { owners: [], invited: [] } },
+  // A boat the club no longer has. It is on staff's retired list, with a line in its file, and nowhere else.
+  { name: "Gannet", classCode: "shell-single", retired: "Sold to another club" },
 ];
 
 /**
@@ -68,6 +72,10 @@ export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<
       const item: Item = { id: newId(), name: i.name, classCode: i.classCode, ruleOverrides: i.ruleOverrides ?? {} };
       if (i.private) item.isPrivate = true;
       if (i.places && i.places > 1) item.places = i.places;
+      if (i.retired) {
+        item.retired = { at: now.toISOString(), by: SAMPLE_STAFF, reason: i.retired };
+        s.itemLog.push({ id: newId(), itemId: item.id, at: now.toISOString(), kind: "retired", by: SAMPLE_STAFF, text: `Retired by ${SAMPLE_STAFF.label}. Reason: ${i.retired}. Nothing was booked on it.`, details: { reason: i.retired } });
+      }
       s.items.push(item);
       const line = (name: string, kind: BoatAccess["kind"]): BoatAccess => ({ id: newId(), itemId: item.id, memberId: memberId(name), kind, addedAt: now.toISOString(), addedBy: SAMPLE_STAFF, endedAt: null, endedBy: null, endedReason: null });
       for (const name of i.private?.owners ?? []) s.boatAccess.push(line(name, "owner"));
