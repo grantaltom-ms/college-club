@@ -36,6 +36,18 @@ test.describe("the live dashboard's link to the demo", () => {
     await expect(nav.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials"]);
   });
 
+  test("an address the server should never send is not drawn as the demo link", async ({ page }) => {
+    // Defence in depth: even if the menu were told something unsafe, it falls back to this site's own landing page link.
+    for (const systemHref of ["javascript:alert(1)", "http://demo.example.org/club/start", "data:text/html,hi", 42]) {
+      await page.route(`${BASE}/api/nav-extras`, (route) => route.fulfill({ json: { extras: ["system"], systemHref } }));
+      await page.goto(`${BASE}/`);
+      const link = page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "CCS System" });
+      await expect(link, String(systemHref)).toHaveAttribute("href", "/club/start");
+      await expect(link, String(systemHref)).not.toHaveAttribute("target", "_blank");
+      await page.unroute(`${BASE}/api/nav-extras`);
+    }
+  });
+
   test("the link is on every dashboard page", async ({ page }) => {
     for (const path of ["/goals", "/visits", "/membership"]) {
       await page.goto(`${BASE}${path}`);
