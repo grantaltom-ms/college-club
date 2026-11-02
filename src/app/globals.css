@@ -194,14 +194,14 @@ button {
   color: var(--cyberspace);
 }
 
-/* Usage dropdown: one top-level menu holding Visits, Timing and Reservations. */
+/* Dropdowns (Usage, Board Materials): one top-level menu holding several pages. */
 .nav-dropdown {
   position: relative;
   display: flex;
   align-items: stretch;
 }
 
-.nav-usage-button {
+.nav-menu-button {
   padding: 22px 0 19px;
   font-family: var(--display);
   font-weight: 500;
@@ -216,7 +216,7 @@ button {
   white-space: nowrap;
 }
 
-.nav-usage-button::after {
+.nav-menu-button::after {
   content: "";
   display: inline-block;
   margin-left: 7px;
@@ -225,11 +225,11 @@ button {
   vertical-align: middle;
 }
 
-.nav-usage-button:hover {
+.nav-menu-button:hover {
   color: var(--cyberspace);
 }
 
-.nav-usage-button.nav-active {
+.nav-menu-button.nav-active {
   color: var(--cyberspace);
   border-bottom-color: var(--waterloo);
 }
@@ -543,7 +543,7 @@ main.frame {
     letter-spacing: 0.1em;
     white-space: nowrap;
   }
-  .nav-usage-button {
+  .nav-menu-button {
     padding: 8px 0 6px;
     font-size: 11px;
     letter-spacing: 0.1em;

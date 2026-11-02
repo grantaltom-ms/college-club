@@ -112,25 +112,31 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         "/club/sign-in?notice=signin_link",
         `/club/sign-in/${"A".repeat(43)}`,
         "/club/outbox",
+        "/club/start",
+        "/club/start?from=dashboard",
       ];
       for (const path of paths) {
         const res = await fetch(`${base}${path}`);
         expect(res.status, path).toBe(404);
         const html = await res.text();
-        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Mark as being fixed|Set up a practice|Seat someone|Boats and lineup|Sunday technique|Back to practices|Practices you are in|Mark as a coach|Take out of seat|Report an incident|Incident reports|Who was involved|A parent was told|Close the report|Save what we found|Water and weather|Honor snack bar|Every snack is|Add to my account|snack bar iPad|Fix its details|Retire it|Bring it back|Edit or retire|Find by name/i);
+        expect(html, path).not.toMatch(/Act as|Test staff|Switch test member|Lindqvist|Abernathy|test build|invented|ccs_test_actor|club-button|Heron|Osprey|Placeholder rules|Rigger|Who is checking in|I'm here|Front-desk iPad|Sign in|sign-in link|Test outbox|Which of you|Email me|Yoga|Erg Conditioning|Stretch|Boathouse gym|Members' Dinner|Regatta Social|Work Party|Replying as|Staff office|Check someone in|Needs a look|Import households|roster|Monthly billing|Bar and snack-bar|Bringing visitors|Record visitors|Recent charges|QuickBooks|Membership Dues|Guest Fees|Snack Bar Sales|Old bookings|old bookings|iCrew|Reservations report|End memberships|Yes, end|Resignations file|Load the equipment|Equipment sheet|Yes, add|private boat|Tour requests|Mark followed up|Welcome back|Watercooler|home screen|CCS Members|webmanifest|Report damage|Damage reports|File the report|Mark as repaired|Dismiss the report|Mark as being fixed|Set up a practice|Seat someone|Boats and lineup|Sunday technique|Back to practices|Practices you are in|Mark as a coach|Take out of seat|Report an incident|Incident reports|Who was involved|A parent was told|Close the report|Save what we found|Water and weather|Honor snack bar|Every snack is|Add to my account|snack bar iPad|Fix its details|Retire it|Bring it back|Edit or retire|Find by name|CCS System|Test member view|Test staff view|Open member view|Open staff view|Open snack bar screen|Open check-in screen|try the system/i);
       }
     });
 
     test("the picker's request handler does nothing and sets no cookie", async () => {
       for (const actor of ["staff", `member:${FIRST_HOUSEHOLD}`, "none"]) {
-        const res = await fetch(`${base}/api/club/act-as`, {
-          method: "POST",
-          redirect: "manual",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ actor }),
-        });
-        expect(res.status, actor).toBe(404);
-        expect(res.headers.get("set-cookie"), actor).toBeNull();
+        // The landing page adds a "next" page to land on; it changes nothing here either.
+        for (const next of [undefined, "/club/admin"]) {
+          const res = await fetch(`${base}/api/club/act-as`, {
+            method: "POST",
+            redirect: "manual",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams(next ? { actor, next } : { actor }),
+          });
+          expect(res.status, `${actor} ${next}`).toBe(404);
+          expect(res.headers.get("set-cookie"), `${actor} ${next}`).toBeNull();
+          expect(res.headers.get("location"), `${actor} ${next}`).toBeNull();
+        }
       }
     });
 
@@ -274,6 +280,25 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         const res = await page.goto(`${base}${path}`);
         expect(res?.status(), path).toBe(200);
       }
+    });
+
+    test("the dashboard menu leaves out CCS System and says nothing about the reservation system", async ({ page }) => {
+      // The menu asks, when a page opens, what extras to show; here the answer is an empty list.
+      const extras = await fetch(`${base}/api/nav-extras`);
+      expect(extras.status).toBe(200);
+      expect(await extras.json()).toEqual({ extras: [] });
+      const asked = page.waitForResponse((r) => r.url() === `${base}/api/nav-extras`);
+      await page.goto(`${base}/`);
+      expect((await asked).ok()).toBe(true);
+      const nav = page.getByRole("navigation", { name: "Dashboard sections" });
+      await expect(nav.getByRole("link")).toHaveText(["Summary", "Goals"]);
+      await expect(nav.getByRole("button")).toHaveText(["Usage", "Board Materials"]);
+      expect(await page.content()).not.toMatch(/CCS System|club\/start/i);
+      // The two menus themselves are on the live site, with every page in them.
+      await nav.getByRole("button", { name: "Usage" }).click();
+      await expect(nav.getByRole("menu", { name: "Usage" }).getByRole("menuitem")).toHaveText(["Visits", "Timing", "Reservations", "Shells"]);
+      await nav.getByRole("button", { name: "Board Materials" }).click();
+      await expect(nav.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials"]);
     });
   });
 }

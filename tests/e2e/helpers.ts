@@ -23,6 +23,15 @@ export async function mockAll(page: Page) {
   await page.route("**/api/membership", (route) => route.fulfill({ status: 200, contentType: "application/json", body: membership }));
 }
 
+/** The dashboard's menu bar. */
+export const dashboardNav = (page: Page) => page.getByRole("navigation", { name: "Dashboard sections" });
+
+/** Opens one of the two top-level menus (Usage, or Board Materials) and returns it, ready to pick a page from. */
+export async function openNavMenu(page: Page, label: "Usage" | "Board Materials") {
+  await dashboardNav(page).getByRole("button", { name: label }).click();
+  return dashboardNav(page).getByRole("menu", { name: label });
+}
+
 /** The test server's Financials password (playwright.config.ts). */
 export const FINANCIALS_PASSWORD = "playwright-only-financials-0001";
 

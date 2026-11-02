@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { FINANCIALS_PASSWORD, unlockFinancials } from "./helpers";
+import { FINANCIALS_PASSWORD, openNavMenu, unlockFinancials } from "./helpers";
 
 // The test server serves the invented sample figures (CCS_ALLOW_SAMPLE_DATA=1), so these tests use the real
 // /api/financials endpoint, not a mock: the point is that the endpoint itself refuses a browser without the password.
@@ -49,7 +49,7 @@ test.describe("the Financials password", () => {
     // Coming back over and over, and to other pages and back, it stays open.
     for (let lap = 0; lap < 5; lap++) {
       await page.goto("/");
-      await page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Financials" }).click();
+      await (await openNavMenu(page, "Board Materials")).getByRole("menuitem", { name: "Financials" }).click();
       await expect(page.getByTestId("finance-table")).toBeVisible();
     }
     expect((await page.request.get("/api/financials")).status()).toBe(200);

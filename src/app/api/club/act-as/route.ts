@@ -3,14 +3,19 @@ import { pickerEnabled } from "@/club/enabled";
 import { ACTOR_COOKIE, parseActorCookie } from "@/club/identity";
 import { memberById } from "@/club/engine/queries";
 import { getClubStore } from "@/club/store/instance";
+import { backPath } from "@/club/web";
 
-/** The "act as this test member" picker posts here. It does not exist at all unless invented data is allowed. */
+/**
+ * The "act as this test member" picker posts here. It does not exist at all unless invented data is allowed.
+ * A form may add `next`, the page to land on afterwards (the test landing page sends staff straight to the Staff office).
+ * Only a path inside /club is believed, so a crafted form can never bounce anyone to another site.
+ */
 export async function POST(request: NextRequest) {
   if (!pickerEnabled()) return new NextResponse(null, { status: 404 });
 
   const form = await request.formData();
   const choice = String(form.get("actor") ?? "");
-  const back = NextResponse.redirect(new URL("/club", request.url), 303);
+  const back = NextResponse.redirect(new URL(backPath(String(form.get("next") ?? ""), "/club"), request.url), 303);
 
   if (choice === "none") {
     back.cookies.delete(ACTOR_COOKIE);

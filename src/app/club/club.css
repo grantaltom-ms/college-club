@@ -206,6 +206,14 @@
   background: var(--oyster-50);
 }
 
+/* A link that sits and sizes like a button (an <a> is inline, so it needs a box of its own to get the full tap size). */
+a.club-button-link {
+  display: inline-block;
+  line-height: 28px;
+  text-decoration: none;
+  color: #fff;
+}
+
 .club-button-quiet {
   background: transparent;
   color: var(--waterloo);

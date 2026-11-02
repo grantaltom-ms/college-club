@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { sampleShells } from "../../src/lib/shells";
+import { dashboardNav, openNavMenu } from "./helpers";
 
 /** Serve invented sample outings from the shells endpoint, so no test touches the real database. */
 async function mockShells(page: Page) {
@@ -25,7 +26,9 @@ test("the shells page shows the headline and every chart", async ({ page }) => {
   // The monthly timeline and the weekday chart repeated other views and are gone.
   await expect(group(page, "Shell outings every month")).toHaveCount(0);
   await expect(group(page, "Shell outings by day of the week, 2026")).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Shells" })).toHaveAttribute("aria-current", "page");
+  // Shells lives in the Usage menu, which is marked as the active section.
+  await expect(dashboardNav(page).getByRole("button", { name: "Usage" })).toHaveAttribute("aria-current", "page");
+  await expect((await openNavMenu(page, "Usage")).getByRole("menuitem", { name: "Shells" })).toHaveAttribute("aria-current", "page");
 });
 
 test("the boat list shows the busiest ten, and every boat on request, again and again", async ({ page }) => {

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openNavMenu } from "./helpers";
 
 test("the email page leads with list size and the jump, then the comparisons", async ({ page }) => {
   await page.goto("/email");
@@ -52,6 +53,6 @@ test("a plain message shows when Mailchimp is not connected, and recovers", asyn
 
 test("navigation reaches the email page", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation").getByRole("link", { name: "Email" }).click();
+  await (await openNavMenu(page, "Board Materials")).getByRole("menuitem", { name: "Email" }).click();
   await expect(page).toHaveURL(/\/email$/);
 });
