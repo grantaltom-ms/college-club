@@ -62,6 +62,42 @@ test.describe("the staff office board", () => {
     await expect(page.getByRole("heading", { level: 1 })).not.toHaveText(/End the membership/);
   });
 
+  test("the end-a-membership page reads as plain English, and the office list keeps a space before its dot", async ({ page }) => {
+    await actAs(page, "Test staff");
+    await page.goto("/club/admin/households/00000000-0000-4000-8000-000000000001/end");
+    await expect(page.getByRole("main")).toContainText(/(The adult in this household|All \d+ adults in this household) will no longer be able to book:/);
+    await expect(page.getByRole("main")).not.toContainText("can no longer book:");
+    // "Full, with people waiting": the time is followed by a space before the dot, never "pm·".
+    await page.goto("/club/admin");
+    const waiting = page.getByTestId("waiting").getByRole("listitem");
+    expect(await waiting.count()).toBeGreaterThan(0);
+    for (const text of await waiting.allTextContents()) expect(text).toMatch(/\d:\d\d [ap]m · /);
+  });
+
+  test("a button that is switched off looks switched off", async ({ page }) => {
+    await actAs(page, "Test staff");
+    await page.goto("/club/admin");
+    const look = await page.evaluate(() => {
+      const b = document.createElement("button");
+      b.className = "club-button";
+      b.disabled = true;
+      b.textContent = "Probe";
+      document.body.appendChild(b);
+      const on = document.createElement("button");
+      on.className = "club-button";
+      on.textContent = "Probe on";
+      document.body.appendChild(on);
+      const s = getComputedStyle(b);
+      const a = getComputedStyle(on);
+      const out = { off: { bg: s.backgroundColor, cursor: s.cursor }, on: { bg: a.backgroundColor } };
+      b.remove();
+      on.remove();
+      return out;
+    });
+    expect(look.off.cursor).toBe("not-allowed");
+    expect(look.off.bg).not.toBe(look.on.bg);
+  });
+
   test("a booking over with nobody checked in is a no-show on its own, and staff can put it right, once, on the record", async ({ page }) => {
     await actAs(page, "Test staff");
     await page.goto("/club/admin");

@@ -1,16 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { bookingFormHref, dayParam, idParam, idsParam, intParam, lengthChoices, momentParam, typeParam } from "./web";
+import { bookingFormHref, idParam, idsParam, intParam, lengthChoices, momentParam, pickDay, typeParam } from "./web";
 
 const ID = "00000000-0000-4000-8000-000000000007";
 
 describe("reading the address safely", () => {
-  it("accepts only days on offer, and falls back otherwise", () => {
-    const days = ["2026-10-28", "2026-10-29"];
-    expect(dayParam("2026-10-29", days, days[0])).toBe("2026-10-29");
-    expect(dayParam("2026-12-25", days, days[0])).toBe("2026-10-28");
-    expect(dayParam(["2026-10-29", "x"], days, days[0])).toBe("2026-10-29");
-    expect(dayParam(undefined, days, days[0])).toBe("2026-10-28");
-    expect(dayParam("<script>", days, days[0])).toBe("2026-10-28");
+  it("shows only days on offer, and says so when the address asked for one that is not", () => {
+    const days = ["2026-10-28", "2026-10-29", "2026-10-30"];
+    // A day on offer: shown, no note.
+    expect(pickDay("2026-10-29", days)).toEqual({ day: "2026-10-29", note: null });
+    expect(pickDay(["2026-10-29", "x"], days)).toEqual({ day: "2026-10-29", note: null });
+    // Nothing asked for, or not a date at all: the first day, no note (nobody asked for a particular day).
+    expect(pickDay(undefined, days)).toEqual({ day: "2026-10-28", note: null });
+    expect(pickDay("<script>", days)).toEqual({ day: "2026-10-28", note: null });
+    expect(pickDay("2026-02-30", days)).toEqual({ day: "2026-10-28", note: null });
+    // Too far ahead: the last day open, and a sentence that names both days.
+    const far = pickDay("2026-12-25", days);
+    expect(far.day).toBe("2026-10-30");
+    expect(far.note).toBe("Friday, Dec 25 is further ahead than you can book yet. Showing Friday, Oct 30, the last day open.");
+    // Exactly one day past the end is still "too far".
+    expect(pickDay("2026-10-31", days).day).toBe("2026-10-30");
+    // Already gone: today, with the other sentence.
+    const gone = pickDay("2026-10-20", days);
+    expect(gone.day).toBe("2026-10-28");
+    expect(gone.note).toBe("Tuesday, Oct 20 has already passed. Showing Wednesday, Oct 28.");
   });
 
   it("knows the booking types and nothing else", () => {

@@ -188,7 +188,8 @@ test.describe("the honor snack bar iPad", () => {
     // Forty is the most in a day, so one more is refused and says so, and nothing is recorded.
     await findMe(page, snack, "Chidi Okonkwo");
     await page.getByTestId("snack-submit").click();
-    await expect(page.getByTestId("ipad-notice")).toHaveText("Those snacks could not be added. Check the number, or ask club staff for help.");
+    await expect(page.getByTestId("ipad-notice")).toHaveText("That is the most snacks one person can add in a day, so these were not added. Please ask club staff.");
+    await expect(page.getByTestId("ipad-notice")).not.toContainText("41");
     await expect(page.getByTestId("snack-done")).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 1, name: "Hi, Chidi" })).toBeVisible();
     await context.close();
@@ -225,7 +226,7 @@ test.describe("the honor snack bar iPad", () => {
       expect(res.headers().location, bad).toContain("?notice=snacks");
     }
     await page.goto(`/club/snacks/${code}/${member}?notice=snacks`);
-    await expect(page.getByTestId("ipad-notice")).toHaveText("Those snacks could not be added. Check the number, or ask club staff for help.");
+    await expect(page.getByTestId("ipad-notice")).toHaveText("Those snacks could not be added. Please start again, or ask club staff for help.");
     // Someone who has left the club is not found, and a made-up member is sent back to the start.
     await page.goto(snack);
     await page.getByLabel("Type your name, then press Find me").fill("fitzgerald");
@@ -252,6 +253,16 @@ test.describe("the honor snack bar iPad", () => {
       }
       const submit = (await page.getByTestId("snack-submit").boundingBox())!;
       expect(submit.height, label).toBeGreaterThanOrEqual(44);
+      // "That is not me" is a real button to hit with a finger, and the quiet line below is big and dark enough to read.
+      const notMe = (await page.getByRole("link", { name: "That is not me" }).boundingBox())!;
+      expect(notMe.height, `${label} That is not me`).toBeGreaterThanOrEqual(44);
+      expect(notMe.width, `${label} That is not me`).toBeGreaterThanOrEqual(120);
+      const quiet = await page.getByTestId("auto-return").evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { size: parseFloat(style.fontSize), color: style.color };
+      });
+      expect(quiet.size, `${label} quiet line size`).toBeGreaterThanOrEqual(17);
+      expect(quiet.color, `${label} quiet line colour`).toBe("rgb(68, 72, 77)");
       await page.getByRole("button", { name: "One more snack" }).click();
       await page.getByTestId("snack-submit").click();
       await expect(page.getByTestId("snack-done")).toBeVisible();

@@ -3,7 +3,7 @@ import { pickerEnabled } from "@/club/enabled";
 import { householdOf, membersOf } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
-import { getClubStore } from "@/club/store/instance";
+import { readClubOnce } from "@/club/store/read-once";
 import { formatDay } from "@/club/time";
 import { HouseholdView } from "./HouseholdView";
 
@@ -26,7 +26,7 @@ export default async function ClubHome() {
     );
   }
 
-  const state = await (await getClubStore()).read();
+  const state = await readClubOnce();
   if (actor.kind === "member") {
     const household = householdOf(state, actor.household.id)!;
     return <HouseholdView state={state} household={household} viewerIsStaff={false} />;

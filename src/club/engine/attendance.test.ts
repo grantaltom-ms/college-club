@@ -350,7 +350,7 @@ describe("the automatic no-show as a plain rule", () => {
   it("describes itself in plain words for the staff screens", () => {
     expect(describeAttendanceRules(ATTENDANCE_RULES)).toEqual([
       "Check-in opens 30 minutes before the start.",
-      "A boat or space booking, or a class chair, that nobody checked in for becomes a no-show the moment it ends.",
+      "A boat or space booking, or a class place, that nobody checked in for becomes a no-show the moment it ends.",
       "Room Space and Work Space reservations do not need a check-in: they are never marked a no-show.",
       "Members can check themselves in on the front-desk iPad or on their own phone while check-in is open; the record shows which. Events are not checked in by members.",
       "Events are not marked automatically; staff mark who came.",
@@ -361,7 +361,7 @@ describe("the automatic no-show as a plain rule", () => {
     expect(describeAttendanceRules(rulesWith({ checkInNotNeededFor: ["Room Space", "Work Space", "Dock Space"] }))[2]).toBe("Room Space, Work Space and Dock Space reservations do not need a check-in: they are never marked a no-show.");
     expect(describeAttendanceRules(rulesWith({ checkInOpensMinutesBefore: 0, noShowAfterEndMinutes: 90 })).slice(0, 2)).toEqual([
       "Check-in opens at the start.",
-      "A boat or space booking, or a class chair, that nobody checked in for becomes a no-show 1 hour 30 minutes after it ends.",
+      "A boat or space booking, or a class place, that nobody checked in for becomes a no-show 1 hour 30 minutes after it ends.",
     ]);
   });
 });

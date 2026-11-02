@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { snackMemberPath } from "@/club/engine/ipad-address";
-import { recordSnacks } from "@/club/engine/snacks";
+import { recordSnacks, SnackDayLimit } from "@/club/engine/snacks";
 import { ClubError } from "@/club/errors";
 import { SNACK_RULES } from "@/club/settings/snack-rules";
 import { field, see, startIpadPost } from "@/club/web-post";
@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     return see(request, `${back}?done=${result.charge.id}`);
   } catch (e) {
     if (!(e instanceof ClubError)) throw e;
-    return see(request, `${back}?notice=snacks`);
+    // The day's limit gets its own words, and still never shows the count (the shared iPad shows nobody's total).
+    return see(request, `${back}?notice=${e instanceof SnackDayLimit ? "snacks_day" : "snacks"}`);
   }
 }

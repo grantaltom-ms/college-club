@@ -5,6 +5,7 @@ import { fullName } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { memberAppMetadata, memberAppViewport } from "@/club/pwa";
+import { readClubOnce } from "@/club/store/read-once";
 
 export const generateMetadata = (): Promise<Metadata> => memberAppMetadata();
 export const generateViewport = (): Promise<Viewport> => memberAppViewport();
@@ -16,6 +17,8 @@ export const generateViewport = (): Promise<Viewport> => memberAppViewport();
 export default async function MemberLayout({ children }: { children: React.ReactNode }) {
   await requireClub();
   const actor = await getCurrentActor();
+  // "My boats" is only offered to members who own a private boat or were invited to one.
+  const hasBoats = actor?.kind === "member" && (await readClubOnce()).boatAccess.some((a) => a.memberId === actor.member.id && a.endedAt === null);
   return (
     <>
       <header className="club-header">
@@ -30,6 +33,7 @@ export default async function MemberLayout({ children }: { children: React.React
             {actor && <Link href="/club/classes">Classes</Link>}
             {actor && <Link href="/club/events">Events</Link>}
             {actor?.kind === "member" && <Link href="/club/my-classes">My classes</Link>}
+            {hasBoats && <Link href="/club/my-boats">My boats</Link>}
             {(actor?.kind === "staff" || (actor?.kind === "member" && actor.member.isCoach === true)) && <Link href="/club/practices">Practices</Link>}
             {actor?.kind === "member" && actor.member.isCoach === true && <Link href="/club/incidents">Report an incident</Link>}
             {actor?.kind === "staff" && <Link href="/club/admin">Staff office</Link>}

@@ -189,7 +189,7 @@ test.describe("visitors, entered by staff", () => {
   test("three is free, five costs ten dollars each, and voiding one puts the day back", async ({ page }) => {
     await actAs(page, "Test staff");
     await page.goto("/club/admin/visitors");
-    await expect(page.getByTestId("visitor-rule")).toHaveText("A member can bring up to 4 visitors a day for free. With more than that, every visitor that day costs $10.00.");
+    await expect(page.getByTestId("visitor-rule")).toHaveText("A member can bring up to 4 visitors a day for free. With more than that, every visitor that day costs $10.00, not just the extra ones: 5 visitors cost $50.00 in all.");
     await expect(page.getByTestId("placeholder-note")).toBeVisible();
     const message = page.getByTestId("visitors-form").getByTestId("action-ok");
 
@@ -253,7 +253,7 @@ test.describe("visitors, signed in on the front-desk iPad", () => {
 
     await page.getByRole("link", { name: "Lars Eriksen" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Hi, Lars" })).toBeVisible();
-    await expect(page.getByTestId("ipad-visitor-rule")).toHaveText("A member can bring up to 4 visitors a day for free. With more than that, every visitor that day costs $10.00.");
+    await expect(page.getByTestId("ipad-visitor-rule")).toHaveText("A member can bring up to 4 visitors a day for free. With more than that, every visitor that day costs $10.00, not just the extra ones: 5 visitors cost $50.00 in all.");
     await expect(page.getByTestId("ipad-visitors-sofar")).toHaveCount(0);
     // Nothing is chosen until the member chooses; pressing the button with no number does nothing.
     await expect(page.locator('input[name="visitors"]:checked')).toHaveCount(0);

@@ -18,7 +18,7 @@ import { SignedOut } from "../SignedOut";
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
 const STATUS: Record<SignUp["status"], string> = {
-  enrolled: "You have a chair",
+  enrolled: "You have a place",
   waitlisted: "On the waiting list",
   cancelled: "Cancelled",
   late_cancelled: "Cancelled late",
@@ -41,7 +41,7 @@ function Row({ state, line, session, now }: { state: ClubState; line: SignUp; se
           ? STATUS[line.status]
           : line.status === "enrolled"
             ? "Awaiting check-in"
-            : "Did not get a chair";
+            : "Did not get a place";
   const late = line.status === "enrolled" && Date.parse(session.startsAt) - now.getTime() < classRulesFor(CLASS_RULES, template).cancelCutoffMinutes * 60000;
   return (
     <li className="club-card" data-testid="class-row" data-status={line.status} data-class={template.name}>

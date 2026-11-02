@@ -97,7 +97,7 @@ describe.each(STORE_KINDS)("what leaving cancels, on the %s store", (kind) => {
     const { f } = await busy(kind);
     const preview = departurePreview(await f.store.read(), [f.m.Ada], NOW);
     expect(preview.bookings[0]).toMatchObject({ what: "Heron", who: "Ada Quill", when: "Thursday, Oct 29, 7:00 to 8:00 am", detail: "" });
-    expect(preview.signUps[0]).toMatchObject({ what: "Yoga", when: "Thursday, Oct 29, 9:00 to 10:00 am", detail: "has a chair" });
+    expect(preview.signUps[0]).toMatchObject({ what: "Yoga", when: "Thursday, Oct 29, 9:00 to 10:00 am", detail: "has a place" });
     expect(preview.rsvps[0]).toMatchObject({ what: "Dinner", detail: "going, party of 2" });
   });
 

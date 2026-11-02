@@ -6,7 +6,7 @@ import type { SnackRules } from "../types";
 import { planBilling, recordCharge, runBilling, voidCharge } from "./billing";
 import { createHousehold, endHousehold, removeMember, setQuickbooksId } from "./households";
 import { clubLedger } from "./ledger";
-import { recordSnacks, snackBarMonth, snackCountWords, snackItemsOnDay, snackPriceWords, snackThanks, snackTotalWords, type SnackInput } from "./snacks";
+import { recordSnacks, SnackDayLimit, snackBarMonth, snackCountWords, snackItemsOnDay, snackPriceWords, snackThanks, snackTotalWords, type SnackInput } from "./snacks";
 import { NOW, STORE_KINDS, TODAY, fixtureFor, memberCtx, staffCtx, type Fixture } from "./testkit";
 
 /**
@@ -226,6 +226,9 @@ describe.each(STORE_KINDS)("the snack bar on the %s store", (kind) => {
       expect(await snackItemsOnDay(await f.store.read(), f.m.Ada, TODAY)).toBe(39);
       const over = await rejection(buy(f, "Ada", 2));
       expect(over).toMatchObject({ code: "invalid", message: "That would make 41 snacks today for Ada Quill. The most that can be recorded in a day is 40. If that is right, ask club staff." });
+      // The iPad tells this refusal apart from a bad number, so it can say "the most in a day" in its own words.
+      expect(over).toBeInstanceOf(SnackDayLimit);
+      expect(await rejection(buy(f, "Ada", 21))).not.toBeInstanceOf(SnackDayLimit);
       expect((await buy(f, "Ada", 1)).items).toBe(1);
       const full = await rejection(buy(f, "Ada", 1));
       expect(full.message).toContain("That would make 41 snacks today");
@@ -252,6 +255,47 @@ describe.each(STORE_KINDS)("the snack bar on the %s store", (kind) => {
       expect((await buy(f, "Ada", 20)).items).toBe(20);
       await recordCharge(f.store, staffCtx(), { householdId: f.h.Quill, memberId: f.m.Ada, category: "snack_bar", adjustment: false, amountCents: 99_900, description: "Case of granola bars" });
       expect(await snackItemsOnDay(await f.store.read(), f.m.Ada, TODAY)).toBe(40);
+    });
+  });
+
+  describe("in the evening, when the Pacific date is a day behind the world clock", () => {
+    // From 4 pm in the afternoon, the date in Greenwich is already tomorrow. The club's day, and so the month's bill, is Pacific.
+    const EVENING_NOV_1 = at("2026-11-02T01:12:00Z"); // 5:12 pm on Sun Nov 1, Pacific
+    const LATE_NOV_1 = at("2026-11-02T07:30:00Z"); // 11:30 pm the same evening
+    const NEXT_MORNING = at("2026-11-02T17:00:00Z"); // 9 am on Mon Nov 2
+
+    it("dates a 5 pm purchase on the Pacific day, lists it for that month, and counts it in that day", async () => {
+      const f = await fixture();
+      const r = await buy(f, "Ben", 3, EVENING_NOV_1);
+      expect(r.charge.day).toBe("2026-11-01");
+      const state = await f.store.read();
+      expect(state.charges[0].day).toBe("2026-11-01");
+      expect(snackItemsOnDay(state, f.m.Ben, "2026-11-01")).toBe(3);
+      expect(snackItemsOnDay(state, f.m.Ben, "2026-11-02")).toBe(0);
+      expect(snackBarMonth(state, "2026-11-01")).toEqual({ label: "November 2026", purchases: 1, items: 3, totalCents: 450 });
+    });
+
+    it("keeps one Pacific evening as one day for the day's limit, and starts a fresh count at Pacific midnight", async () => {
+      const f = await fixture();
+      await buy(f, "Ada", 20, EVENING_NOV_1);
+      await buy(f, "Ada", 20, LATE_NOV_1);
+      expect((await rejection(buy(f, "Ada", 1, LATE_NOV_1))).code).toBe("invalid");
+      expect((await buy(f, "Ada", 20, NEXT_MORNING)).charge.day).toBe("2026-11-02");
+    });
+
+    it("puts a 9:30 pm purchase on the last day of the month into that month, and not the next", async () => {
+      const f = await fixture();
+      const r = await buy(f, "Cy", 2, at("2026-12-01T05:30:00Z")); // 9:30 pm on Mon Nov 30, Pacific
+      expect(r.charge.day).toBe("2026-11-30");
+      const month = snackBarMonth(await f.store.read(), "2026-11-30");
+      expect(month).toEqual({ label: "November 2026", purchases: 1, items: 2, totalCents: 300 });
+      expect(snackBarMonth(await f.store.read(), "2026-12-01").purchases).toBe(0);
+    });
+
+    it("dates 12:30 am on the day the clocks fall back to that day, and 11:30 pm the evening before to the day before", async () => {
+      const f = await fixture();
+      expect((await buy(f, "Dee", 1, at("2026-11-01T07:30:00Z"))).charge.day).toBe("2026-11-01"); // 12:30 am PDT
+      expect((await buy(f, "Eli", 1, at("2026-11-01T06:30:00Z"))).charge.day).toBe("2026-10-31"); // 11:30 pm PDT
     });
   });
 

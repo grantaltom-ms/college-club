@@ -62,7 +62,8 @@ const people = (n: number) => `${n} visitor${n === 1 ? "" : "s"}`;
 /** The rule in words, shown where visitors are signed in. */
 export function visitorRuleWords(rules: Pick<BillingRuleValues, "visitorFreePerDay" | "visitorFeeCents">): string {
   if (rules.visitorFeeCents === 0) return "There is no fee for visitors.";
-  return `A member can bring up to ${people(rules.visitorFreePerDay)} a day for free. With more than that, every visitor that day costs ${formatMoney(rules.visitorFeeCents)}.`;
+  const over = rules.visitorFreePerDay + 1;
+  return `A member can bring up to ${people(rules.visitorFreePerDay)} a day for free. With more than that, every visitor that day costs ${formatMoney(rules.visitorFeeCents)}, not just the extra ones: ${people(over)} cost ${formatMoney(over * rules.visitorFeeCents)} in all.`;
 }
 
 /** What a day's total means, said back to the member after they sign visitors in. */

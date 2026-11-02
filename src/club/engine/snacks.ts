@@ -21,6 +21,16 @@ const TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
 const invalid = (message: string) => new ClubError("invalid", message);
 const conflict = (message: string) => new ClubError("conflict", message);
 
+/**
+ * The member has already had the most that can be recorded in a day. It is its own kind of refusal so the shared iPad can say
+ * so in plain words ("that is the most one person can add in a day") without ever showing anyone's running total.
+ */
+export class SnackDayLimit extends ClubError {
+  constructor(message: string) {
+    super("invalid", message);
+  }
+}
+
 export interface SnackInput {
   memberId: string;
   /** How many snacks. */
@@ -72,7 +82,7 @@ export async function recordSnacks(store: ClubStore, ctx: Ctx, rules: SnackRules
     if (isBilledDay(s, today)) throw conflict(`${monthLabel(monthOf(today))} was already billed, so nothing can be added to it. Ask club staff.`);
     const already = snackItemsOnDay(s, member.id, today);
     if (already + input.items > itemsPerDayMax) {
-      throw invalid(`That would make ${already + input.items} snacks today for ${fullName(member)}. The most that can be recorded in a day is ${itemsPerDayMax}. If that is right, ask club staff.`);
+      throw new SnackDayLimit(`That would make ${already + input.items} snacks today for ${fullName(member)}. The most that can be recorded in a day is ${itemsPerDayMax}. If that is right, ask club staff.`);
     }
 
     const charge: Charge = {

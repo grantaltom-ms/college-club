@@ -95,7 +95,7 @@ describe("the visitor fee", () => {
   });
 
   it("says the rule and what a day's total means, in plain words", () => {
-    expect(visitorRuleWords(rules)).toBe("A member can bring up to 4 visitors a day for free. With more than that, every visitor that day costs $10.00.");
+    expect(visitorRuleWords(rules)).toBe("A member can bring up to 4 visitors a day for free. With more than that, every visitor that day costs $10.00, not just the extra ones: 5 visitors cost $50.00 in all.");
     expect(visitorRuleWords({ visitorFreePerDay: 4, visitorFeeCents: 0 })).toBe("There is no fee for visitors.");
     expect(visitorRuleWords({ visitorFreePerDay: 1, visitorFeeCents: 500 })).toContain("up to 1 visitor a day");
     expect(visitorTotalWords(2, rules)).toBe("That makes 2 visitors today, with no fee. 2 more visitors would still be free.");

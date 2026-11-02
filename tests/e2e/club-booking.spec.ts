@@ -161,6 +161,9 @@ test("a refusal is always explained in plain words and never offers a Book butto
   await page.goto(href);
   await expect(page.getByTestId("refusal-reasons").getByRole("listitem")).toHaveText(["You need Sculling level 1 (placeholder) to use Heron."]);
   await expect(page.getByRole("button", { name: "Book Heron" })).toHaveCount(0);
+  // The refusal says what to do next: it is not a dead end, and it does not sound like a matter of waiting ("yet").
+  await expect(page.getByRole("heading", { name: "This booking cannot go ahead as chosen" })).toBeVisible();
+  await expect(page.getByTestId("refusal-help")).toContainText("ask them to check your record");
 
   // Straight to the form for a slot that is already taken, and one beyond the booking window.
   const itemId = new URL(href, "http://x").searchParams.get("item")!;
@@ -410,4 +413,29 @@ test.describe("on a phone", () => {
     await openDay(page, "2026-10-30");
     expect(await fits()).toBe(true);
   });
+});
+
+test("a day outside the booking window is not shown silently as another day: the page says so", async ({ page }) => {
+  await actAs(page, "Nora Abernathy");
+  // Far too late: the last day open is shown, with a sentence that names both days.
+  await page.goto("/club/book?day=2026-12-25");
+  await expect(page.getByTestId("day-note")).toHaveText(/^Friday, Dec 25 is further ahead than you can book yet\. Showing \w+, Nov \d+, the last day open\.$/);
+  const days = page.getByRole("navigation", { name: "Pick a day" }).getByRole("link");
+  await expect(days.last()).toHaveAttribute("aria-current", "page");
+  // Already gone: today, with the other sentence.
+  await page.goto("/club/book?day=2026-10-20");
+  await expect(page.getByTestId("day-note")).toHaveText(/^Tuesday, Oct 20 has already passed\. Showing \w+, Oct \d+\.$/);
+  await expect(days.first()).toHaveAttribute("aria-current", "page");
+  // A day on offer, nothing asked for, and nonsense in the address: no note.
+  await page.goto("/club/book?day=2026-10-30");
+  await expect(page.getByTestId("day-note")).toHaveCount(0);
+  await page.goto("/club/book");
+  await expect(page.getByTestId("day-note")).toHaveCount(0);
+  await page.goto("/club/book?day=banana");
+  await expect(page.getByTestId("day-note")).toHaveCount(0);
+  // Classes work the same way.
+  await page.goto("/club/classes?day=2027-03-01");
+  await expect(page.getByTestId("day-note")).toContainText("is further ahead than you can book yet");
+  await page.goto("/club/classes");
+  await expect(page.getByTestId("day-note")).toHaveCount(0);
 });

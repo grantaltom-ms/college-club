@@ -8,7 +8,7 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
 import { RULE_BOOK, rulesFor } from "@/club/settings/rulebook";
-import { getClubStore } from "@/club/store/instance";
+import { readClubOnce } from "@/club/store/read-once";
 import { formatDayLong, formatRange, pacificDate } from "@/club/time";
 import type { Booking, ClubState } from "@/club/types";
 import { idParam, NOTICES } from "@/club/web";
@@ -94,7 +94,7 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
   if (!actor) return <SignedOut />;
 
   const now = clubNow();
-  const state = await (await getClubStore()).read();
+  const state = await readClubOnce();
   const params = await searchParams;
   const staff = actor.kind === "staff";
   const viewerId = actor.kind === "member" ? actor.member.id : null;

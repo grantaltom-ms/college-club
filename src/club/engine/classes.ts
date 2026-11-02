@@ -176,7 +176,7 @@ export function checkSignUp(state: ClubState, book: RuleBook, classRules: ClassR
   if (upcoming >= rules.maxUpcomingPerMember) {
     add(
       "over_upcoming_limit",
-      `${who} already ${isYou ? "hold" : "holds"} ${plural(upcoming, "class place")} (chairs and waiting-list spots), the most allowed at once. Leave one or wait until a class is done.`,
+      `${who} already ${isYou ? "hold" : "holds"} ${plural(upcoming, "class place")} (including waiting-list spots), the most allowed at once. Leave one or wait until a class is done.`,
     );
   }
   const sameDay = mine.filter((g) => {
@@ -361,7 +361,7 @@ export async function createClass(store: ClubStore, book: RuleBook, classRules: 
   if (description.length > 500) throw new ClubError("invalid", "The description must be 500 characters or fewer.");
   const instructor = (input.instructor ?? "").trim();
   if (instructor.length > 120) throw new ClubError("invalid", "The instructor's name must be 120 characters or fewer.");
-  const defaultCapacity = whole(input.defaultCapacity, "Chairs", 1, 200);
+  const defaultCapacity = whole(input.defaultCapacity, "Places", 1, 200);
   const defaultMinutes = whole(input.defaultMinutes, "Length in minutes", 15, 480);
   const rules = input.rules ?? {};
   try {
@@ -402,7 +402,7 @@ export function planSessions(state: ClubState, book: RuleBook, ctx: Ctx, input: 
   const weeks = whole(input.weeks ?? 1, "Weeks", 1, 52);
   if (Number.isNaN(input.startsAt.getTime())) throw new ClubError("invalid", "Choose a start time.");
   const template = templateOf(state, { classId: input.classId });
-  const capacity = whole(input.capacity ?? template.defaultCapacity, "Chairs", 1, 200);
+  const capacity = whole(input.capacity ?? template.defaultCapacity, "Places", 1, 200);
   const minutes = whole(input.minutes ?? template.defaultMinutes, "Length in minutes", 15, 480);
   const roomItemId = input.roomItemId === undefined ? template.roomItemId : input.roomItemId;
   const room = roomItemId ? roomOrThrow(state, book, roomItemId) : null;
@@ -516,13 +516,13 @@ export async function cancelSession(store: ClubStore, ctx: Ctx, sessionId: strin
  */
 export async function setCapacity(store: ClubStore, classRules: ClassRules, ctx: Ctx, sessionId: string, capacity: number): Promise<{ session: ClassSession; promoted: SignUp[] }> {
   requireStaff(ctx.actor);
-  const chairs = whole(capacity, "Chairs", 1, 200);
+  const chairs = whole(capacity, "Places", 1, 200);
   return store.transaction(async (s) => {
     const session = sessionOrThrow(s, sessionId);
-    if (session.status !== "scheduled") throw new ClubError("conflict", "That class was cancelled, so its chairs cannot change.");
-    if (Date.parse(session.endsAt) <= ctx.now.getTime()) throw new ClubError("conflict", "That class is over, so its chairs cannot change.");
+    if (session.status !== "scheduled") throw new ClubError("conflict", "That class was cancelled, so its places cannot change.");
+    if (Date.parse(session.endsAt) <= ctx.now.getTime()) throw new ClubError("conflict", "That class is over, so its places cannot change.");
     const taken = enrolledCount(s, session.id);
-    if (chairs < taken) throw new ChairsTooFew(`${plural(taken, "person").replace("persons", "people")} already have chairs, so chairs cannot go below ${taken}. Cancel some sign-ups first.`);
+    if (chairs < taken) throw new ChairsTooFew(`${plural(taken, "person").replace("persons", "people")} already have places, so places cannot go below ${taken}. Cancel some sign-ups first.`);
     session.capacity = chairs;
     const promoted = promoteWaitlist(s, classRules, session.id, ctx.now);
     return { session: structuredClone(session), promoted: structuredClone(promoted) };

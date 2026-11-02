@@ -216,6 +216,11 @@ test.describe("staff work a report", () => {
     await page.getByRole("button", { name: `Take ${boat} out of service` }).click();
     await expect(page.getByTestId("boat-out-of-service")).toContainText(`${boat} is out of service: Damage reported: ${what}`);
     await expect(page.getByTestId("damage-log")).toContainText(`${boat} taken out of service by Test staff. 1 upcoming booking stays`);
+    // The page links straight to the list of people who have the boat booked, so they can be told.
+    await page.getByTestId("boat-out-of-service").getByRole("link", { name: "See who has it booked, to tell them" }).click();
+    await expect(page).toHaveURL(/\/club\/equipment\?affected=/);
+    await expect(page.getByTestId("affected")).toContainText("Nothing was cancelled; please contact");
+    await page.goBack();
     await page.goto("/club/book?day=2026-11-02&type=Shell");
     await expect(slot(page, boat, "7:00 to 7:30 am", "out of service")).toHaveAttribute("data-state", "out_of_service");
     // The outing Declan already booked stays.

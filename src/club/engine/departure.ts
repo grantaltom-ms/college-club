@@ -61,7 +61,7 @@ export function departurePreview(state: ClubState, memberIds: string[], now: Dat
     const session = state.sessions.find((x) => x.id === g.sessionId);
     if (!session || session.status !== "scheduled" || Date.parse(session.startsAt) <= now.getTime()) continue;
     const name = state.classes.find((c) => c.id === session.classId)?.name ?? "A class";
-    signUps.push({ id: g.id, what: name, when: when(session.startsAt, session.endsAt), startsAt: session.startsAt, who: nameOf(state, g.memberId), detail: g.status === "waitlisted" ? "on the waiting list" : "has a chair" });
+    signUps.push({ id: g.id, what: name, when: when(session.startsAt, session.endsAt), startsAt: session.startsAt, who: nameOf(state, g.memberId), detail: g.status === "waitlisted" ? "on the waiting list" : "has a place" });
   }
 
   const rsvps: DepartureLine[] = [];
