@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { sampleFinancials } from "../../src/lib/financials";
-import { unlockFinancials } from "./helpers";
+import { dashboardNav, openNavMenu, unlockFinancials } from "./helpers";
 
 /** Serve invented finance figures from the financials endpoint, so no test touches the real database. */
 async function mockFinancials(page: Page) {
@@ -40,7 +40,9 @@ test("the financials page shows the summary strip, one chart, the 5-column table
   // Subtotal row for the invented sample's club year: months and labeled figures agree.
   await expect(page.getByTestId("subtotal-2023–24")).toContainText("$300,000.00");
   await expect(page.getByTestId("subtotal-2023–24")).toContainText("$21,200.00");
-  await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Financials" })).toHaveAttribute("aria-current", "page");
+  // Financials lives in the Board Materials menu, which is marked as the active section.
+  await expect(dashboardNav(page).getByRole("button", { name: "Board Materials" })).toHaveAttribute("aria-current", "page");
+  await expect((await openNavMenu(page, "Board Materials")).getByRole("menuitem", { name: "Financials" })).toHaveAttribute("aria-current", "page");
   // Ask the numbers, with no model: the default question names Feb 2024 and highlights its row.
   await expect(page.getByTestId("ask-answer")).toContainText("Feb 2024");
   await expect(page.getByTestId("ask-answer")).toContainText("$13,400.00");

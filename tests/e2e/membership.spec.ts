@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { sampleMembership } from "../../src/lib/membership";
+import { dashboardNav, openNavMenu } from "./helpers";
 
 /** Serve invented membership counts from the membership endpoint, so no test touches the real database. */
 async function mockMembership(page: Page) {
@@ -21,7 +22,9 @@ test("the membership page shows the monthly table, the charts and the sample ban
   // Both charts, with their table views carrying the same figures.
   await expect(page.getByRole("group", { name: "Paying members by month" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Resignations and applicants by month" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Membership" })).toHaveAttribute("aria-current", "page");
+  // Membership lives in the Board Materials menu, which is marked as the active section.
+  await expect(dashboardNav(page).getByRole("button", { name: "Board Materials" })).toHaveAttribute("aria-current", "page");
+  await expect((await openNavMenu(page, "Board Materials")).getByRole("menuitem", { name: "Membership" })).toHaveAttribute("aria-current", "page");
 });
 
 test("a membership source that fails shows a plain message and a way to try again", async ({ page }) => {
