@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { demoGateState } from "@/club/demo-gate";
 import { pickerEnabled } from "@/club/enabled";
 import { ipadCode, ipadPath, snackCode, snackPath } from "@/club/engine/ipad-address";
 import { fullName } from "@/club/engine/queries";
@@ -117,6 +118,13 @@ export default async function StartPage() {
           Back to the dashboard
         </Link>
       </p>
+      {demoGateState() === "on" && (
+        <form method="post" action="/api/demo/lock" className="club-actions" data-testid="start-lock-form">
+          <button type="submit" className="club-button club-button-quiet" data-testid="start-lock">
+            Lock the demo on this device
+          </button>
+        </form>
+      )}
     </section>
   );
 }

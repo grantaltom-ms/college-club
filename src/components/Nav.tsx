@@ -25,10 +25,23 @@ const BOARD_LINKS: NavLink[] = [
 ];
 
 /**
- * The way into the reservation system's test landing page. It is for test builds only (development, previews, automated tests)
- * and is left out on the live site, where the reservation system does not exist yet; see /api/nav-extras.
+ * The way into the reservation system's test landing page. In a test build (development, previews, automated tests) it goes to
+ * this site's own page. On the live site, where the reservation system does not exist yet, it is left out, unless the club has
+ * set the demo's address: then it goes to the demo on that other address, which asks for the demo password. See /api/nav-extras.
  */
 const SYSTEM_LINK: NavLink = { href: "/club/start", label: "CCS System" };
+
+/** The demo's address as the menu was told it, or null when it is not a safe web address (defence in depth: the server checks too). */
+function safeDemoHref(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    return url.protocol === "https:" || (local && url.protocol === "http:") ? url.href : null;
+  } catch {
+    return null;
+  }
+}
 
 /** One top-level menu holding several pages. Keyed by page by its parent, so navigating starts it closed on the new page. */
 function NavDropdown({ label, links, pathname }: { label: string; links: NavLink[]; pathname: string }) {
@@ -95,6 +108,7 @@ function NavDropdown({ label, links, pathname }: { label: string; links: NavLink
 export function Nav() {
   const pathname = usePathname();
   const [showSystem, setShowSystem] = useState(false);
+  const [systemHref, setSystemHref] = useState<string | null>(null);
 
   // The dashboard pages are built ahead of time, so whether this is a test build is asked once when a page opens. The live site
   // answers "nothing extra", and then the menu is exactly Summary, Usage, Board Materials and Goals.
@@ -102,8 +116,11 @@ export function Nav() {
     const controller = new AbortController();
     fetch("/api/nav-extras", { cache: "no-store", signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
-      .then((body: { extras?: unknown } | null) => {
-        if (Array.isArray(body?.extras) && body.extras.includes("system")) setShowSystem(true);
+      .then((body: { extras?: unknown; systemHref?: unknown } | null) => {
+        if (Array.isArray(body?.extras) && body.extras.includes("system")) {
+          setSystemHref(safeDemoHref(body?.systemHref));
+          setShowSystem(true);
+        }
       })
       .catch(() => {});
     return () => controller.abort();
@@ -111,7 +128,14 @@ export function Nav() {
 
   return (
     <nav className="site-nav" aria-label="Dashboard sections">
-      {showSystem && <Link href={SYSTEM_LINK.href}>{SYSTEM_LINK.label}</Link>}
+      {showSystem &&
+        (systemHref ? (
+          <a href={systemHref} target="_blank" rel="noopener noreferrer">
+            {SYSTEM_LINK.label}
+          </a>
+        ) : (
+          <Link href={SYSTEM_LINK.href}>{SYSTEM_LINK.label}</Link>
+        ))}
       <Link href={SUMMARY.href} aria-current={pathname === SUMMARY.href ? "page" : undefined}>
         {SUMMARY.label}
       </Link>

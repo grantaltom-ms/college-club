@@ -4,6 +4,8 @@ const PORT = 3100;
 const PORT_SWITCH_OFF = 3101;
 const PORT_LIVE_SITE = 3102;
 const PORT_POSTGRES = 3103;
+const PORT_DEMO_GATE = 3104;
+const PORT_LIVE_DEMO_LINK = 3105;
 
 // The booking specs also run against a server whose records live in Postgres. That needs a local or throwaway
 // Postgres (CLUB_TEST_DATABASE_URL, which CI always sets); without one, only the in-memory run happens.
@@ -67,7 +69,8 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       // The iPad secret is set on purpose: even with the right secret there must be no iPad here.
-      env: { CCS_ALLOW_SAMPLE_DATA: "", VERCEL_ENV: "", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer" },
+      // The demo password is set on purpose too: where invented data is not allowed the keypad must not exist.
+      env: { CCS_ALLOW_SAMPLE_DATA: "", VERCEL_ENV: "", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer", CCS_DEMO_PASSWORD: "playwright-only-demo-0001" },
     },
     {
       // The worst mistake: the sample-data switch is on, but this is the live production site.
@@ -75,7 +78,34 @@ export default defineConfig({
       url: `http://localhost:${PORT_LIVE_SITE}/favicon.ico`,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
-      env: { CCS_ALLOW_SAMPLE_DATA: "1", VERCEL_ENV: "production", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer" },
+      // The demo password is set on purpose too: on the live site the keypad must not exist either, so nothing redirects to it.
+      env: { CCS_ALLOW_SAMPLE_DATA: "1", VERCEL_ENV: "production", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001", CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer", CCS_DEMO_PASSWORD: "playwright-only-demo-0001" },
+    },
+    {
+      // A test build with the demo keypad on: the invented club and the public-site preview are locked behind the demo password.
+      command: `npx next start -p ${PORT_DEMO_GATE}`,
+      url: `http://localhost:${PORT_DEMO_GATE}/api/nav-extras`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      env: {
+        CCS_ALLOW_SAMPLE_DATA: "1",
+        CCS_CLUB_NOW: "2026-10-28T20:00:00Z",
+        CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0003",
+        CLUB_LINK_SECRET: "playwright-only-link-secret-0003",
+        CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer",
+        CCS_DEMO_PASSWORD: "playwright-only-demo-0001",
+        RESEND_API_KEY: "re_playwright_only_fake_key_0003",
+        CLUB_MAIL_FROM: "Playwright Club <no-reply@example.org>",
+      },
+    },
+    {
+      // The live site with the demo's address set: the dashboard menu links to the demo, and nothing of the reservation system runs here.
+      // The sample switch is on by mistake and the password is set, on purpose, to show neither changes what the live site answers.
+      command: `npx next start -p ${PORT_LIVE_DEMO_LINK}`,
+      url: `http://localhost:${PORT_LIVE_DEMO_LINK}/favicon.ico`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      env: { CCS_ALLOW_SAMPLE_DATA: "1", VERCEL_ENV: "production", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001", CCS_DEMO_PASSWORD: "playwright-only-demo-0001", CCS_DEMO_URL: "https://demo.example.org" },
     },
     ...(E2E_DB
       ? [
