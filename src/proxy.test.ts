@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEMO_COOKIE, makeDemoPass } from "@/club/demo-gate";
-import { config, proxy } from "./proxy";
+import { config, NOT_THERE_PATH, proxy } from "./proxy";
 
 const PASSWORD = "demo-password-0001";
 const SITE = "https://demo.example.org";
@@ -70,8 +70,37 @@ describe("the demo keypad's door", () => {
     for (const path of ["/club/start", "/site", "/", "/api/club/act-as"]) expect(passesThrough(proxy(request(path))), path).toBe(true);
   });
 
-  it("changes nothing on the live site, even with the password and the sample switch set", () => {
+  it("on the live site, answers the member area, the preview site and the keypad as an address that is not there, however written", () => {
     vi.stubEnv("VERCEL_ENV", "production");
-    for (const path of ["/club/start", "/site", "/", "/demo"]) expect(passesThrough(proxy(request(path))), path).toBe(true);
+    for (const path of ["/club/start", "/site", "/demo", "/demo?next=/club/start", "/api/club/act-as", "/%63lub/start", "/%63lub", "/%64emo", "/Club/start", "//site", "/api/%64emo/unlock"]) {
+      const res = proxy(request(path));
+      expect(passesThrough(res), path).toBe(false);
+      expect(new URL(res.headers.get("x-middleware-rewrite")!).pathname, path).toBe(NOT_THERE_PATH);
+    }
+    for (const method of ["POST", "PUT", "DELETE"]) {
+      expect(new URL(proxy(request("/api/demo/unlock", { method })).headers.get("x-middleware-rewrite")!).pathname, method).toBe(NOT_THERE_PATH);
+    }
+  });
+
+  it("on the live site, lets a server action's request reach its own page, which answers 'not found' by itself", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    const action = new NextRequest(`${SITE}/club/admin/billing`, { method: "POST", headers: { "next-action": "40c09439f9f0d091d27ab22282bba076e18cb671" } });
+    expect(passesThrough(proxy(action))).toBe(true);
+    // The same address without an action named is hidden like any other.
+    expect(passesThrough(proxy(request("/club/admin/billing", { method: "POST" })))).toBe(false);
+  });
+
+  it("on the live site, leaves the dashboard, its data and the menu's question alone", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    for (const path of ["/", "/goals", "/financials", "/api/dashboard", "/api/financials", "/api/nav-extras", "/clubhouse"]) {
+      expect(passesThrough(proxy(request(path))), path).toBe(true);
+    }
+  });
+
+  it("where invented data is not allowed for any reason, hides the same things", () => {
+    vi.stubEnv("CCS_ALLOW_SAMPLE_DATA", "");
+    vi.stubEnv("VERCEL_ENV", "");
+    expect(new URL(proxy(request("/club/start")).headers.get("x-middleware-rewrite")!).pathname).toBe(NOT_THERE_PATH);
+    expect(passesThrough(proxy(request("/goals")))).toBe(true);
   });
 });

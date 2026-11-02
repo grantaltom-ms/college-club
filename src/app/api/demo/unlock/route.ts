@@ -2,9 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { DEMO_COOKIE, DEMO_KEYPAD_PATH, DEMO_PASS_DAYS, demoGateState, demoNext, demoPassword, demoPasswordMatches, makeDemoPass } from "@/club/demo-gate";
 import { sameOrigin } from "@/lib/same-origin";
 
-/** The longest password this will even look at. Nobody's password is longer; it only stops a huge post being worked on. */
-const TYPED_MAX = 200;
-
 /**
  * Checks the demo password. Right: this browser gets a 30-day pass and goes on to the page it asked for. Wrong: back to the
  * keypad after a short wait. Where the keypad is off (the live site, development) this does not exist.
@@ -16,7 +13,7 @@ export async function POST(request: NextRequest) {
   const form = await request.formData().catch(() => null);
   const typed = form?.get("password");
   const next = demoNext(String(form?.get("next") ?? ""));
-  if (!password || typeof typed !== "string" || typed.length > TYPED_MAX || !demoPasswordMatches(typed, password)) {
+  if (!password || typeof typed !== "string" || !demoPasswordMatches(typed, password)) {
     // A second's wait on every wrong answer makes guessing by machine slow.
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const back = new URL(DEMO_KEYPAD_PATH, request.url);

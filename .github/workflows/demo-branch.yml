@@ -5,6 +5,7 @@ name: Keep the demo branch level with main
 # address of a branch's latest test version never changes: for this repository it is
 #   https://college-club-git-demo-grantaltom-ms-projects.vercel.app
 # This job copies main onto `demo` after every merge. Nothing is ever written to `demo` by hand; it is thrown away and remade each time.
+# If Vercel does not build the new commit by itself, a build can be started by hand (Vercel, the demo branch, Redeploy).
 # (A push made with this job's own token does not start the CI workflow again, so the browser tests do not run twice.)
 
 on:
@@ -24,5 +25,13 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Point the demo branch at this commit of main
-        run: git push --force origin HEAD:refs/heads/demo
+      - name: Make the demo branch a copy of main, as a commit of its own
+        run: |
+          set -e
+          # Vercel does not build a commit it has already built, and main's latest commit is already live, so the demo branch
+          # gets one extra empty commit of its own. It is the same code as main. The commit is written in the name of whoever
+          # wrote main's latest commit, so Vercel's check that the author belongs to the team still passes.
+          git config user.name "$(git log -1 --format='%an')"
+          git config user.email "$(git log -1 --format='%ae')"
+          git commit --allow-empty -m "Demo copy of main at $(git rev-parse --short HEAD)"
+          git push --force origin HEAD:refs/heads/demo

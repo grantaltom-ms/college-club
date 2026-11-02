@@ -79,18 +79,15 @@ export function demoPassValid(token: string | undefined, password: string | null
 }
 
 /**
- * Whether a page or handler is inside what the keypad covers: the member area, the public-site preview and the member area's
- * data handlers. The dashboard, its data and the keypad itself are not. The address is tidied the way a browser or a server
- * would (escapes undone, repeated slashes and dot segments folded, capitals ignored), and anything that cannot be read is
- * treated as covered, so a strangely written address can never slip past by looking different.
+ * An address as a browser or server would tidy it: escapes undone (twice, because an address can be escaped twice over),
+ * backslashes read as slashes, repeated slashes and dot segments folded, capitals ignored. Null when it cannot be read.
  */
-export function isGatedPath(pathname: string): boolean {
-  let decoded = pathname;
+function addressParts(pathname: string): string[] | null {
+  let decoded: string;
   try {
-    // Twice, because an address can be escaped twice over.
     decoded = decodeURIComponent(decodeURIComponent(pathname));
   } catch {
-    return true;
+    return null;
   }
   const parts: string[] = [];
   for (const part of decoded.replace(/\\/g, "/").split("/")) {
@@ -98,9 +95,28 @@ export function isGatedPath(pathname: string): boolean {
     if (part === "..") parts.pop();
     else parts.push(part.toLowerCase());
   }
+  return parts;
+}
+
+/**
+ * Whether a page or handler is inside what the keypad covers: the member area, the public-site preview and the member area's
+ * data handlers. The dashboard, its data and the keypad itself are not. An address that cannot be read is treated as covered,
+ * so a strangely written address can never slip past by looking different.
+ */
+export function isGatedPath(pathname: string): boolean {
+  const parts = addressParts(pathname);
+  if (parts === null) return true;
   const [first, second] = parts;
   if (first === "club" || first === "site") return true;
   return first === "api" && second === "club";
+}
+
+/** The keypad's own addresses: its page and its two buttons. */
+export function isKeypadPath(pathname: string): boolean {
+  const parts = addressParts(pathname);
+  if (parts === null) return false;
+  const [first, second] = parts;
+  return first === "demo" || (first === "api" && second === "demo");
 }
 
 /**
@@ -117,15 +133,21 @@ export function demoNext(value: string | null | undefined): string {
   return v;
 }
 
-export type GateDecision = { kind: "allow" } | { kind: "keypad"; next: string } | { kind: "refuse" };
+export type GateDecision = { kind: "allow" } | { kind: "keypad"; next: string } | { kind: "refuse" } | { kind: "hide" };
 
 /**
  * What to do with one request. A covered address without a good pass goes to the keypad (a page being opened) or is refused (a
  * button, a form or a data request, which cannot show a keypad). Everything else passes untouched, and with the keypad off
  * nothing at all is covered.
+ *
+ * Where invented data is not allowed (the live site) none of this exists: the member area, the public-site preview, the keypad
+ * and their escaped spellings all get "hide", which the door answers exactly as it answers any address that is not there. (An
+ * address written with escapes that decodes to a real page, such as /%63lub, used to reach the server as a plain error instead of
+ * "not found", which told a visitor the page existed.)
  */
 export function decideGate(input: { method: string; pathname: string; search: string; pass: string | undefined; now: Date; env?: Env }): GateDecision {
   const env = input.env ?? process.env;
+  if (!sampleDataAllowed(env)) return isGatedPath(input.pathname) || isKeypadPath(input.pathname) ? { kind: "hide" } : { kind: "allow" };
   const state = demoGateState(env);
   if (state === "off") return { kind: "allow" };
   if (!isGatedPath(input.pathname)) return { kind: "allow" };

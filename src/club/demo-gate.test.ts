@@ -12,6 +12,7 @@ import {
   demoPassword,
   demoPasswordMatches,
   isGatedPath,
+  isKeypadPath,
   makeDemoPass,
 } from "./demo-gate";
 
@@ -151,6 +152,15 @@ describe("what the keypad covers", () => {
     for (const path of sneaky) expect(isGatedPath(path), path).toBe(true);
   });
 
+  it("knows the keypad's own addresses, however written", () => {
+    for (const path of ["/demo", "/demo/", "/api/demo/unlock", "/api/demo/lock", "/%64emo", "/Demo", "//demo", "/./demo", "/api/%64emo/unlock"]) {
+      expect(isKeypadPath(path), path).toBe(true);
+    }
+    for (const path of ["/", "/goals", "/club", "/demonstration", "/api/demonstration", "/api", "/api/club/demo", "/x/demo", "/%E0%A4%A"]) {
+      expect(isKeypadPath(path), path).toBe(false);
+    }
+  });
+
   it("treats an address it cannot read as covered", () => {
     expect(isGatedPath("/%E0%A4%A")).toBe(true);
     expect(isGatedPath("/goals%")).toBe(true);
@@ -208,8 +218,41 @@ describe("what to do with a request", () => {
     expect(ask({ env, method: "POST", pathname: "/api/club/act-as" })).toEqual({ kind: "allow" });
   });
 
-  it("lets everything through on the live site, covered address or not (nothing exists there)", () => {
-    expect(ask({ env: { ...ON, VERCEL_ENV: "production" } })).toEqual({ kind: "allow" });
+  it("hides the member area, the preview site and the keypad on the live site, with or without the password set", () => {
+    const live = { ...ON, VERCEL_ENV: "production" };
+    for (const pathname of ["/club", "/club/start", "/site", "/site/request-a-tour", "/api/club/act-as", "/demo", "/api/demo/unlock", "/api/demo/lock"]) {
+      expect(ask({ env: live, pathname }), pathname).toEqual({ kind: "hide" });
+      expect(ask({ env: live, pathname, method: "POST" }), pathname).toEqual({ kind: "hide" });
+      expect(ask({ env: { ...live, CCS_DEMO_PASSWORD: undefined }, pathname }), pathname).toEqual({ kind: "hide" });
+    }
+  });
+
+  it("hides them however the address is written, so no spelling reaches a page that is not there", () => {
+    const live = { ...ON, VERCEL_ENV: "production" };
+    for (const pathname of ["/%63lub", "/%63lub/start", "/%2563lub/start", "/Club/start", "/CLUB", "/SITE/request-a-tour", "//club/start", "/club//start", "/./club/start", "/x/../club/start", "/%64emo", "/%2564emo", "/Demo", "/api/%63lub/act-as", "/api/%64emo/unlock", "/\\club/start", "/%E0%A4%A"]) {
+      expect(ask({ env: live, pathname }), pathname).toEqual({ kind: "hide" });
+    }
+  });
+
+  it("hides them wherever invented data is not allowed, not only on the live site", () => {
+    const off = { NODE_ENV: "production", CCS_DEMO_PASSWORD: PASSWORD };
+    expect(ask({ env: off })).toEqual({ kind: "hide" });
+    expect(ask({ env: off, pathname: "/demo" })).toEqual({ kind: "hide" });
+  });
+
+  it("leaves the dashboard, its data and the menu's question alone on the live site", () => {
+    const live = { ...ON, VERCEL_ENV: "production" };
+    for (const pathname of ["/", "/goals", "/visits", "/financials", "/api/dashboard", "/api/financials", "/api/nav-extras", "/clubhouse", "/api/clubhouse", "/demonstration"]) {
+      expect(ask({ env: live, pathname }), pathname).toEqual({ kind: "allow" });
+    }
+  });
+
+  it("never hides anything where invented data is allowed (a test build)", () => {
+    for (const env of [ON, { ...ON, CCS_DEMO_PASSWORD: undefined }, { NODE_ENV: "development" }, { ...ON, VERCEL_ENV: "preview" }]) {
+      for (const pathname of ["/club/start", "/site", "/demo", "/%63lub/start"]) {
+        expect(ask({ env, pathname }).kind, pathname).not.toBe("hide");
+      }
+    }
   });
 
   it("lets the dashboard, its data, the menu's question and the keypad through without a pass", () => {

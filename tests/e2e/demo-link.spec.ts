@@ -62,6 +62,12 @@ test.describe("the live dashboard's link to the demo", () => {
       expect(res.headers.get("location"), path).toBeNull();
       expect(await res.text(), path).not.toMatch(/Try the club system|Open the demo|Test member view|Abernathy|Staff office/i);
     }
+    // The same for addresses written with escapes: not found, never a server error that gives the page away.
+    for (const path of ["/%63lub/start", "/%63lub", "/%64emo", "/%73ite/request-a-tour", "/api/%64emo/unlock"]) {
+      const res = await fetch(`${BASE}${path}`, { redirect: "manual" });
+      expect(res.status, path).toBe(404);
+      expect(res.headers.get("location"), path).toBeNull();
+    }
     for (const path of ["/api/demo/unlock", "/api/demo/lock", "/api/club/act-as"]) {
       const res = await fetch(`${BASE}${path}`, { method: "POST", redirect: "manual", body: new URLSearchParams({ password: "playwright-only-demo-0001", actor: "staff" }) });
       expect(res.status, path).toBe(404);
