@@ -79,7 +79,8 @@ test.describe("finding an item", () => {
     await expect(page.getByTestId("equipment-row")).toHaveCount(2);
     await expect(page.getByTestId("equipment-count")).toHaveText(/^Showing 2 of \d+ items\.$/);
     await expect(page.getByLabel("Find by name")).toHaveValue(t);
-    await page.getByLabel("Find by name").fill(`${t.slice(0, 5)}x`);
+    // Longer than any tag, so no name in the club can start with it (a shorter made-up word could match another test's items).
+    await page.getByLabel("Find by name").fill(`${t}zzz`);
     await page.getByRole("button", { name: "Find" }).click();
     await expect(page.getByTestId("equipment-row")).toHaveCount(0);
     await expect(page.getByText("Nothing has a name starting that way.")).toBeVisible();
@@ -273,6 +274,23 @@ test.describe("retiring an item", () => {
     await editForm(page).getByLabel("Name").fill(`${a} (old)`);
     await save(page);
     await expect(page.getByTestId("action-ok")).toContainText(`name from ${a} to ${a} (old)`);
+  });
+
+  test("a retired pool offers its name and nothing else: no number of places to change", async ({ page }) => {
+    const t = tag();
+    const name = `Pw retired docks ${t}`;
+    await addItems(page, row(name, "Dock Space", "", "", "5"));
+    await openItem(page, name, t);
+    // While it is in use the pool offers its places...
+    await expect(editForm(page).getByLabel("Places in this pool")).toHaveValue("5");
+    await page.getByTestId("retire-form").getByLabel("Why is it being retired?").fill("Dock removed");
+    await page.getByRole("button", { name: `Retire ${name}` }).click();
+    await expect(page.getByTestId("action-ok")).toContainText(`${name} is retired. Nothing was booked on it.`);
+    // ...and once retired, only the name can be changed.
+    await expect(editForm(page).getByLabel("Name")).toBeVisible();
+    await expect(editForm(page).getByLabel("Places in this pool")).toHaveCount(0);
+    await expect(editForm(page).getByLabel("Skill level needed")).toHaveCount(0);
+    await expect(page.getByText("A retired item can only be renamed.")).toBeVisible();
   });
 });
 
