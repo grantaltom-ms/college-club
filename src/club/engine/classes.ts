@@ -19,6 +19,7 @@ import {
 } from "../types";
 import { clockWords, opensAt } from "./bookings";
 import { blockReasonFor } from "./eligibility";
+import { isRetired } from "./boat-access";
 import type { BookingLedger, Ctx } from "./households";
 import { classClash, enrolledCount, fullName, memberById, ordinal, practiceSeatClash, waitingCount, waitlistPlace } from "./queries";
 
@@ -347,6 +348,7 @@ export interface NewClass {
 function roomOrThrow(state: ClubState, book: RuleBook, itemId: string): Item {
   const item = state.items.find((i) => i.id === itemId);
   if (!item) throw new ClubError("not_found", "That room no longer exists.");
+  if (isRetired(item)) throw new ClubError("invalid", `${item.name} has been retired, so a class cannot use it.`);
   if (!CLASS_ROOM_TYPES.includes(classOf(book, item).type)) throw new ClubError("invalid", `${item.name} is not a gym or room, so a class cannot use it.`);
   return item;
 }

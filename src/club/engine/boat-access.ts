@@ -26,6 +26,9 @@ export type BoatViewer = { kind: "member"; memberId: string } | { kind: "staff" 
 
 export const isPrivate = (item: Item): boolean => item.isPrivate === true;
 
+/** Staff retired it: no longer offered or bookable, kept for the record. Staff can bring it back (see equipment-edit.ts). */
+export const isRetired = (item: Item): boolean => item.retired !== undefined;
+
 /** The lines on a boat's list that are in force right now. */
 export function activeAccess(state: ClubState, itemId: string): BoatAccess[] {
   return state.boatAccess.filter((a) => a.itemId === itemId && a.endedAt === null);
@@ -49,8 +52,12 @@ export function boatLocked(state: ClubState, item: Item): boolean {
   return isPrivate(item) && activeOwners(state, item.id).length === 0;
 }
 
-/** Whether the viewer is shown this item at all. A club boat is shown to everyone; a private boat only to staff and its list. */
+/**
+ * Whether the viewer is shown this item at all. A club boat is shown to everyone; a private boat only to staff and its list. A
+ * retired item is shown to nobody (staff see it on the Equipment page's own retired list, which does not ask this).
+ */
 export function itemVisibleTo(state: ClubState, item: Item, viewer: BoatViewer): boolean {
+  if (isRetired(item)) return false;
   if (!isPrivate(item) || viewer.kind === "staff") return true;
   return accessKind(state, item.id, viewer.memberId) !== null;
 }
@@ -74,6 +81,7 @@ export function crewNotAllowedWords(item: Item, name: string): string {
 function privateItem(state: ClubState, itemId: string): Item {
   const item = state.items.find((i) => i.id === itemId);
   if (!item) throw new ClubError("not_found", "That boat no longer exists.");
+  if (isRetired(item)) throw new ClubError("conflict", `${item.name} has been retired, so its list of owners cannot change. Club staff can bring it back first.`);
   if (!isPrivate(item)) throw new ClubError("invalid", `${item.name} is a club boat, not a private one, so it has no list of owners.`);
   return item;
 }
@@ -291,7 +299,7 @@ function boatView(state: ClubState, book: RuleBook, item: Item, now: Date): Priv
 /** Every private boat, for staff: locked ones first, then by name. */
 export function privateBoats(state: ClubState, book: RuleBook, now: Date): PrivateBoatView[] {
   return state.items
-    .filter(isPrivate)
+    .filter((i) => isPrivate(i) && !isRetired(i))
     .map((i) => boatView(state, book, i, now))
     .sort((a, b) => Number(b.locked) - Number(a.locked) || a.name.localeCompare(b.name));
 }
@@ -299,7 +307,7 @@ export function privateBoats(state: ClubState, book: RuleBook, now: Date): Priva
 /** The private boats this member is an active owner of, for the My boats page. */
 export function myOwnedBoats(state: ClubState, book: RuleBook, memberId: string, now: Date): PrivateBoatView[] {
   return state.items
-    .filter((i) => isPrivate(i) && accessKind(state, i.id, memberId) === "owner")
+    .filter((i) => isPrivate(i) && !isRetired(i) && accessKind(state, i.id, memberId) === "owner")
     .map((i) => boatView(state, book, i, now))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -307,7 +315,7 @@ export function myOwnedBoats(state: ClubState, book: RuleBook, memberId: string,
 /** The private boats this member was invited to (and does not own). */
 export function myInvitedBoats(state: ClubState, book: RuleBook, memberId: string): { itemId: string; name: string; className: string; locked: boolean }[] {
   return state.items
-    .filter((i) => isPrivate(i) && accessKind(state, i.id, memberId) === "invited")
+    .filter((i) => isPrivate(i) && !isRetired(i) && accessKind(state, i.id, memberId) === "invited")
     .map((i) => ({ itemId: i.id, name: i.name, className: classOf(book, i).name, locked: boatLocked(state, i) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -315,7 +323,7 @@ export function myInvitedBoats(state: ClubState, book: RuleBook, memberId: strin
 /** Private boats with nobody who can use them as an owner: the staff to-do list. */
 export function lockedBoats(state: ClubState, now: Date): { itemId: string; name: string; upcoming: number }[] {
   return state.items
-    .filter((i) => boatLocked(state, i))
+    .filter((i) => !isRetired(i) && boatLocked(state, i))
     .map((i) => ({
       itemId: i.id,
       name: i.name,

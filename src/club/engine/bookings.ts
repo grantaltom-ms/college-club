@@ -21,7 +21,7 @@ import {
   type OutOfServicePeriod,
   type RuleBook,
 } from "../types";
-import { accessKind, boatLocked, crewNotAllowedWords, isPrivate, lockedWords, notAllowedWords } from "./boat-access";
+import { accessKind, boatLocked, crewNotAllowedWords, isPrivate, isRetired, lockedWords, notAllowedWords } from "./boat-access";
 import { bookingBlockReason, meetsQualification } from "./eligibility";
 import type { BookingLedger, Ctx } from "./households";
 import { firstFullStretch, holdingIn, placesOf } from "./pools";
@@ -35,6 +35,7 @@ export type ReasonCode =
   | "boat_locked"
   | "not_allowed_on_boat"
   | "crew_not_allowed"
+  | "item_retired"
   | "out_of_service"
   | "starts_in_past"
   | "too_far_ahead"
@@ -172,7 +173,8 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
     }
   }
 
-  // The item.
+  // The item. A retired one is gone for good (until staff bring it back): a fact, not a rule, so staff cannot book past it.
+  if (isRetired(item)) add("item_retired", `${item.name} has been retired and can no longer be booked.`);
   for (const p of state.outOfService) {
     if (p.itemId !== item.id) continue;
     if (overlaps(start, end, Date.parse(p.from), p.until === null ? Infinity : Date.parse(p.until))) {

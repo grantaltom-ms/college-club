@@ -1,17 +1,29 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
-import { affectedBookings, outOfServiceAt } from "@/club/engine/bookings";
+import { affectedBookings } from "@/club/engine/bookings";
+import { equipmentList, type EquipmentLine } from "@/club/engine/equipment-edit";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
-import { RULE_BOOK, classOf } from "@/club/settings/rulebook";
+import { RULE_BOOK } from "@/club/settings/rulebook";
 import { getClubStore } from "@/club/store/instance";
-import { formatDay, formatDayLong, formatRange, pacificDate } from "@/club/time";
+import { formatDay, formatDayLong, formatMoment, formatRange, pacificDate } from "@/club/time";
 import { idParam, NOTICES } from "@/club/web";
 import { SignedOut } from "../SignedOut";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/** Staff only: what is in service, and taking things out of service or back. A fuller staff screen comes in step 5. */
+/** What kind of thing an item is, in one line: "Shell · Double, 2 seats", "Dock space · pool of 60 places". */
+function describe(l: EquipmentLine): string {
+  const size = l.pool ? `pool of ${plural(l.places, "place")}` : plural(l.seats, "seat");
+  return `${l.type} · ${l.className}, ${size}${l.isPrivate ? " · private boat" : ""}`;
+}
+
+/**
+ * Staff only: what is in service, taking things out of service or back, and a way into each item to fix it or retire it. The find
+ * box narrows the list by the first letters of any word of a name; retired items are kept apart, below.
+ */
 export default async function Equipment({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireClub();
   const actor = await getCurrentActor();
@@ -21,10 +33,13 @@ export default async function Equipment({ searchParams }: { searchParams: Promis
   const now = clubNow();
   const state = await (await getClubStore()).read();
   const params = await searchParams;
+  const find = (one(params.find) ?? "").slice(0, 80);
+  const list = equipmentList(state, RULE_BOOK, now, find);
   const periodId = idParam(params.affected);
   const period = periodId ? state.outOfService.find((p) => p.id === periodId) : undefined;
   const affected = period ? affectedBookings(state, period.itemId, new Date(period.from), period.until ? new Date(period.until) : null) : [];
   const notice = NOTICES[one(params.notice) ?? ""];
+  const shown = list.active.length + list.retired.length;
 
   return (
     <section>
@@ -63,53 +78,109 @@ export default async function Equipment({ searchParams }: { searchParams: Promis
         </div>
       )}
 
+      <form method="get" action="/club/equipment" className="club-form" role="search" data-testid="equipment-find">
+        <p>
+          <label htmlFor="equipment-find-box">Find by name</label>
+          <input id="equipment-find-box" name="find" type="search" defaultValue={find} maxLength={80} autoComplete="off" />
+        </p>
+        <p>
+          <button type="submit" className="club-button club-button-quiet">
+            Find
+          </button>
+          {find !== "" && (
+            <>
+              {" "}
+              <Link href="/club/equipment">Show everything</Link>
+            </>
+          )}
+        </p>
+      </form>
+      <p className="club-meta" data-testid="equipment-count">
+        {find === "" ? `${plural(list.total, "item")}.` : `Showing ${shown} of ${plural(list.total, "item")}.`}
+      </p>
+      {find !== "" && shown === 0 && <p>Nothing has a name starting that way.</p>}
+
       <ul className="club-cards" aria-label="Equipment">
-        {state.items.map((item) => {
-          const out = outOfServiceAt(state, item.id, now);
-          return (
-            <li key={item.id} className="club-card" data-testid="equipment-row" data-item={item.name}>
-              <h3>
-                {item.name} <span className="club-meta">{classOf(RULE_BOOK, item).name}</span>
-              </h3>
-              {out ? (
-                <>
-                  <p data-testid="equipment-status">
-                    <strong>Out of service</strong>: {out.reason}
-                    {out.expectedReturn ? `, expected back ${formatDay(out.expectedReturn)}` : ""}
-                  </p>
-                  <form method="post" action="/api/club/equipment/return">
-                    <input type="hidden" name="period" value={out.id} />
-                    <button type="submit" className="club-button club-button-quiet" aria-label={`Return ${item.name} to service`}>
-                      Return to service
+        {list.active.map((l) => (
+          <li key={l.itemId} className="club-card" data-testid="equipment-row" data-item={l.name}>
+            <h3>
+              {l.name} <span className="club-meta">{l.className}</span>
+            </h3>
+            <p className="club-meta" data-testid="equipment-kind">
+              {describe(l)}
+            </p>
+            {l.out ? (
+              <>
+                <p data-testid="equipment-status">
+                  <strong>Out of service</strong>: {l.out.reason}
+                  {l.out.expectedReturn ? `, expected back ${formatDay(l.out.expectedReturn)}` : ""}
+                </p>
+                <form method="post" action="/api/club/equipment/return">
+                  <input type="hidden" name="period" value={l.out.periodId} />
+                  <button type="submit" className="club-button club-button-quiet" aria-label={`Return ${l.name} to service`}>
+                    Return to service
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <p data-testid="equipment-status">In service</p>
+                <details>
+                  <summary>Take out of service</summary>
+                  <form method="post" action="/api/club/equipment/out-of-service" className="club-form">
+                    <input type="hidden" name="item" value={l.itemId} />
+                    <p>
+                      <label htmlFor={`reason-${l.itemId}`}>Why (members will see this)</label>
+                      <input id={`reason-${l.itemId}`} name="reason" type="text" maxLength={200} required />
+                    </p>
+                    <p>
+                      <label htmlFor={`back-${l.itemId}`}>Expected back (optional)</label>
+                      <input id={`back-${l.itemId}`} name="expectedReturn" type="date" />
+                    </p>
+                    <button type="submit" className="club-button" aria-label={`Take ${l.name} out of service`}>
+                      Take out of service
                     </button>
                   </form>
-                </>
-              ) : (
-                <>
-                  <p data-testid="equipment-status">In service</p>
-                  <details>
-                    <summary>Take out of service</summary>
-                    <form method="post" action="/api/club/equipment/out-of-service" className="club-form">
-                      <input type="hidden" name="item" value={item.id} />
-                      <p>
-                        <label htmlFor={`reason-${item.id}`}>Why (members will see this)</label>
-                        <input id={`reason-${item.id}`} name="reason" type="text" maxLength={200} required />
-                      </p>
-                      <p>
-                        <label htmlFor={`back-${item.id}`}>Expected back (optional)</label>
-                        <input id={`back-${item.id}`} name="expectedReturn" type="date" />
-                      </p>
-                      <button type="submit" className="club-button" aria-label={`Take ${item.name} out of service`}>
-                        Take out of service
-                      </button>
-                    </form>
-                  </details>
-                </>
-              )}
-            </li>
-          );
-        })}
+                </details>
+              </>
+            )}
+            <p>
+              <Link href={`/club/equipment/${l.itemId}`} aria-label={`Edit or retire ${l.name}`} data-testid="equipment-edit-link">
+                Edit or retire
+              </Link>
+            </p>
+          </li>
+        ))}
       </ul>
+
+      {list.retired.length > 0 && (
+        <details data-testid="equipment-retired" open={find !== ""}>
+          <summary>{plural(list.retired.length, "retired item")}</summary>
+          <ul className="club-cards" aria-label="Retired equipment">
+            {list.retired.map((l) => (
+              <li key={l.itemId} className="club-card" data-testid="retired-row" data-item={l.name}>
+                <h3>
+                  {l.name} <span className="club-meta">{l.className}</span>
+                </h3>
+                <p className="club-meta">{describe(l)}</p>
+                <p data-testid="retired-status">
+                  Retired {l.retired ? formatMoment(l.retired.at) : ""} by {l.retired?.by}: {l.retired?.reason}
+                </p>
+                {l.upcoming > 0 && (
+                  <p className="club-meta" data-testid="retired-upcoming">
+                    {plural(l.upcoming, "upcoming booking")} still on it.
+                  </p>
+                )}
+                <p>
+                  <Link href={`/club/equipment/${l.itemId}`} aria-label={`Open retired ${l.name}`}>
+                    Open, to rename or bring back
+                  </Link>
+                </p>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   );
 }

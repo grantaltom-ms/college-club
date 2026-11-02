@@ -19,7 +19,7 @@ import {
   type RuleBook,
   type SeatSide,
 } from "../types";
-import { isPrivate, PEOPLE_SEARCH_MIN_LETTERS, PEOPLE_SEARCH_MOST, type BoatPeopleSearch } from "./boat-access";
+import { isPrivate, isRetired, PEOPLE_SEARCH_MIN_LETTERS, PEOPLE_SEARCH_MOST, type BoatPeopleSearch } from "./boat-access";
 import { blockReasonFor } from "./eligibility";
 import { log, type Ctx } from "./households";
 import { placesOf } from "./pools";
@@ -181,6 +181,7 @@ export function practiceNoticeFor(state: ClubState, booking: Booking): string | 
 function boatReasons(state: ClubState, book: RuleBook, itemId: string, startsAt: Date, endsAt: Date, exceptPracticeId?: string): string[] {
   const item = itemById(state, itemId);
   if (!item) return ["That boat no longer exists."];
+  if (isRetired(item)) return [`${item.name} has been retired, so it cannot go on a practice.`];
   if (isPrivate(item)) return [`${item.name} is a private boat. Its owners decide who uses it, so it cannot go on a practice.`];
   if (!BOOKING_TYPE_INFO[classOf(book, item).type].onWater || placesOf(item) > 1) return [`${item.name} is not a boat, so it cannot go on a practice.`];
   const reasons: string[] = [];
@@ -658,7 +659,7 @@ export const sideWords = (side: SeatSide | null): string => (side === "port" ? "
 /** The boats that can go on a practice: club boats, kayaks and paddle boards (not a private boat, a dock or a room), by name. */
 export function reservableBoats(state: ClubState, book: RuleBook): { id: string; name: string; className: string; seats: number }[] {
   return state.items
-    .filter((i) => !isPrivate(i) && placesOf(i) === 1 && BOOKING_TYPE_INFO[classOf(book, i).type].onWater)
+    .filter((i) => !isPrivate(i) && !isRetired(i) && placesOf(i) === 1 && BOOKING_TYPE_INFO[classOf(book, i).type].onWater)
     .map((i) => ({ id: i.id, name: i.name, className: classOf(book, i).name, seats: classOf(book, i).seats }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }

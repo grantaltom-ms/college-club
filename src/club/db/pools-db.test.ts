@@ -89,18 +89,28 @@ describe.skipIf(!ADMIN_URL)("pools", () => {
       for (const code of ["t-boat", "t-kayak", "t-board", "t-work"]) expect(await attempt(`insert into club.items (name, class_code, places) values ($1, $2, 1)`, [`One ${code}`, code])).toBeNull();
     });
 
-    it("cannot change once the pool is made, but a save that names the same number changes nothing", async () => {
+    // A pool can be resized since the equipment-edit migration (see equipment-edit-db.test.ts), but never to or from a single place,
+    // and never without a matching line in the item's file. A save that names the same number changes nothing.
+    it("can never become a single place or stop being one, and a save that names the same number changes nothing", async () => {
       const id = await pool(8);
-      expect((await attempt(`update club.items set places = 9 where id = $1`, [id]))?.message).toMatch(/cannot be changed/);
-      expect((await attempt(`update club.items set places = 1 where id = $1`, [id]))?.message).toMatch(/cannot be changed/);
+      expect((await attempt(`update club.items set places = 1 where id = $1`, [id]))?.message).toMatch(/cannot become a pool, or stop being one/);
       expect(await attempt(`update club.items set places = 8, rule_overrides = '{"maxMinutes": 90}'::jsonb where id = $1`, [id])).toBeNull();
+      expect((await q(`select places from club.items where id = $1`, [id])).rows[0].places).toBe(8);
+      const single = await item("t-boat");
+      expect((await attempt(`update club.items set places = 4 where id = $1`, [single]))?.message).toMatch(/cannot become a pool, or stop being one/);
+    });
+
+    it("cannot be resized without a line in the item's file", async () => {
+      const id = await pool(8);
+      expect((await attempt(`update club.items set places = 9 where id = $1`, [id]))?.message).toMatch(/cannot change without a matching line in its file/);
       expect((await q(`select places from club.items where id = $1`, [id])).rows[0].places).toBe(8);
     });
 
-    it("cannot move a boat's class so that it is a pool, or a pool's class to a boat", async () => {
+    it("cannot move a boat's class so that it is a pool, or a pool's class to a boat, or to another kind of space", async () => {
       const id = await pool(8);
-      expect((await attempt(`update club.items set class_code = 't-boat' where id = $1`, [id]))?.message).toMatch(/Only a dock, club room or gym space/);
-      expect(await attempt(`update club.items set class_code = 't-gym' where id = $1`, [id])).toBeNull();
+      // The item cannot change what kind of thing it is at all now, so a pool never becomes a boat and a dock never becomes a gym.
+      expect((await attempt(`update club.items set class_code = 't-boat' where id = $1`, [id]))?.message).toMatch(/cannot change what kind of thing it is/);
+      expect((await attempt(`update club.items set class_code = 't-gym' where id = $1`, [id]))?.message).toMatch(/cannot change what kind of thing it is/);
     });
 
     it("is never a private pool", async () => {

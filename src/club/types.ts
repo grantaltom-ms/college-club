@@ -179,10 +179,44 @@ export interface Item {
   isPrivate?: boolean;
   /**
    * How many people can hold this item at the same moment. Undefined means one, like every boat. Only a dock, club room or gym
-   * space (`POOLED_TYPES`) can have more: it is a pool, and the club only counts how many places are left. Set when the item is
-   * made and never changed.
+   * space (`POOLED_TYPES`) can have more: it is a pool, and the club only counts how many places are left. Staff can resize a pool
+   * (never to or from a single place, and never below what is booked at its busiest moment); see equipment-edit.ts.
    */
   places?: number;
+  /**
+   * Set when staff retire the item: it is no longer offered or bookable and drops out of every list and picker, but it is kept for
+   * the record (old bookings still name it) and staff can bring it back. Undefined while the item is in use.
+   */
+  retired?: ItemRetirement;
+}
+
+/** When, by whom and why an item was retired. */
+export interface ItemRetirement {
+  /** ISO instant. */
+  at: string;
+  by: Actor;
+  reason: string;
+}
+
+/** What a line in an item's file records: a fix, a retirement, or bringing it back. */
+export const ITEM_LOG_KINDS = ["changed", "retired", "restored"] as const;
+export type ItemLogKind = (typeof ITEM_LOG_KINDS)[number];
+
+/**
+ * One line in an item's own file: who changed it, when, and what it said before. Lines are only added, never changed or removed.
+ * `details` holds the old and new value of each thing a "changed" line is about (nameFrom/nameTo, seatsFrom/seatsTo,
+ * skillFrom/skillTo, placesFrom/placesTo), so the database can check a change had its line.
+ */
+export interface ItemLogEntry {
+  id: string;
+  itemId: string;
+  /** ISO instant. */
+  at: string;
+  kind: ItemLogKind;
+  by: Actor;
+  /** A plain sentence a staff member can read. */
+  text: string;
+  details: Record<string, string | number | null>;
 }
 
 /** An owner is picked by staff; an invited person is named by an owner (or by staff). */
@@ -896,6 +930,8 @@ export interface ClubState {
   memberQualifications: MemberQualification[];
   history: HistoryEntry[];
   items: Item[];
+  /** The file of each item: every fix, retirement and return, with who did it. Never changed or removed. */
+  itemLog: ItemLogEntry[];
   outOfService: OutOfServicePeriod[];
   /** Who may use each private boat. Empty lines for a club boat: it has no list. */
   boatAccess: BoatAccess[];
