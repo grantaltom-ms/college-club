@@ -20,10 +20,12 @@ export interface EditFormProps {
   skill: { current: string; choices: { value: string; label: string }[] } | null;
   /** A pool's number of places; null when the item is not a pool or is retired. */
   places: number | null;
+  /** Max combined rower weight in pounds for boats; null when the item is not a boat or is retired. */
+  maxWeightLbs: number | null | undefined;
 }
 
 /** The boxes to fix on one item. Whatever staff leave as it is stays as it is. */
-export function EditItemForm({ itemId, name, seats, skill, places }: EditFormProps) {
+export function EditItemForm({ itemId, name, seats, skill, places, maxWeightLbs }: EditFormProps) {
   const { state, pending, run } = useStaffAction(changeItem);
   return (
     <form className="club-form" data-testid="edit-item-form" onSubmit={submit(run)}>
@@ -60,6 +62,24 @@ export function EditItemForm({ itemId, name, seats, skill, places }: EditFormPro
         <p>
           <label htmlFor={`item-places-${itemId}`}>Places in this pool</label>
           <input id={`item-places-${itemId}`} name="places" type="number" inputMode="numeric" min={2} max={500} step={1} defaultValue={places} required />
+        </p>
+      )}
+      {maxWeightLbs !== undefined && (
+        <p>
+          <label htmlFor={`item-weight-${itemId}`}>Max weight (pounds)</label>
+          <input
+            id={`item-weight-${itemId}`}
+            name="maxWeightLbs"
+            type="number"
+            inputMode="numeric"
+            min={50}
+            max={800}
+            step={1}
+            defaultValue={maxWeightLbs ?? ""}
+            placeholder="Leave blank if not set"
+            autoComplete="off"
+          />
+          <span className="club-meta">Combined rower weight. Leave blank to clear.</span>
         </p>
       )}
       <ActionMessage state={state} />

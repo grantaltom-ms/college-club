@@ -32,6 +32,12 @@ function editFrom(form: FormData): ItemEdit | string {
     if (!/^\d{1,5}$/.test(places)) return "Places must be a whole number.";
     edit.places = Number(places);
   }
+  if (form.has("maxWeightLbs")) {
+    const weight = textOf(form, "maxWeightLbs", 6).trim();
+    if (weight === "") edit.maxWeightLbs = null;
+    else if (!/^\d{2,3}$/.test(weight)) return "Max weight must be a whole number of pounds, or left blank.";
+    else edit.maxWeightLbs = Number(weight);
+  }
   return edit;
 }
 

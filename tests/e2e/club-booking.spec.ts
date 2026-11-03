@@ -53,7 +53,7 @@ test("core flow: pick a member, find a free single, book it, see it in My bookin
   await cancelAll(page);
 
   await openDay(page, "2026-10-31", "Shell");
-  await expect(page.getByTestId("day-heading")).toHaveText("Saturday, Oct 31");
+  await expect(page.getByTestId("day-heading")).toHaveText(/^Saturday, Oct 31$/);
   await expect(page.getByTestId("placeholder-note")).toBeVisible();
   // Pick Kingfisher's 9:00 am half hour, the free single.
   await slot(page, "Kingfisher", "9:00 to 9:30 am", "free").click();
@@ -299,10 +299,10 @@ test("staff take a boat out of service: new bookings stop, existing ones stay, a
   await actAs(page, "Tomas Vandermeer");
   await page.goto("/club/my-bookings");
   await expect(row(page, "Cormorant").getByTestId("booking-status")).toHaveText("Upcoming");
-  // Everyone else is stopped, and told why.
+  // Members no longer see an out-of-commission boat on Reservations; a leftover booking link still refuses in words.
   await actAs(page, "Nora Abernathy");
   await openDay(page, "2026-11-03", "Shell");
-  await expect(slot(page, "Cormorant", "8:00 to 8:30 am", "out of service")).toBeVisible();
+  await expect(page.locator('[data-testid=item-card][data-item=Cormorant]')).toHaveCount(0);
   await page.goto(cormorantHref);
   await expect(page.getByTestId("refusal-reasons")).toHaveText("Cormorant is out of service (Seat repair).");
   await expect(page.getByRole("button", { name: "Book Cormorant" })).toHaveCount(0);
@@ -431,12 +431,16 @@ test("Reservations opens on categories first: gym before shells, kayaks with boa
   await expect(page.getByTestId("shell-kinds")).toBeVisible();
   await expect(page.getByTestId("item-card")).toHaveCount(0);
   await page.getByTestId("shell-kinds").locator("[data-kind=single]").click();
-  await expect(page.getByTestId("browse-label")).toHaveText(/Shells · Single/);
+  await expect(page.getByTestId("browse-label")).toHaveText(/Shells · 1x/);
   await expect(page.getByTestId("day-heading")).toBeVisible();
+  await expect(page.getByTestId("day-select")).toBeVisible();
   await expect(page.getByTestId("item-card").first()).toBeVisible();
   // Singles only: a known double stays off this list.
   await expect(page.locator('[data-testid=item-card][data-item=Loon]')).toHaveCount(0);
   await expect(page.locator('[data-testid=item-card][data-item=Heron]')).toBeVisible();
+  // Out-of-commission boats are hidden from members.
+  await expect(page.locator('[data-testid=item-card][data-item=Merganser]')).toHaveCount(0);
+  await expect(page.getByTestId("item-card").filter({ hasText: "max" }).first()).toContainText(/max \d+ lb/);
 });
 
 test("a day outside the booking window is not shown silently as another day: the page says so", async ({ page }) => {
@@ -444,12 +448,14 @@ test("a day outside the booking window is not shown silently as another day: the
   // Far too late: the last day open is shown, with a sentence that names both days.
   await page.goto("/club/book?day=2026-12-25&type=Shell");
   await expect(page.getByTestId("day-note")).toHaveText(/^Friday, Dec 25 is further ahead than you can book yet\. Showing \w+, Nov \d+, the last day open\.$/);
-  const days = page.getByRole("navigation", { name: "Pick a day" }).getByRole("link");
-  await expect(days.last()).toHaveAttribute("aria-current", "page");
+  const daySelect = page.getByTestId("day-select");
+  await expect(daySelect).toBeVisible();
+  const lastDay = await daySelect.locator("option").last().getAttribute("value");
+  await expect(daySelect).toHaveValue(lastDay!);
   // Already gone: today, with the other sentence.
   await page.goto("/club/book?day=2026-10-20&type=Shell");
   await expect(page.getByTestId("day-note")).toHaveText(/^Tuesday, Oct 20 has already passed\. Showing \w+, Oct \d+\.$/);
-  await expect(days.first()).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("day-select")).toHaveValue("2026-10-28");
   // A day on offer, nothing asked for, and nonsense in the address: no note.
   await page.goto("/club/book?day=2026-10-30&type=Shell");
   await expect(page.getByTestId("day-note")).toHaveCount(0);
