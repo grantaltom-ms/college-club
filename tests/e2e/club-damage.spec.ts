@@ -32,7 +32,20 @@ async function uploadBoat(page: Page, name: string) {
 const settled = (page: Page) => page.waitForLoadState("networkidle");
 
 const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
-const card = (page: Page, boat: string) => page.locator(`[data-testid="item-card"][data-item="${boat}"]`);
+const shellRow = (page: Page, boat: string) => page.locator(`[data-testid="shell-row"][data-item="${boat}"]`);
+
+/** Pacific hour (0–23) from a slot range like "9:00 to 9:30 am". Shells need ?hour= for the dense free list. */
+function hourFromRange(range: string): number {
+  const m = /^(\d{1,2}):\d{2} to .+ (am|pm)$/i.exec(range.trim());
+  if (!m) throw new Error(`bad range: ${range}`);
+  let h = Number(m[1]);
+  const ap = m[2].toLowerCase();
+  if (ap === "pm" && h !== 12) h += 12;
+  if (ap === "am" && h === 12) h = 0;
+  return h;
+}
+
+const shellDay = (day: string, hour: number) => `/club/book?day=${day}&what=shell&kind=single&hour=${hour}`;
 
 /** A member files a report through the form, as a person would. */
 async function file(page: Page, boat: string, what: string, opts: { where?: string; how?: string; major?: boolean } = {}) {
@@ -47,9 +60,9 @@ async function file(page: Page, boat: string, what: string, opts: { where?: stri
   await expect(page.getByTestId("action-ok")).toContainText(`Your report on ${boat} is filed.`);
 }
 
-/** The member books the 30-minute slot at the given time, from the day view, and ends on My bookings. */
+/** The member books the 30-minute slot at the given time, from the dense hour list, and ends on My bookings. */
 async function book(page: Page, boat: string, day: string, range: string) {
-  await page.goto(`/club/book?day=${day}&what=shell&kind=single`);
+  await page.goto(shellDay(day, hourFromRange(range)));
   await slot(page, boat, range, "free").click();
   await expect(page.getByRole("heading", { level: 1, name: `Book ${boat}` })).toBeVisible();
   await expect(page.getByTestId("check-ok")).toBeVisible();
@@ -64,8 +77,8 @@ test.describe("filing and reading a report", () => {
     await uploadBoat(page, boat);
 
     await actAs(page, "Jordan Bellweather");
-    await page.goto("/club/book?day=2026-10-30&what=shell&kind=single");
-    await card(page, boat).getByTestId("report-damage-link").click();
+    await page.goto(shellDay("2026-10-30", 7));
+    await shellRow(page, boat).getByTestId("report-damage-link").click();
     await expect(page).toHaveURL(/\/club\/damage\?item=/);
     await settled(page);
     await expect(page.locator("#damage-item option:checked")).toHaveText(boat);
@@ -81,10 +94,10 @@ test.describe("filing and reading a report", () => {
     await expect(mine.getByTestId("damage-status")).toHaveText("Open");
 
     await actAs(page, "Britta Eriksen");
-    await page.goto("/club/book?day=2026-10-30&what=shell&kind=single");
-    const notice = card(page, boat).getByTestId("damage-notice");
+    await page.goto(shellDay("2026-10-30", 7));
+    const notice = shellRow(page, boat).getByTestId("damage-notice");
     await expect(notice).toHaveText(`Minor damage reported on Oct 28, 2026: "${what}" (Bow seat). You can still use it.`);
-    await expect(card(page, boat)).not.toContainText(/Jordan|caught the dock/);
+    await expect(shellRow(page, boat)).not.toContainText(/Jordan|caught the dock/);
     // Britta did not file it, so it is not in her list of reports.
     await page.goto("/club/damage");
     await expect(page.getByTestId("no-damage-reports")).toBeVisible();
@@ -121,8 +134,8 @@ test.describe("filing and reading a report", () => {
     await page.goto("/club/my-bookings");
     const outing = page.locator(`[data-testid="booking-row"][data-item="${boat}"]`);
     await expect(outing.getByTestId("booking-damage-notice")).toHaveText(`Major damage reported on Oct 28, 2026: "${what}". Check with club staff before you use it.`);
-    await page.goto("/club/book?day=2026-10-31&what=shell&kind=single");
-    await expect(card(page, boat).getByTestId("damage-notice")).toContainText("Major damage reported");
+    await page.goto(shellDay("2026-10-31", 7));
+    await expect(shellRow(page, boat).getByTestId("damage-notice")).toContainText("Major damage reported");
 
     await actAs(page, "Test staff");
     await page.goto("/club/admin");
@@ -143,8 +156,8 @@ test.describe("filing and reading a report", () => {
     await page.goto("/club/my-bookings");
     await expect(outing).toBeVisible();
     await expect(outing.getByTestId("booking-damage-notice")).toHaveCount(0);
-    await page.goto("/club/book?day=2026-10-31&what=shell&kind=single");
-    await expect(card(page, boat).getByTestId("damage-notice")).toHaveCount(0);
+    await page.goto(shellDay("2026-10-31", 7));
+    await expect(shellRow(page, boat).getByTestId("damage-notice")).toHaveCount(0);
     await actAs(page, "Jordan Bellweather");
     await page.goto("/club/damage");
     const mine = page.locator(`[data-testid="my-damage-report"][data-item="${boat}"]`);
@@ -221,7 +234,7 @@ test.describe("staff work a report", () => {
     await expect(page).toHaveURL(/\/club\/equipment\?affected=/);
     await expect(page.getByTestId("affected")).toContainText("Nothing was cancelled; please contact");
     await page.goBack();
-    await page.goto("/club/book?day=2026-11-02&what=shell&kind=single");
+    await page.goto(shellDay("2026-11-02", 7));
     await expect(slot(page, boat, "7:00 to 7:30 am", "out of service")).toHaveAttribute("data-state", "out_of_service");
     // The outing Declan already booked stays.
     await actAs(page, "Hollis Whitcombe");
@@ -245,9 +258,9 @@ test.describe("staff work a report", () => {
     await expect(page.getByTestId("damage-repair")).toHaveText("Repaired on Oct 28, 2026 by Sam Shop · 1 hour 30 minutes spent · cost $12.50. Glued and clamped the slide.");
     await expect(page.getByTestId("damage-log")).toContainText(`${boat} returned to service by Test staff.`);
     await expect(page.getByTestId("boat-out-of-service")).toHaveCount(0);
-    await page.goto("/club/book?day=2026-11-02&what=shell&kind=single");
+    await page.goto(shellDay("2026-11-02", 7));
     await expect(slot(page, boat, "7:00 to 7:30 am", "free")).toBeVisible();
-    await expect(card(page, boat).getByTestId("damage-notice")).toHaveCount(0);
+    await expect(shellRow(page, boat).getByTestId("damage-notice")).toHaveCount(0);
 
     // The filer sees that it is repaired and when, and none of what it cost.
     await actAs(page, "Jordan Bellweather");

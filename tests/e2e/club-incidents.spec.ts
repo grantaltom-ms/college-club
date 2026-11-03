@@ -300,7 +300,7 @@ test.describe("who can open what", () => {
     const what = `Only for Kenji and staff ${tag()}`;
     await fileAsCoach(page, what, { boat: "Pelican" });
     await actAs(page, "Dev Rao");
-    await page.goto("/club/book?day=2026-10-30&what=shell&kind=single");
+    await page.goto("/club/book?day=2026-10-30&what=shell&kind=single&hour=9");
     expect(await page.content()).not.toContain(what);
     await page.goto("/club/my-bookings");
     expect(await page.content()).not.toContain(what);

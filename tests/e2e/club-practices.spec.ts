@@ -33,6 +33,20 @@ async function uploadBoats(page: Page, ...names: string[]) {
 const settled = (page: Page) => page.waitForLoadState("networkidle");
 
 const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
+const shellRow = (page: Page, item: string) => page.locator(`[data-testid="shell-row"][data-item="${item}"]`);
+
+/** Pacific hour from a slot range. Shells need ?hour= for the dense free list. */
+function hourFromRange(range: string): number {
+  const m = /^(\d{1,2}):\d{2} to .+ (am|pm)$/i.exec(range.trim());
+  if (!m) throw new Error(`bad range: ${range}`);
+  let h = Number(m[1]);
+  const ap = m[2].toLowerCase();
+  if (ap === "pm" && h !== 12) h += 12;
+  if (ap === "am" && h === 12) h = 0;
+  return h;
+}
+
+const shellDay = (day: string, hour: number) => `/club/book?day=${day}&what=shell&kind=single&hour=${hour}`;
 
 /** Fills in the set-up form as a person would and ends on the new practice's page. */
 async function setUp(page: Page, o: { name: string; day: string; start: string; end: string; boats: string[]; notes?: string; coach?: string }) {
@@ -63,9 +77,9 @@ async function seat(page: Page, name: string, side: "port" | "starboard" | "" = 
   await expect(choice).toHaveCount(0);
 }
 
-/** The member books the free slot at the given time from the day view, as a person would, and ends on My bookings. */
+/** The member books the free slot at the given time from the dense hour list, and ends on My bookings. */
 async function book(page: Page, boat: string, day: string, range: string) {
-  await page.goto(`/club/book?day=${day}&what=shell&kind=single`);
+  await page.goto(shellDay(day, hourFromRange(range)));
   await slot(page, boat, range, "free").click();
   await expect(page.getByRole("heading", { level: 1, name: `Book ${boat}` })).toBeVisible();
   await expect(page.getByTestId("check-ok")).toBeVisible();
@@ -150,13 +164,21 @@ test.describe("setting a practice up and seating people", () => {
     await actAs(page, "Walter Pemberton");
     expect((await page.goto(practiceUrl))?.status()).toBe(404);
 
-    // The boat is a "Practice" slot while it runs, free before and after, and the legend says what the colour means.
-    await page.goto("/club/book?day=2026-11-04&what=shell&kind=single");
-    await expect(page.getByRole("list", { name: "Legend" })).toContainText("Practice");
-    await expect(slot(page, boat, "7:00 to 7:30 am", "practice")).toBeVisible();
-    await expect(slot(page, boat, "8:30 to 9:00 am", "practice")).toBeVisible();
+    // Members only see free shells that hour: during the practice the boat is hidden; free before and after.
+    await page.goto(shellDay("2026-11-04", 7));
+    await expect(shellRow(page, boat)).toHaveCount(0);
+    await page.goto(shellDay("2026-11-04", 8));
+    await expect(shellRow(page, boat)).toHaveCount(0);
+    await page.goto(shellDay("2026-11-04", 6));
     await expect(slot(page, boat, "6:30 to 7:00 am", "free")).toBeVisible();
+    await page.goto(shellDay("2026-11-04", 9));
     await expect(slot(page, boat, "9:00 to 9:30 am", "free")).toBeVisible();
+    // Staff still see the practice hold on a taken boat.
+    await actAs(page, "Test staff");
+    await page.goto(shellDay("2026-11-04", 7));
+    await expect(slot(page, boat, "7:00 to 7:30 am", "practice")).toBeVisible();
+    await page.goto(shellDay("2026-11-04", 8));
+    await expect(slot(page, boat, "8:30 to 9:00 am", "practice")).toBeVisible();
   });
 
   test("seating someone who is booked on another boat, or in a class, then is refused in the engine's own words; a person cannot be in two seats", async ({ page }) => {
@@ -215,7 +237,7 @@ test.describe("setting a practice up and seating people", () => {
     await expect(page.locator(`[data-testid="practice-card"][data-practice="${name}"]`)).toHaveAttribute("data-status", "cancelled");
 
     await actAs(page, "Hollis Whitcombe");
-    await page.goto("/club/book?day=2026-11-10&what=shell&kind=single");
+    await page.goto(shellDay("2026-11-10", 7));
     await expect(slot(page, boat, "7:00 to 7:30 am", "free")).toBeVisible();
   });
 });
