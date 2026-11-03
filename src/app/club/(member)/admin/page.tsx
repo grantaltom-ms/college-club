@@ -31,10 +31,19 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
 
   return (
     <section>
-      <h1>Staff office</h1>
-      <p className="club-meta">
-        {formatDayLong(pacificDate(now))}. Everything here is invented test data.
-      </p>
+      <header className="club-page-head">
+        <div>
+          <h1>Staff office</h1>
+          <p className="club-meta">
+            {formatDayLong(pacificDate(now))}. Everything here is invented test data.
+          </p>
+        </div>
+        <p className="club-page-actions">
+          <Link href="/club/admin/check-in" className="club-button club-button-link" data-testid="check-in-link">
+            Check someone in
+          </Link>
+        </p>
+      </header>
       {notice && (
         <p className="club-alert" role="alert">
           {notice}
@@ -61,28 +70,26 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
       )}
 
       <h2>Today</h2>
-      <ul className="club-list" data-testid="today">
+      <ul className="club-today" data-testid="today">
         <li>
           <Link href="/club/my-bookings">
-            {summary.today.bookings} boat and space booking{summary.today.bookings === 1 ? "" : "s"}
+            <span className="club-today-count">{summary.today.bookings}</span>
+            <span>boat and space booking{summary.today.bookings === 1 ? "" : "s"}</span>
           </Link>
         </li>
         <li>
           <Link href="/club/classes">
-            {summary.today.classes} class{summary.today.classes === 1 ? "" : "es"}
+            <span className="club-today-count">{summary.today.classes}</span>
+            <span>class{summary.today.classes === 1 ? "" : "es"}</span>
           </Link>
         </li>
         <li>
           <Link href="/club/events">
-            {summary.today.events} event{summary.today.events === 1 ? "" : "s"}
+            <span className="club-today-count">{summary.today.events}</span>
+            <span>event{summary.today.events === 1 ? "" : "s"}</span>
           </Link>
         </li>
       </ul>
-      <p>
-        <Link href="/club/admin/check-in" className="club-button" data-testid="check-in-link">
-          Check someone in
-        </Link>
-      </p>
 
       <h2>Out of service</h2>
       {summary.outOfService.length === 0 ? (
@@ -169,23 +176,96 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
       )}
 
       <h2>Tools</h2>
-      <ul className="club-list" data-testid="tools">
-        <li>
-          <Link href="/club">Households</Link> · <Link href="/club/admin/households/new">Add a household</Link> · <Link href="/club/admin/import">Import households</Link> · <Link href="/club/admin/resignations">Resignations</Link> · <Link href="/club/admin/history">Old bookings</Link> · <Link href="/club/admin/tours">Tour requests</Link>
-        </li>
-        <li>
-          <Link href="/club/admin/check-in">Check someone in</Link> · <Link href="/club/admin/ipad">Front-desk iPad</Link>
-        </li>
-        <li>
-          <Link href="/club/my-bookings">All bookings</Link> · <Link href="/club/equipment">Equipment</Link> · <Link href="/club/admin/equipment-import">Load the equipment list</Link> · <Link href="/club/admin/boats">Private boats</Link> · <Link href="/club/admin/damage">Damage reports</Link> · <Link href="/club/admin/incidents">Incident reports</Link> · <Link href="/club/incidents">Report an incident</Link> · <Link href="/club/practices">Practices</Link>
-        </li>
-        <li>
-          <Link href="/club/classes/manage">Add a class or schedule sessions</Link> · <Link href="/club/events/manage">Add an event</Link>
-        </li>
-        <li>
-          <Link href="/club/admin/charges">Bar and snack-bar charges</Link> · <Link href="/club/admin/visitors">Visitors</Link> · <Link href="/club/admin/billing">Monthly billing</Link>
-        </li>
-      </ul>
+      <div className="club-tool-board" data-testid="tools">
+        <article className="club-card club-tool-card">
+          <h3>People</h3>
+          <ul className="club-tool-links">
+            <li>
+              <Link href="/club">Households</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/households/new">Add a household</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/import">Import households</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/resignations">Resignations</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/history">Old bookings</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/tours">Tour requests</Link>
+            </li>
+          </ul>
+        </article>
+        <article className="club-card club-tool-card">
+          <h3>Front desk</h3>
+          <ul className="club-tool-links">
+            <li>
+              <Link href="/club/admin/check-in">Check someone in</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/ipad">Front-desk iPad</Link>
+            </li>
+            <li>
+              <Link href="/club/my-bookings">All bookings</Link>
+            </li>
+          </ul>
+        </article>
+        <article className="club-card club-tool-card">
+          <h3>Boats and spaces</h3>
+          <ul className="club-tool-links">
+            <li>
+              <Link href="/club/equipment">Equipment</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/equipment-import">Load the equipment list</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/boats">Private boats</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/damage">Damage reports</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/incidents">Incident reports</Link>
+            </li>
+            <li>
+              <Link href="/club/incidents">Report an incident</Link>
+            </li>
+            <li>
+              <Link href="/club/practices">Practices</Link>
+            </li>
+          </ul>
+        </article>
+        <article className="club-card club-tool-card">
+          <h3>Classes and events</h3>
+          <ul className="club-tool-links">
+            <li>
+              <Link href="/club/classes/manage">Add a class or schedule sessions</Link>
+            </li>
+            <li>
+              <Link href="/club/events/manage">Add an event</Link>
+            </li>
+          </ul>
+        </article>
+        <article className="club-card club-tool-card">
+          <h3>Billing</h3>
+          <ul className="club-tool-links">
+            <li>
+              <Link href="/club/admin/charges">Bar and snack-bar charges</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/visitors">Visitors</Link>
+            </li>
+            <li>
+              <Link href="/club/admin/billing">Monthly billing</Link>
+            </li>
+          </ul>
+        </article>
+      </div>
 
       <h2>How check-in works</h2>
       <p className="club-placeholder" data-testid="placeholder-note">

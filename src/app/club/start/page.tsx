@@ -38,10 +38,14 @@ export default async function StartPage() {
 
   return (
     <section>
-      <h1>CCS System</h1>
-      <p>
-        This is the club&apos;s reservation and member system, running on invented people and bookings. Nothing here is real, and nothing here reaches a real member. Pick a view to try.
-      </p>
+      <header className="club-page-head">
+        <div>
+          <h1>CCS System</h1>
+          <p className="club-lead">
+            The club&apos;s reservation and member system, running on invented people and bookings. Nothing here is real, and nothing here reaches a real member. Pick a view to try.
+          </p>
+        </div>
+      </header>
       <ul className="club-cards" aria-label="Views to try">
         <li className="club-card" data-testid="start-member">
           <h2>Test member view</h2>

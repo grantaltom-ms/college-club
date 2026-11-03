@@ -26,19 +26,30 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
 
   return (
     <section>
-      <h1>Events</h1>
+      <header className="club-page-head">
+        <div>
+          <h1>Events</h1>
+          <p className="club-meta">RSVP for dinners, socials and club gatherings.</p>
+        </div>
+        {actor.kind === "staff" && (
+          <p className="club-page-actions">
+            <Link href="/club/events/manage" className="club-button club-button-link">
+              Add an event
+            </Link>
+          </p>
+        )}
+      </header>
       <EventPlaceholderNote />
-      {actor.kind === "staff" && (
-        <p>
-          <Link href="/club/events/manage">Add an event</Link>
-        </p>
-      )}
       {notice && (
         <p className="club-alert" role="alert">
           {notice}
         </p>
       )}
-      {upcoming.length === 0 && <p data-testid="no-events">No events are coming up.</p>}
+      {upcoming.length === 0 && (
+        <p className="club-empty-inline" data-testid="no-events">
+          No events are coming up.
+        </p>
+      )}
       <ul className="club-cards" aria-label="Events">
         {upcoming.map((event) => {
           const view = eventView(state, event, viewer, now);

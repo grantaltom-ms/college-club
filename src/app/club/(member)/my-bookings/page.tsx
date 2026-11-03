@@ -161,7 +161,14 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
 
       <h2>Upcoming</h2>
       {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">Nothing booked.</p>
+        <p className="club-empty-inline" data-testid="no-upcoming">
+          Nothing booked.{" "}
+          {!staff && (
+            <Link href="/club/book" className="club-inline-cta">
+              Book a boat or space
+            </Link>
+          )}
+        </p>
       ) : (
         <ul className="club-cards" aria-label="Upcoming bookings">
           {upcoming.map((b) => (

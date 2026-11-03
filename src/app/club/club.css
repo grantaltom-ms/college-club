@@ -1,48 +1,203 @@
-/* Member area: plain and functional. Brand colors and fonts come from globals.css. */
+/* Member area: clear and calm. Brand colors and fonts come from globals.css; chrome uses the UI sans from the refresh. */
 .club {
   min-height: 100vh;
 }
 
 .club-frame {
-  max-width: 880px;
+  max-width: var(--container);
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 var(--gutter);
 }
 
 .club-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   border-bottom: 1px solid var(--hairline);
-  background: var(--card);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  backdrop-filter: blur(10px);
 }
 
+.club-header-bar,
 .club-header .club-frame {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 24px;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  gap: 8px 16px;
+  max-width: calc(var(--container) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 10px var(--gutter);
 }
 
 .club-wordmark {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   letter-spacing: 0.04em;
   color: var(--ink);
   text-decoration: none;
 }
 
-.club-header nav {
+.club-header-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 20px;
+  align-items: center;
+  margin-left: auto;
 }
 
-.club-header nav a {
-  display: inline-block;
-  padding: 10px 0;
-  color: var(--waterloo);
+.club-menu-button {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-input);
+  background: none;
+  font-family: var(--ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cyberspace);
+  cursor: pointer;
+}
+
+.club-menu-button:hover {
+  background: var(--oyster-50);
+}
+
+/* Phone menu: a panel under the sticky header. Hidden until Menu is pressed. */
+.club-nav {
+  display: none;
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 0;
+  right: 0;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 8px var(--gutter) 20px;
+  background: var(--oyster);
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: var(--shadow-md);
+}
+
+.club-header[data-open] .club-nav {
+  display: block;
+}
+
+.club-nav-group + .club-nav-group {
+  margin-top: 14px;
+}
+
+.club-nav-group-label {
+  margin: 0 0 4px;
+  padding: 0 4px;
+  font-family: var(--ui);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.club-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.club-nav li + li a,
+.club-nav li + li form {
+  border-top: 1px solid var(--hairline);
+}
+
+.club-nav a,
+.club-nav button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 4px 0 10px;
+  border: 0;
+  background: none;
+  font-family: var(--ui);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.club-nav a:hover,
+.club-nav button:hover {
+  text-decoration: underline;
+}
+
+.club-scrim {
+  position: absolute;
+  top: calc(100% + 1px);
+  right: 0;
+  left: 0;
+  height: 100vh;
+  z-index: -1;
+  background: rgba(51, 54, 58, 0.45);
+}
+
+@media (min-width: 900px) {
+  .club-menu-button,
+  .club-scrim,
+  .club-nav-group-label {
+    display: none;
+  }
+
+  .club-nav {
+    display: flex;
+    position: static;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px 4px;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .club-nav-group {
+    display: contents;
+  }
+
+  .club-nav ul {
+    display: contents;
+  }
+
+  .club-nav li + li a,
+  .club-nav li + li form {
+    border-top: 0;
+  }
+
+  .club-nav a,
+  .club-nav button {
+    display: inline-flex;
+    width: auto;
+    min-height: 40px;
+    padding: 0 10px;
+    border-radius: var(--radius-pill);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--waterloo-dark);
+  }
+
+  .club-nav a:hover,
+  .club-nav button:hover {
+    background: var(--oyster-50);
+    text-decoration: none;
+  }
+
+  .club-header-actions {
+    display: none;
+  }
 }
 
 .club-banner {
@@ -50,37 +205,43 @@
   padding: 10px 14px;
   background: var(--oyster-50);
   border: 1px solid var(--hairline);
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-input);
+  font-family: var(--ui);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--cyberspace);
 }
 
 .club-acting {
-  margin: 0 0 16px;
+  margin: 0 0 20px;
   color: var(--slate);
-  font-size: 0.95rem;
+  font-family: var(--ui);
+  font-size: 0.9rem;
 }
 
 .club main {
-  padding-bottom: 48px;
+  padding-bottom: 64px;
 }
 
 /* Headings often hold a person's or a household's name. A very long single word (no space or hyphen to break at) must wrap
    instead of pushing the page sideways on a phone. */
 .club h1 {
-  font-size: 1.6rem;
-  margin: 8px 0 8px;
+  font-size: 1.75rem;
+  margin: 4px 0 8px;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
 .club h2 {
-  font-size: 1.15rem;
-  margin: 28px 0 10px;
+  font-size: 1.2rem;
+  margin: 32px 0 12px;
   overflow-wrap: anywhere;
 }
 
 .club h3 {
-  font-family: var(--body);
-  font-size: 1.1rem;
+  font-family: var(--ui);
+  font-size: 1.05rem;
+  font-weight: 600;
   margin: 0 0 2px;
   overflow-wrap: anywhere;
 }
@@ -88,6 +249,34 @@
 .club-meta {
   color: var(--slate);
   font-size: 0.95rem;
+}
+
+.club-lead {
+  max-width: 36rem;
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  color: var(--cyberspace);
+}
+
+.club-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 8px;
+}
+
+.club-page-head h1 {
+  margin-top: 0;
+}
+
+.club-page-actions,
+.club-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
 }
 
 .club-cards,
@@ -106,9 +295,10 @@
 .club-card {
   background: var(--card);
   border: 1px solid var(--hairline);
-  border-radius: 4px;
-  padding: 12px 14px;
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
   margin-bottom: 12px;
+  box-shadow: var(--shadow-xs);
 }
 
 .club-cards > .club-card {
@@ -126,16 +316,18 @@
 .club-history li {
   display: grid;
   gap: 2px;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--grid);
 }
 
 .club-chip {
   display: inline-block;
-  padding: 0 8px;
-  border-radius: 10px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
   background: var(--oyster);
-  font-size: 0.85rem;
+  font-family: var(--ui);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .club-chip-active {
@@ -153,44 +345,44 @@
   gap: 2px 14px;
   margin: 8px 0 0;
   color: var(--slate);
-  font-size: 0.9rem;
+  font-family: var(--ui);
+  font-size: 0.88rem;
 }
 
 .club-slots dt {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .club-slots dd {
   margin: 0;
 }
 
-.club-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .club-button {
-  min-height: 44px;
+  min-height: var(--tap-min);
   padding: 8px 16px;
   border: 1px solid var(--waterloo);
-  border-radius: 4px;
+  border-radius: var(--radius-input);
   background: var(--waterloo);
   color: #fff;
-  font: inherit;
+  font-family: var(--ui);
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
   margin: 0 8px 8px 0;
   /* A button can carry an item's or a person's name ("Retire <name>"). One very long word must wrap, not push the page sideways. */
   max-width: 100%;
   overflow-wrap: anywhere;
+  transition: background-color var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
 }
 
 .club-button:hover {
   background: var(--cyberspace);
+  border-color: var(--cyberspace);
 }
 
 .club-button:focus-visible,
-.club-header a:focus-visible {
+.club-header a:focus-visible,
+.club-menu-button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
@@ -204,29 +396,197 @@
 
 .club-button:disabled:hover {
   background: var(--oyster-50);
+  border-color: var(--oyster);
 }
 
 /* A link that sits and sizes like a button (an <a> is inline, so it needs a box of its own to get the full tap size). */
 a.club-button-link {
-  display: inline-block;
-  line-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
   text-decoration: none;
   color: #fff;
+  box-sizing: border-box;
 }
 
 .club-button-quiet {
   background: transparent;
-  color: var(--waterloo);
+  color: var(--waterloo-dark);
+}
+
+a.club-button-quiet {
+  color: var(--waterloo-dark);
 }
 
 .club-button-quiet:hover {
   background: var(--oyster-50);
+  border-color: var(--hairline);
+}
+
+.club-empty {
+  padding: 12px 0 24px;
+}
+
+.club-empty-inline {
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius-card);
+  color: var(--slate);
+}
+
+.club-inline-cta {
+  font-family: var(--ui);
+  font-weight: 600;
+}
+
+.club-shortcuts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 18px 0 8px;
+}
+
+.club-shortcut {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: var(--tap-min);
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-xs);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.club-shortcut:hover {
+  border-color: var(--waterloo);
+  box-shadow: var(--shadow-md);
+}
+
+.club-shortcut-title {
+  font-family: var(--ui);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.club-shortcut-meta {
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  color: var(--slate);
+}
+
+.club-shortcut-quiet {
+  background: var(--oyster-50);
+  box-shadow: none;
+}
+
+.club-today {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.club-today a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: var(--tap-min);
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  text-decoration: none;
+  color: var(--ink);
+  box-shadow: var(--shadow-xs);
+}
+
+.club-today a:hover {
+  border-color: var(--waterloo);
+}
+
+.club-today-count {
+  font-family: var(--ui);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--waterloo-dark);
+}
+
+.club-tool-board {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+  margin: 12px 0;
+}
+
+.club-tool-card h3 {
+  margin-bottom: 8px;
+}
+
+.club-tool-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.club-tool-links li + li {
+  border-top: 1px solid var(--grid);
+}
+
+.club-tool-links a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-family: var(--ui);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.club-tool-links a:hover {
+  text-decoration: underline;
+}
+
+@media (min-width: 560px) {
+  .club-shortcuts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .club-today {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (min-width: 720px) {
   .club-history li {
     grid-template-columns: 11rem 1fr 9rem;
     gap: 12px;
+  }
+
+  .club-shortcuts {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .club-tool-board {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 900px) {
+  .club-shortcuts {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .club-tool-board {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -239,13 +599,17 @@ a.club-button-link {
 }
 
 .club-chips a {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   min-height: 44px;
-  padding: 10px 12px;
+  padding: 8px 14px;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--radius-pill);
   background: var(--card);
   color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -280,9 +644,11 @@ a.club-button-link {
   min-height: 44px;
   padding: 6px 4px;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--radius-input);
   text-align: center;
-  font-size: 0.9rem;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  font-weight: 600;
   line-height: 1.2;
   text-decoration: none;
   color: var(--ink);
@@ -353,8 +719,9 @@ a.slot-free:focus-visible {
 
 .club-form label {
   display: block;
-  font-weight: 500;
-  margin-bottom: 2px;
+  font-family: var(--ui);
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 
 .club-form select,
@@ -365,18 +732,19 @@ a.slot-free:focus-visible {
   min-height: 44px;
   width: 100%;
   max-width: 28rem;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--radius-input);
   background: var(--card);
-  font: inherit;
+  font-family: var(--ui);
+  font-size: 1rem;
 }
 
 .club-form fieldset {
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--radius-card);
   margin: 12px 0;
-  padding: 8px 12px;
+  padding: 10px 14px;
   /* A fieldset will not shrink below its widest word unless told it may. */
   min-width: 0;
 }
@@ -400,9 +768,12 @@ a.slot-free:focus-visible {
 .club-success,
 .club-placeholder {
   margin: 8px 0 12px;
-  padding: 10px 14px;
-  border-radius: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-input);
   border: 1px solid var(--hairline);
+  font-family: var(--ui);
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .club-alert {
@@ -446,9 +817,10 @@ details summary {
   min-width: 44px;
   min-height: 44px;
   border: 1px solid var(--waterloo);
-  border-radius: 4px;
+  border-radius: var(--radius-input);
   background: var(--card);
   color: var(--waterloo);
+  font-family: var(--ui);
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
@@ -573,9 +945,10 @@ details summary {
   width: 100%;
   box-sizing: border-box;
   padding: 14px 16px;
+  font-family: var(--ui);
   font-size: 1.6rem;
   border: 2px solid var(--hairline);
-  border-radius: 6px;
+  border-radius: var(--radius-input);
 }
 
 .ipad-names,
@@ -593,12 +966,15 @@ details summary {
   justify-content: center;
   min-height: 72px;
   padding: 12px 20px;
+  font-family: var(--ui);
   font-size: 1.6rem;
+  font-weight: 600;
   color: var(--ink);
   text-decoration: none;
   background: var(--card);
   border: 2px solid var(--hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-xs);
 }
 
 .ipad-name:active,
@@ -615,7 +991,8 @@ details summary {
   padding: 16px 20px;
   background: var(--card);
   border: 2px solid var(--hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-xs);
 }
 
 .ipad-card h2 {
@@ -662,15 +1039,17 @@ details summary {
   justify-content: center;
   min-height: 56px;
   padding: 0 28px;
+  font-family: var(--ui);
   font-size: 1.3rem;
+  font-weight: 600;
   color: var(--cyberspace);
   text-decoration: none;
   background: var(--card);
   border: 2px solid var(--waterloo);
-  border-radius: 12px;
+  border-radius: var(--radius-input);
 }
 
-/* Sign-in: the test outbox shows plain-text emails, and Sign out sits in the menu like a link. */
+/* Sign-in: the test outbox shows plain-text emails. Sign out is styled with the rest of the member menu. */
 .club-pre {
   margin: 8px 0;
   padding: 10px 12px;
@@ -678,23 +1057,14 @@ details summary {
   word-break: break-word;
   background: var(--oyster-50);
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--radius-input);
   font-size: 0.9rem;
 }
 
-.club-header nav form {
-  display: inline;
-}
-
-.club-header nav button {
-  display: inline-block;
-  padding: 10px 0;
-  border: 0;
-  background: none;
-  color: var(--waterloo);
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
+.club-nav form {
+  display: block;
+  margin: 0;
+  padding: 0;
 }
 
 /* Step 9: signing visitors in on the iPad, and the staff billing screens. */
@@ -705,13 +1075,15 @@ details summary {
   min-height: 72px;
   margin: 24px 0 8px;
   padding: 12px 20px;
+  font-family: var(--ui);
   font-size: 1.4rem;
+  font-weight: 600;
   text-align: center;
   color: var(--ink);
   text-decoration: none;
   background: var(--card);
   border: 2px dashed var(--hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .ipad-link:active,
@@ -750,10 +1122,12 @@ details summary {
   justify-content: center;
   width: 72px;
   height: 72px;
+  font-family: var(--ui);
   font-size: 1.8rem;
+  font-weight: 700;
   background: var(--card);
   border: 2px solid var(--hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .ipad-count input:checked + span {
@@ -819,19 +1193,20 @@ details summary {
 .club-form textarea {
   width: 100%;
   max-width: 28rem;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--radius-input);
   background: var(--card);
-  font: inherit;
+  font-family: var(--ui);
+  font-size: 1rem;
 }
 
 .club-damage {
   margin: 8px 0;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-left: 4px solid var(--sun);
   background: var(--sun-tint);
-  border-radius: 4px;
+  border-radius: var(--radius-input);
 }
 
 .club-damage-major {

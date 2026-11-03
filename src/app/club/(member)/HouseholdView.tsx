@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { bookingBlockReason } from "@/club/engine/eligibility";
 import { fullName, historyOf, membersOf, qualificationsOf } from "@/club/engine/queries";
 import { formatDay, formatMoment } from "@/club/time";
@@ -77,6 +78,31 @@ export function HouseholdView({ state, household, viewerIsStaff }: { state: Club
           <dt>Notes</dt>
           <dd>{household.notes || "none"}</dd>
         </dl>
+      )}
+
+      {!viewerIsStaff && household.status === "active" && (
+        <nav className="club-shortcuts" aria-label="Common tasks">
+          <Link href="/club/book" className="club-shortcut">
+            <span className="club-shortcut-title">Book</span>
+            <span className="club-shortcut-meta">Boats and spaces</span>
+          </Link>
+          <Link href="/club/classes" className="club-shortcut">
+            <span className="club-shortcut-title">Classes</span>
+            <span className="club-shortcut-meta">Fitness sessions</span>
+          </Link>
+          <Link href="/club/events" className="club-shortcut">
+            <span className="club-shortcut-title">Events</span>
+            <span className="club-shortcut-meta">Dinners and socials</span>
+          </Link>
+          <Link href="/club/my-bookings" className="club-shortcut">
+            <span className="club-shortcut-title">My bookings</span>
+            <span className="club-shortcut-meta">What is coming up</span>
+          </Link>
+          <Link href="/club/damage" className="club-shortcut club-shortcut-quiet">
+            <span className="club-shortcut-title">Report damage</span>
+            <span className="club-shortcut-meta">Something broken or unsafe</span>
+          </Link>
+        </nav>
       )}
 
       <h2>Adults</h2>

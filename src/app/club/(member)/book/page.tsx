@@ -48,7 +48,17 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
   return (
     <section>
-      <h1>Book a boat or space</h1>
+      <header className="club-page-head">
+        <div>
+          <h1>Book a boat or space</h1>
+          <p className="club-meta">Tap a free time to book it. Green is yours; grey is taken.</p>
+        </div>
+        <p className="club-page-actions">
+          <Link href="/club/my-bookings" className="club-button club-button-quiet club-button-link">
+            {actor.kind === "staff" ? "See all bookings" : "See my bookings"}
+          </Link>
+        </p>
+      </header>
       <PlaceholderNote />
       {blocked && (
         <p className="club-alert" role="alert" data-testid="blocked-note">

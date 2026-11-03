@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
 import { pickerEnabled } from "@/club/enabled";
 import { fullName } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { memberAppMetadata, memberAppViewport } from "@/club/pwa";
 import { readClubOnce } from "@/club/store/read-once";
+import { MemberNav, type MemberNavLink } from "./MemberNav";
 
 export const generateMetadata = (): Promise<Metadata> => memberAppMetadata();
 export const generateViewport = (): Promise<Viewport> => memberAppViewport();
@@ -19,35 +19,37 @@ export default async function MemberLayout({ children }: { children: React.React
   const actor = await getCurrentActor();
   // "My boats" is only offered to members who own a private boat or were invited to one.
   const hasBoats = actor?.kind === "member" && (await readClubOnce()).boatAccess.some((a) => a.memberId === actor.member.id && a.endedAt === null);
+
+  const links: MemberNavLink[] = [];
+  if (actor) {
+    links.push({ href: "/club/book", label: "Book", group: "go" });
+    links.push({ href: "/club/my-bookings", label: actor.kind === "staff" ? "All bookings" : "My bookings", group: actor.kind === "staff" ? "desk" : "mine" });
+    links.push({ href: "/club/classes", label: "Classes", group: "go" });
+    links.push({ href: "/club/events", label: "Events", group: "go" });
+    if (actor.kind === "member") links.push({ href: "/club/my-classes", label: "My classes", group: "mine" });
+    if (hasBoats) links.push({ href: "/club/my-boats", label: "My boats", group: "mine" });
+    if (actor.kind === "staff" || (actor.kind === "member" && actor.member.isCoach === true)) {
+      links.push({ href: "/club/practices", label: "Practices", group: "go" });
+    }
+    if (actor.kind === "member" && actor.member.isCoach === true) {
+      links.push({ href: "/club/incidents", label: "Report an incident", group: "mine" });
+    }
+    if (actor.kind === "staff") {
+      links.push({ href: "/club/admin", label: "Staff office", group: "desk" });
+      links.push({ href: "/club/equipment", label: "Equipment", group: "desk" });
+    }
+  }
+  if (actor === null) links.push({ href: "/club/sign-in", label: "Sign in", group: "account" });
+  if (pickerEnabled()) links.push({ href: "/club/act-as", label: "Switch test member", group: "account" });
+
   return (
     <>
-      <header className="club-header">
-        <div className="club-frame">
-          <Link href="/club" className="club-wordmark">
-            College Club Seattle
-          </Link>
-          <nav aria-label="Member area">
-            <Link href="/club">{actor?.kind === "staff" ? "Households" : "My household"}</Link>
-            {actor && <Link href="/club/book">Book</Link>}
-            {actor && <Link href="/club/my-bookings">{actor.kind === "staff" ? "All bookings" : "My bookings"}</Link>}
-            {actor && <Link href="/club/classes">Classes</Link>}
-            {actor && <Link href="/club/events">Events</Link>}
-            {actor?.kind === "member" && <Link href="/club/my-classes">My classes</Link>}
-            {hasBoats && <Link href="/club/my-boats">My boats</Link>}
-            {(actor?.kind === "staff" || (actor?.kind === "member" && actor.member.isCoach === true)) && <Link href="/club/practices">Practices</Link>}
-            {actor?.kind === "member" && actor.member.isCoach === true && <Link href="/club/incidents">Report an incident</Link>}
-            {actor?.kind === "staff" && <Link href="/club/admin">Staff office</Link>}
-            {actor?.kind === "staff" && <Link href="/club/equipment">Equipment</Link>}
-            {actor === null && <Link href="/club/sign-in">Sign in</Link>}
-            {pickerEnabled() && <Link href="/club/act-as">Switch test member</Link>}
-            {actor?.source === "login" && (
-              <form method="post" action="/api/club/sign-out">
-                <button type="submit">Sign out</button>
-              </form>
-            )}
-          </nav>
-        </div>
-      </header>
+      <MemberNav
+        homeHref="/club"
+        homeLabel={actor?.kind === "staff" ? "Households" : "My household"}
+        links={links}
+        showSignOut={actor?.source === "login"}
+      />
       <div className="club-frame">
         <p className="club-banner" role="note">
           Test build. Every household, member and booking here is invented. Nothing is connected to real club data.
