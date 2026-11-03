@@ -48,7 +48,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<S
               </p>
               <p>
                 <Link href={actor.kind === "staff" ? "/club" : "/club/book"} className="ds-button ds-button-large">
-                  {actor.kind === "staff" ? "Go to the club" : "Book a boat or space"}
+                  {actor.kind === "staff" ? "Go to the club" : "Make a reservation"}
                 </Link>
               </p>
               <form method="post" action="/api/club/sign-out">

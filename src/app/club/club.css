@@ -1390,43 +1390,193 @@ details summary {
   margin-top: 12px;
 }
 
+/* Reservations screen: cool paper + lake-blue accent (not three beige layers). */
+.club-book {
+  --book-ink: #1a2330;
+  --book-muted: #5b6675;
+  --book-line: #d5dde6;
+  --book-card: #ffffff;
+  --book-wash: #eef3f7;
+  --book-lake: #0a6e99;
+  --book-lake-deep: #085578;
+  --book-yours: #1f7a54;
+  --book-yours-wash: #e4f3eb;
+  --book-taken: #e8eef3;
+  --book-taken-ink: #7a8796;
+}
+
+.club-book .club-launch-head h1 {
+  color: var(--book-ink);
+}
+
 .club-book .club-lead {
   margin-bottom: 20px;
+  color: var(--book-muted);
 }
 
-.club-chips-days {
-  margin-bottom: 10px;
+.club-book-choose {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 28px;
 }
 
-.club-chips-types {
-  margin-bottom: 22px;
+.club-book-choose-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  background: var(--book-card);
+  border: 1px solid var(--book-line);
+  border-radius: var(--radius-card-lg);
+  box-shadow: var(--shadow-xs);
+  text-decoration: none;
+  color: var(--book-ink);
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
-.club-chips a[aria-current="page"] {
-  background: var(--cyberspace);
-  border-color: var(--cyberspace);
-  color: var(--white);
+.club-book-choose-card:hover,
+.club-book-choose-card:focus-visible {
+  border-color: var(--book-lake);
+  box-shadow: var(--shadow-md);
 }
 
-.club-book-daybar {
+.club-book-choose-label {
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.club-book-choose-hint {
+  font-family: var(--ui);
+  font-size: 0.92rem;
+  color: var(--book-muted);
+}
+
+.club-book-choose-kinds {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .club-book-choose {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .club-book-choose-kinds {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.club-book-context {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px 16px;
-  margin: 8px 0 18px;
+  margin: 0 0 14px;
 }
 
-.club-book-daybar h2 {
+.club-book-context .club-back {
   margin: 0;
-  font-size: 1.15rem;
 }
 
-.club-book-daybar .club-legend {
+.club-book-context-label {
   margin: 0;
+  font-family: var(--ui);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--book-lake-deep);
+}
+
+.club-book-day {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  background: var(--book-wash);
+  border: 1px solid var(--book-line);
+  border-radius: var(--radius-card);
+}
+
+.club-book-day-label {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--book-lake);
+}
+
+.club-book-day-long {
+  margin: 2px 0 0;
+  font-family: var(--display);
+  font-size: 1.2rem;
+  color: var(--book-ink);
+}
+
+.club-book-day-more summary {
+  font-family: var(--ui);
+  font-weight: 600;
+  color: var(--book-lake-deep);
+  cursor: pointer;
+  list-style: none;
+}
+
+.club-book-day-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.club-book-day-more .club-chips {
+  margin-top: 10px;
+}
+
+.club-chips-days {
+  margin-bottom: 0;
+}
+
+.club-book .club-chips a {
+  background: var(--book-card);
+  border-color: var(--book-line);
+  color: var(--book-ink);
+}
+
+.club-book .club-chips a[aria-current="page"] {
+  background: var(--book-lake);
+  border-color: var(--book-lake);
+  color: var(--white);
+}
+
+.club-book-legend {
+  margin: 0 0 16px;
   gap: 8px 14px;
   font-family: var(--ui);
   font-size: 0.85rem;
+  color: var(--book-muted);
+}
+
+.club-book .slot-free {
+  border-color: var(--book-lake);
+  background: var(--book-lake);
+  color: var(--white);
+}
+
+.club-book a.slot-free:hover,
+.club-book a.slot-free:focus-visible {
+  background: var(--book-lake-deep);
+  border-color: var(--book-lake-deep);
+}
+
+.club-book .slot-yours {
+  background: var(--book-yours-wash);
+  border-color: var(--book-yours);
+  color: var(--book-ink);
+}
+
+.club-book .slot-booked,
+.club-book .slot-taken {
+  background: var(--book-taken);
+  border-color: transparent;
+  color: var(--book-taken-ink);
 }
 
 .club-book-list {
@@ -1436,8 +1586,8 @@ details summary {
 
 .club-book-item {
   padding: 20px 18px 14px;
-  background: var(--card);
-  border: 1px solid var(--hairline);
+  background: var(--book-card);
+  border: 1px solid var(--book-line);
   border-radius: var(--radius-card-lg);
   box-shadow: var(--shadow-xs);
 }
@@ -1450,6 +1600,7 @@ details summary {
   font-family: var(--display);
   font-size: 1.25rem;
   margin: 0 0 4px;
+  color: var(--book-ink);
 }
 
 .club-book-item .slots {
@@ -1464,12 +1615,13 @@ details summary {
 }
 
 .club-book-item-foot a {
-  color: var(--slate);
+  color: var(--book-muted);
   text-decoration: none;
 }
 
 .club-book-item-foot a:hover {
   text-decoration: underline;
+  color: var(--book-lake-deep);
 }
 
 .club-confirm {

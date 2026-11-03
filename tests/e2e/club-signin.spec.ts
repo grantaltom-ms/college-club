@@ -67,7 +67,7 @@ test.describe("a member signing in", () => {
     await page.getByRole("button", { name: "Sign in as Nora Abernathy", exact: true }).click();
     await expect(page).toHaveURL("/club/book");
     await expect(page.getByTestId("acting-as")).toHaveText("Signed in as Nora Abernathy.");
-    await expect(page.getByRole("heading", { level: 1, name: "Book a boat or space" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Reservations" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(0);
 
     // The browser holds a long random secret in a cookie the page's own scripts cannot read, and nothing is left of the test picker.

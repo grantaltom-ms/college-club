@@ -93,7 +93,7 @@ export function HouseholdView({ state, household, viewerIsStaff }: { state: Club
               <p className="club-lead">Ready when you are.</p>
               <p className="club-actions">
                 <Link href="/club/book" className="club-button club-button-primary club-button-link club-button-xl">
-                  Book a boat or space
+                  Make a reservation
                 </Link>
               </p>
               <nav className="club-quiet-links" aria-label="Other things to do">

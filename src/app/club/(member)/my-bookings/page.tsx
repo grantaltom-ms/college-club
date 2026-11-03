@@ -181,7 +181,7 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
           Nothing booked.{" "}
           {!staff && (
             <Link href="/club/book" className="club-inline-cta">
-              Book a boat or space
+              Make a reservation
             </Link>
           )}
         </p>
