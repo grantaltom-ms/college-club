@@ -40,24 +40,21 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const viewer = viewerOf(actor);
   const present = new Set(state.items.filter((i) => itemVisibleTo(state, i, viewer)).map((i) => classOf(RULE_BOOK, i).type));
   const types = BOOKING_TYPES.filter((t) => present.has(t));
-  const type = typeParam(params.type);
+  // Prefer Shells on first open: that is what most people came to do. "All" is one tap away.
+  const askedType = typeParam(params.type);
+  const typeUnset = first(params.type) === undefined;
+  const type = askedType ?? (typeUnset && present.has("Shell") ? "Shell" : null);
   const view = dayView(state, RULE_BOOK, { day, now, viewer, type: type && present.has(type) ? type : null });
   const blocked = blockedReason(actor);
-  const href = (d: string, t: string | null) => `/club/book?day=${d}${t ? `&type=${encodeURIComponent(t)}` : ""}`;
+  const href = (d: string, t: string | null) => `/club/book?day=${d}${t ? `&type=${encodeURIComponent(t)}` : "&type="}`;
   const today = pacificDate(now);
 
   return (
-    <section>
-      <header className="club-page-head">
-        <div>
-          <h1>Book a boat or space</h1>
-          <p className="club-meta">Tap a free time to book it. Green is yours; grey is taken.</p>
-        </div>
-        <p className="club-page-actions">
-          <Link href="/club/my-bookings" className="club-button club-button-quiet club-button-link">
-            {actor.kind === "staff" ? "See all bookings" : "See my bookings"}
-          </Link>
-        </p>
+    <section className="club-book">
+      <header className="club-launch-head">
+        <p className="club-kicker">Reserve</p>
+        <h1>Book a boat or space</h1>
+        <p className="club-lead">Pick a day, then tap a free time.</p>
       </header>
       <PlaceholderNote />
       {blocked && (
@@ -78,14 +75,14 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
         </p>
       )}
 
-      <nav aria-label="Pick a day" className="club-chips">
+      <nav aria-label="Pick a day" className="club-chips club-chips-days">
         {days.map((d) => (
           <Link key={d} href={href(d, type)} aria-current={d === day ? "page" : undefined}>
             {d === today ? "Today" : shortDay(d)}
           </Link>
         ))}
       </nav>
-      <nav aria-label="Filter by type" className="club-chips">
+      <nav aria-label="Filter by type" className="club-chips club-chips-types">
         <Link href={href(day, null)} aria-current={type ? undefined : "page"}>
           All
         </Link>
@@ -96,76 +93,98 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
         ))}
       </nav>
 
-      <h2 data-testid="day-heading">{formatDayLong(day)}</h2>
-      <ul className="club-legend" aria-label="Legend">
-        {(["free", "booked", "yours", "class", "practice", "out_of_service", "past"] as const).map((s) => (
-          <li key={s}>
-            <span className={`slot slot-${s}`} aria-hidden="true" /> {SLOT_WORDS[s]}
+      <div className="club-book-daybar">
+        <h2 data-testid="day-heading">{formatDayLong(day)}</h2>
+        <ul className="club-legend" aria-label="Legend">
+          <li>
+            <span className="slot slot-free" aria-hidden="true" /> Free
           </li>
-        ))}
-      </ul>
+          <li>
+            <span className="slot slot-yours" aria-hidden="true" /> Yours
+          </li>
+          <li>
+            <span className="slot slot-booked" aria-hidden="true" /> Taken
+          </li>
+          <li>
+            <span className="slot slot-practice" aria-hidden="true" /> Practice
+          </li>
+        </ul>
+      </div>
 
-      {view.items.length === 0 && <p>Nothing of that type is set up yet.</p>}
-      <div className="club-cards">
-        {view.items.map((item) => (
-          <article key={item.item.id} className="club-card" aria-label={item.item.name} data-testid="item-card" data-item={item.item.name}>
-            <h3>
-              {item.item.name} <span className="club-meta">{item.className}</span>
-              {item.isPrivate && <span className="club-tag">Private</span>}
-            </h3>
-            <p className="club-meta">
-              {item.type}
-              {item.seats > 1 ? ` · ${item.seats} seats` : ""}
-              {item.places > 1 ? ` · ${item.places} places` : ""}
-              {item.needs ? ` · needs ${item.needs}` : ""}
-            </p>
-            {item.qualified === false && <p className="club-meta">You do not hold that qualification yet, so you cannot book this one.</p>}
-            {item.note && <p className="club-meta">{item.note}</p>}
-            {(() => {
-              const notices = openDamageNotices(state, item.item.id);
-              return notices.length === 0 ? null : (
-                <div className={`club-damage${notices.some((n) => n.major) ? " club-damage-major" : ""}`} data-testid="damage-notice">
-                  {notices.map((n) => (
-                    <p key={n.reportId}>{noticeWords(n)}</p>
-                  ))}
-                </div>
-              );
-            })()}
-            {item.locked && (
-              <p className="club-meta" data-testid="boat-locked-note">
-                Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
-              </p>
-            )}
-            <ol className="slots">
-              {item.slots.map((slot) => {
-                const counted = slot.placesLeft !== null && !slot.heldFor && (slot.state === "free" || slot.state === "booked" || slot.state === "yours");
-                const words = slot.heldFor ? `${slot.heldFor} class` : counted && slot.state !== "yours" ? `${slot.placesLeft} of ${item.places} places left` : SLOT_WORDS[slot.state].toLowerCase();
-                const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${words}`;
-                return (
-                  <li key={slot.startsAt}>
-                    {slot.state === "free" && !item.locked ? (
-                      <Link className="slot slot-free" href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })} aria-label={label}>
-                        {formatClock(slot.startsAt)}
-                        {slot.placesLeft !== null && <small>{slot.placesLeft} left</small>}
-                      </Link>
-                    ) : (
-                      <span className={`slot slot-${slot.state}`} aria-label={label} data-state={slot.state} title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}>
-                        {formatClock(slot.startsAt)}
-                        <small>{slot.bookedBy ?? slot.heldFor ?? (slot.state === "past" ? "" : slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state])}</small>
-                      </span>
-                    )}
-                  </li>
+      {view.items.length === 0 && <p className="club-empty-inline">Nothing of that type is set up yet.</p>}
+      <div className="club-book-list">
+        {view.items.map((item) => {
+          const openSlots = item.slots.filter((s) => s.state !== "past");
+          return (
+            <article key={item.item.id} className="club-book-item" aria-label={item.item.name} data-testid="item-card" data-item={item.item.name}>
+              <header className="club-book-item-head">
+                <h3>
+                  {item.item.name}
+                  {item.isPrivate && <span className="club-tag">Private</span>}
+                </h3>
+                <p className="club-meta">
+                  {item.className}
+                  {item.seats > 1 ? ` · ${item.seats} seats` : ""}
+                  {item.places > 1 ? ` · ${item.places} places` : ""}
+                  {item.needs ? ` · needs ${item.needs}` : ""}
+                </p>
+              </header>
+              {item.qualified === false && <p className="club-meta">You do not hold that qualification yet, so you cannot book this one.</p>}
+              {item.note && <p className="club-meta">{item.note}</p>}
+              {(() => {
+                const notices = openDamageNotices(state, item.item.id);
+                return notices.length === 0 ? null : (
+                  <div className={`club-damage${notices.some((n) => n.major) ? " club-damage-major" : ""}`} data-testid="damage-notice">
+                    {notices.map((n) => (
+                      <p key={n.reportId}>{noticeWords(n)}</p>
+                    ))}
+                  </div>
                 );
-              })}
-            </ol>
-            <p className="club-meta">
-              <Link href={`/club/damage?item=${item.item.id}`} data-testid="report-damage-link" aria-label={`Report damage on ${item.item.name}`}>
-                Report damage
-              </Link>
-            </p>
-          </article>
-        ))}
+              })()}
+              {item.locked && (
+                <p className="club-meta" data-testid="boat-locked-note">
+                  Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
+                </p>
+              )}
+              <ol className="slots">
+                {openSlots.map((slot) => {
+                  const counted = slot.placesLeft !== null && !slot.heldFor && (slot.state === "free" || slot.state === "booked" || slot.state === "yours");
+                  const words = slot.heldFor ? `${slot.heldFor} class` : counted && slot.state !== "yours" ? `${slot.placesLeft} of ${item.places} places left` : SLOT_WORDS[slot.state].toLowerCase();
+                  const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${words}`;
+                  const taken = slot.state === "booked" || slot.state === "class" || slot.state === "practice" || slot.state === "out_of_service" || slot.state === "not_open";
+                  return (
+                    <li key={slot.startsAt}>
+                      {slot.state === "free" && !item.locked ? (
+                        <Link className="slot slot-free" href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })} aria-label={label}>
+                          {formatClock(slot.startsAt)}
+                          {slot.placesLeft !== null && <small>{slot.placesLeft} left</small>}
+                        </Link>
+                      ) : (
+                        <span
+                          className={`slot slot-${slot.state}${taken ? " slot-taken" : ""}`}
+                          aria-label={label}
+                          data-state={slot.state}
+                          title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}
+                        >
+                          {formatClock(slot.startsAt)}
+                          <small>{slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state])}</small>
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+              <p className="club-book-item-foot">
+                <Link href={`/club/damage?item=${item.item.id}`} data-testid="report-damage-link" aria-label={`Report damage on ${item.item.name}`}>
+                  Report damage
+                </Link>
+              </p>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
 }
+
+const first = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);

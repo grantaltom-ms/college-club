@@ -61,17 +61,23 @@ function MemberCard({ state, member, household, staff }: { state: ClubState; mem
 export function HouseholdView({ state, household, viewerIsStaff }: { state: ClubState; household: Household; viewerIsStaff: boolean }) {
   const members = membersOf(state, household.id);
   const history = historyOf(state, household.id);
+  const canBook = !viewerIsStaff && household.status === "active" && members.some((m) => !bookingBlockReason(m, household));
+
   return (
-    <article>
-      <h1 data-testid="household-name">{household.displayName}</h1>
-      <p className="club-meta" data-testid="household-facts">
-        {household.membershipType} · joined {formatDay(household.joinedOn)} ·{" "}
-        {household.status === "ended" ? (
-          <strong>membership ended {formatDay(household.endedOn!)}</strong>
-        ) : (
-          <span className="club-chip club-chip-active">Active</span>
-        )}
-      </p>
+    <article className={viewerIsStaff ? undefined : "club-launch"}>
+      <header className="club-launch-head">
+        <p className="club-kicker">{viewerIsStaff ? "Household" : "Your household"}</p>
+        <h1 data-testid="household-name">{household.displayName}</h1>
+        <p className="club-meta" data-testid="household-facts">
+          {household.membershipType} · joined {formatDay(household.joinedOn)} ·{" "}
+          {household.status === "ended" ? (
+            <strong>membership ended {formatDay(household.endedOn!)}</strong>
+          ) : (
+            <span className="club-chip club-chip-active">Active</span>
+          )}
+        </p>
+      </header>
+
       {viewerIsStaff && (
         <dl className="club-slots" aria-label="Household records">
           <Slot label="QuickBooks ID" value={household.quickbooksId} />
@@ -81,28 +87,28 @@ export function HouseholdView({ state, household, viewerIsStaff }: { state: Club
       )}
 
       {!viewerIsStaff && household.status === "active" && (
-        <nav className="club-shortcuts" aria-label="Common tasks">
-          <Link href="/club/book" className="club-shortcut">
-            <span className="club-shortcut-title">Book</span>
-            <span className="club-shortcut-meta">Boats and spaces</span>
-          </Link>
-          <Link href="/club/classes" className="club-shortcut">
-            <span className="club-shortcut-title">Classes</span>
-            <span className="club-shortcut-meta">Fitness sessions</span>
-          </Link>
-          <Link href="/club/events" className="club-shortcut">
-            <span className="club-shortcut-title">Events</span>
-            <span className="club-shortcut-meta">Dinners and socials</span>
-          </Link>
-          <Link href="/club/my-bookings" className="club-shortcut">
-            <span className="club-shortcut-title">My bookings</span>
-            <span className="club-shortcut-meta">What is coming up</span>
-          </Link>
-          <Link href="/club/damage" className="club-shortcut club-shortcut-quiet">
-            <span className="club-shortcut-title">Report damage</span>
-            <span className="club-shortcut-meta">Something broken or unsafe</span>
-          </Link>
-        </nav>
+        <div className="club-hero-action">
+          {canBook ? (
+            <>
+              <p className="club-lead">Ready when you are.</p>
+              <p className="club-actions">
+                <Link href="/club/book" className="club-button club-button-primary club-button-link club-button-xl">
+                  Book a boat or space
+                </Link>
+              </p>
+              <nav className="club-quiet-links" aria-label="Other things to do">
+                <Link href="/club/classes">Classes</Link>
+                <Link href="/club/events">Events</Link>
+                <Link href="/club/my-bookings">My bookings</Link>
+                <Link href="/club/damage">Report damage</Link>
+              </nav>
+            </>
+          ) : (
+            <p className="club-alert" role="status">
+              This household cannot make new bookings right now.
+            </p>
+          )}
+        </div>
       )}
 
       <h2>Adults</h2>

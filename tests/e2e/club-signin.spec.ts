@@ -65,9 +65,9 @@ test.describe("a member signing in", () => {
     expect(await cookieNamed(page, "ccs_session")).toBeUndefined();
 
     await page.getByRole("button", { name: "Sign in as Nora Abernathy", exact: true }).click();
-    await expect(page).toHaveURL("/club");
+    await expect(page).toHaveURL("/club/book");
     await expect(page.getByTestId("acting-as")).toHaveText("Signed in as Nora Abernathy.");
-    await expect(page.getByTestId("household-name")).toHaveText("The Abernathy household");
+    await expect(page.getByRole("heading", { level: 1, name: "Book a boat or space" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(0);
 
     // The browser holds a long random secret in a cookie the page's own scripts cannot read, and nothing is left of the test picker.
@@ -160,6 +160,8 @@ test.describe("partners sharing one email address", () => {
     await expect(page.getByRole("button", { name: "I am Camille Moreau", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "I am Julien Moreau", exact: true }).click();
     await expect(page.getByTestId("acting-as")).toHaveText("Signed in as Julien Moreau.");
+    await expect(page).toHaveURL("/club/book");
+    await page.goto("/club");
     await expect(page.getByTestId("member-row")).toHaveCount(2);
     await page.getByRole("button", { name: "Sign out" }).click();
 
@@ -263,6 +265,8 @@ test.describe("staff signing in", () => {
     const other = await browser.newContext({ baseURL });
     const quinn = await other.newPage();
     await signInAs(quinn, "quinn.signin@example.com", "Sign in as Quinn Signin");
+    await expect(quinn).toHaveURL("/club/book");
+    await quinn.goto("/club");
     await expect(quinn.getByTestId("household-name")).toHaveText(name);
     // A member is not staff: no staff office, and the staff pages do not exist for them.
     await expect(quinn.getByRole("link", { name: "Staff office" })).toHaveCount(0);

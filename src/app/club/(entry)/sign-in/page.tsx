@@ -47,8 +47,8 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<S
                 You are signed in as {actor.kind === "staff" ? actor.label : fullName(actor.member)}.
               </p>
               <p>
-                <Link href="/club" className="ds-button ds-button-large">
-                  Go to the club
+                <Link href={actor.kind === "staff" ? "/club" : "/club/book"} className="ds-button ds-button-large">
+                  {actor.kind === "staff" ? "Go to the club" : "Book a boat or space"}
                 </Link>
               </p>
               <form method="post" action="/api/club/sign-out">
