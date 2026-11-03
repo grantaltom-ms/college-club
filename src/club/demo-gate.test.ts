@@ -6,6 +6,7 @@ import {
   DEMO_NEXT_MAX,
   DEMO_PASS_DAYS,
   decideGate,
+  isClassCalendarPath,
   demoGateState,
   demoNext,
   demoPassValid,
@@ -267,6 +268,16 @@ describe("what to do with a request", () => {
     expect(ask({ pathname: "/club/admin/check-in", search: "?q=ada" })).toEqual({ kind: "keypad", next: "/club/admin/check-in?q=ada" });
     expect(ask({ method: "HEAD" })).toEqual({ kind: "keypad", next: "/club/start" });
     expect(ask({ method: "get" })).toEqual({ kind: "keypad", next: "/club/start" });
+  });
+
+  it("lets the fitness-classes calendar feed through without a pass, so calendar apps can subscribe", () => {
+    expect(isClassCalendarPath("/api/club/classes/calendar")).toBe(true);
+    expect(isClassCalendarPath("/API/Club/Classes/Calendar")).toBe(true);
+    expect(isClassCalendarPath("/api/club/classes/calendar/extra")).toBe(false);
+    expect(ask({ pathname: "/api/club/classes/calendar" })).toEqual({ kind: "allow" });
+    expect(ask({ pathname: "/api/club/classes/calendar", method: "HEAD" })).toEqual({ kind: "allow" });
+    // Still hidden on the live site with every other /api/club address.
+    expect(ask({ env: { ...ON, VERCEL_ENV: "production" }, pathname: "/api/club/classes/calendar" })).toEqual({ kind: "hide" });
   });
 
   it("refuses a button, a form or a data request, which cannot show a keypad", () => {

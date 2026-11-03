@@ -38,6 +38,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         `/club/classes/of/${FIRST_HOUSEHOLD}`,
         `/club/classes/${FIRST_HOUSEHOLD}`,
         "/club/classes/manage",
+        "/api/club/classes/calendar",
         "/club/my-classes",
         "/club/events",
         "/club/events/manage",

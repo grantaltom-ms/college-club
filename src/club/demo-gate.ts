@@ -120,6 +120,17 @@ export function isKeypadPath(pathname: string): boolean {
 }
 
 /**
+ * The fitness-classes ICS subscribe feed. Calendar apps fetch it without a browser cookie, so the demo
+ * keypad must not stand in front of it. It is still covered by "hide" on the live site (under /api/club),
+ * and the handler itself answers "page not found" when the member area is off.
+ */
+export function isClassCalendarPath(pathname: string): boolean {
+  const parts = addressParts(pathname);
+  if (parts === null) return false;
+  return parts.length === 4 && parts[0] === "api" && parts[1] === "club" && parts[2] === "classes" && parts[3] === "calendar";
+}
+
+/**
  * Where the keypad may send someone on to afterwards: a page of the member area or the public-site preview, written plainly.
  * Anything else (another site, a look-alike like /clubhouse, a page outside, dot segments, odd characters, too long) is the
  * landing page, so the keypad can never be used to send a visitor somewhere else.
@@ -153,6 +164,8 @@ export function decideGate(input: { method: string; pathname: string; search: st
   if (!isGatedPath(input.pathname)) return { kind: "allow" };
   if (state === "on" && demoPassValid(input.pass, demoPassword(env), input.now)) return { kind: "allow" };
   const method = input.method.toUpperCase();
+  // Calendar subscribe clients have no demo cookie; the feed itself is only class names and times.
+  if ((method === "GET" || method === "HEAD") && isClassCalendarPath(input.pathname)) return { kind: "allow" };
   if (method === "GET" || method === "HEAD") return { kind: "keypad", next: demoNext(`${input.pathname}${input.search}`) };
   return { kind: "refuse" };
 }
