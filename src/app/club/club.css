@@ -585,8 +585,9 @@ a.club-button-quiet {
     grid-template-columns: repeat(5, 1fr);
   }
 
+  /* Five tool groups: two columns keep every card filled; a third column left an empty hole. */
   .club-tool-board {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr 1fr;
   }
 }
 
