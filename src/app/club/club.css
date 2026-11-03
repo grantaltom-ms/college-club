@@ -1452,18 +1452,55 @@ details summary {
   color: var(--book-muted);
 }
 
-.club-book-choose-kinds {
-  grid-template-columns: 1fr;
-}
-
 @media (min-width: 640px) {
   .club-book-choose {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  .club-book-choose-kinds {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+/* Shell size: three square tiles in a row (1x · 2x · 4x). */
+.club-book-shell-sizes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0 28px;
+}
+
+.club-book-shell-size {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: var(--book-card);
+  border: 1px solid var(--book-line);
+  border-radius: var(--radius-card);
+  text-decoration: none;
+  color: var(--book-ink);
+  text-align: center;
+  box-shadow: var(--shadow-xs);
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.club-book-shell-size:hover,
+.club-book-shell-size:focus-visible {
+  border-color: var(--book-lake);
+  box-shadow: var(--shadow-md);
+}
+
+.club-book-shell-size-label {
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 5vw, 1.85rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.club-book-shell-size-hint {
+  font-family: var(--ui);
+  font-size: 0.78rem;
+  color: var(--book-muted);
 }
 
 .club-book-context {
@@ -1490,60 +1527,68 @@ details summary {
 .club-book-day {
   display: grid;
   gap: 10px;
-  margin: 0 0 16px;
-  padding: 16px 18px;
+  margin: 0 0 12px;
+  padding: 14px 16px;
   background: var(--book-wash);
   border: 1px solid var(--book-line);
   border-radius: var(--radius-card);
 }
 
+.club-book-day-long {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.1rem;
+  color: var(--book-ink);
+}
+
+.club-book-day-select,
+.club-book-hour .club-book-day-select {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
 .club-book-day-label {
   margin: 0;
   font-family: var(--ui);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--book-lake);
 }
 
-.club-book-day-long {
-  margin: 2px 0 0;
-  font-family: var(--display);
-  font-size: 1.2rem;
-  color: var(--book-ink);
-}
-
-.club-book-day-more summary {
-  font-family: var(--ui);
-  font-weight: 600;
-  color: var(--book-lake-deep);
-  cursor: pointer;
-  list-style: none;
-}
-
-.club-book-day-more summary::-webkit-details-marker {
-  display: none;
-}
-
-.club-book-day-more .club-chips {
-  margin-top: 10px;
-}
-
-.club-chips-days {
-  margin-bottom: 0;
-}
-
-.club-book .club-chips a {
+.club-book-day-select select,
+.club-book-hour select {
+  width: 100%;
+  max-width: 22rem;
+  min-height: var(--tap-min);
+  padding: 8px 12px;
+  border: 1px solid var(--book-line);
+  border-radius: var(--radius-input);
   background: var(--book-card);
-  border-color: var(--book-line);
+  font-family: var(--ui);
+  font-size: 0.95rem;
   color: var(--book-ink);
 }
 
-.club-book .club-chips a[aria-current="page"] {
-  background: var(--book-lake);
-  border-color: var(--book-lake);
-  color: var(--white);
+.club-book-hour {
+  margin: 0 0 8px;
+}
+
+.club-book .club-slots-compact {
+  gap: 6px;
+}
+
+.club-book .club-slots-compact .slot {
+  min-height: var(--tap-min);
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.club-book .club-slots-compact .slot small {
+  font-size: 0.68rem;
+  line-height: 1.1;
 }
 
 .club-book-legend {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { dayView, pickableDays, type SlotView } from "@/club/engine/availability";
+import { dayView, pickableDays, type ItemDayView, type SlotView } from "@/club/engine/availability";
 import { itemVisibleTo } from "@/club/engine/boat-access";
 import { noticeWords, openDamageNotices } from "@/club/engine/damage";
 import { requireClub } from "@/club/guard";
@@ -7,7 +7,7 @@ import { getCurrentActor } from "@/club/identity";
 import { clubNow } from "@/club/clock";
 import { RULE_BOOK, classOf } from "@/club/settings/rulebook";
 import { readClubOnce } from "@/club/store/read-once";
-import { formatClock, formatDay, formatDayLong, formatRange, pacificDate, weekdayName } from "@/club/time";
+import { formatClock, formatDayLong, formatRange, pacificDate, pacificMinutes } from "@/club/time";
 import { bookingFormHref, pickDay, typeParam } from "@/club/web";
 import {
   browseById,
@@ -21,6 +21,8 @@ import {
 import { blockedReason, viewerOf } from "@/club/web-actor";
 import { PlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
+import { DaySelect } from "./DaySelect";
+import { HourSelect } from "./HourSelect";
 
 const SLOT_WORDS: Record<SlotView["state"], string> = {
   free: "Free",
@@ -33,7 +35,20 @@ const SLOT_WORDS: Record<SlotView["state"], string> = {
   not_open: "Not open yet",
 };
 
-const shortDay = (day: string) => `${weekdayName(day).slice(0, 3)} ${formatDay(day).replace(/, \d{4}$/, "")}`;
+/** Members never see a boat that is entirely out of commission for the day; staff still can. */
+function showItemToViewer(row: ItemDayView, staff: boolean): boolean {
+  if (staff) return true;
+  const open = row.slots.filter((s) => s.state !== "past");
+  if (open.length === 0) return false;
+  return !open.every((s) => s.state === "out_of_service");
+}
+
+function hourLabel(hour: number): string {
+  if (hour === 0) return "12 am";
+  if (hour < 12) return `${hour} am`;
+  if (hour === 12) return "12 pm";
+  return `${hour - 12} pm`;
+}
 
 export default async function BookPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireClub();
@@ -46,19 +61,19 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const days = pickableDays(state, RULE_BOOK, now);
   const { day, note: dayNote } = pickDay(params.day, days);
   const viewer = viewerOf(actor);
+  const staff = actor.kind === "staff";
   const askedType = typeParam(params.type);
   const whatRaw = first(params.what);
   const kindRaw = first(params.kind);
+  const hourRaw = first(params.hour);
+  const hour = hourRaw && /^\d{1,2}$/.test(hourRaw) ? Number(hourRaw) : null;
+  const hourLive = hour !== null && hour >= 0 && hour <= 23 ? hour : null;
 
   const options = visibleBrowse(state, RULE_BOOK, now, (i) => itemVisibleTo(state, i, viewer));
-  // Prefer an explicit what=; else map a legacy type= so deep links and tests still open the grid.
   const browse = (whatRaw ? browseById(whatRaw) : null) ?? browseFromType(askedType);
-  // Deep links (what= or type=) still open even when a seasonal category is hidden from the chooser (dock in winter).
   const browseLive = browse && (options.some((o) => o.id === browse.id) || Boolean(whatRaw || askedType)) ? browse : null;
-  // Shell size is required on the new what=shell path; a legacy type=Shell link still shows every shell.
   const needsKind = Boolean(browseLive && "kinds" in browseLive && browseLive.kinds && !askedType);
   const kind = shellKindById(kindRaw);
-  // Ready to show times only after the person has named what (and, for shells on the new path, which size).
   const ready = Boolean(browseLive && (!needsKind || kind));
 
   const typeFilter = askedType && browseLive?.types.length === 1 ? askedType : browseLive?.types.length === 1 ? browseLive.types[0] : null;
@@ -66,32 +81,49 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
     ? dayView(state, RULE_BOOK, { day, now, viewer, type: typeFilter && browseLive!.types.includes(typeFilter as never) ? typeFilter : null })
     : { day, items: [] };
   const items = ready
-    ? view.items.filter((row) => itemMatchesBrowse(RULE_BOOK, row.item, browseLive!, kind)).filter((row) => {
-        // When a legacy type= narrows paddle craft to one kind, honour it.
-        if (!askedType || browseLive!.types.length === 1) return true;
-        return classOf(RULE_BOOK, row.item).type === askedType;
-      })
+    ? view.items
+        .filter((row) => itemMatchesBrowse(RULE_BOOK, row.item, browseLive!, kind))
+        .filter((row) => {
+          if (!askedType || browseLive!.types.length === 1) return true;
+          return classOf(RULE_BOOK, row.item).type === askedType;
+        })
+        .filter((row) => showItemToViewer(row, staff))
     : [];
 
   const blocked = blockedReason(actor);
   const today = pacificDate(now);
-  const href = (opts: { day?: string; what?: string | null; kind?: string | null }) => {
+  const href = (opts: { day?: string; what?: string | null; kind?: string | null; hour?: number | null }) => {
     const d = opts.day ?? day;
     const w = opts.what === undefined ? browseLive?.id ?? null : opts.what;
     const k = opts.kind === undefined ? (needsKind ? kind?.id ?? null : null) : opts.kind;
+    const h = opts.hour === undefined ? hourLive : opts.hour;
     const q = new URLSearchParams();
     q.set("day", d);
     if (w) q.set("what", w);
     if (k) q.set("kind", k);
+    // Keep legacy type= links working when that is how we got here.
+    if (!w && askedType) q.set("type", askedType);
+    if (h !== null && h !== undefined) q.set("hour", String(h));
     return `/club/book?${q.toString()}`;
   };
+
+  const dayLabels = Object.fromEntries(days.map((d) => [d, formatDayLong(d)]));
+  const hourValues = new Set<number>();
+  for (const row of items) {
+    for (const slot of row.slots) {
+      if (slot.state === "past" || slot.state === "out_of_service") continue;
+      hourValues.add(Math.floor(pacificMinutes(new Date(slot.startsAt)) / 60));
+    }
+  }
+  const hours = [...hourValues].sort((a, b) => a - b).map((h) => ({ value: h, label: hourLabel(h) }));
+  const hourActive = hourLive !== null && hours.some((h) => h.value === hourLive) ? hourLive : null;
 
   return (
     <section className="club-book">
       <header className="club-launch-head">
         <p className="club-kicker">Book</p>
         <h1>Reservations</h1>
-        <p className="club-lead">{ready ? "Tap a free time." : needsKind && browseLive ? "Which size of shell?" : "What would you like to reserve?"}</p>
+        <p className="club-lead">{ready ? "Pick a day and hour, then tap a free time." : needsKind && browseLive ? "Which size of shell?" : "What would you like to reserve?"}</p>
       </header>
       <PlaceholderNote />
       {blocked && (
@@ -115,7 +147,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
       {!browseLive && (
         <nav aria-label="What to reserve" className="club-book-choose" data-testid="book-choose">
           {options.map((b) => (
-            <Link key={b.id} href={href({ what: b.id, kind: null })} className="club-book-choose-card" data-browse={b.id}>
+            <Link key={b.id} href={href({ what: b.id, kind: null, hour: null })} className="club-book-choose-card" data-browse={b.id}>
               <span className="club-book-choose-label">{b.label}</span>
               <span className="club-book-choose-hint">{chooseHint(b)}</span>
             </Link>
@@ -128,11 +160,11 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           <p className="club-back">
             <Link href="/club/book">All categories</Link>
           </p>
-          <nav aria-label="Shell size" className="club-book-choose club-book-choose-kinds" data-testid="shell-kinds">
+          <nav aria-label="Shell size" className="club-book-shell-sizes" data-testid="shell-kinds">
             {SHELL_KINDS.map((k) => (
-              <Link key={k.id} href={href({ what: "shell", kind: k.id })} className="club-book-choose-card" data-kind={k.id}>
-                <span className="club-book-choose-label">{k.label}</span>
-                <span className="club-book-choose-hint">{k.seats === 1 ? "One seat" : `${k.seats} seats`}</span>
+              <Link key={k.id} href={href({ what: "shell", kind: k.id, hour: null })} className="club-book-shell-size" data-kind={k.id}>
+                <span className="club-book-shell-size-label">{k.label}</span>
+                <span className="club-book-shell-size-hint">{k.hint}</span>
               </Link>
             ))}
           </nav>
@@ -143,7 +175,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
         <>
           <div className="club-book-context">
             <p className="club-back">
-              <Link href={needsKind ? href({ what: "shell", kind: null }) : "/club/book"}>{needsKind ? "Change shell size" : "All categories"}</Link>
+              <Link href={needsKind ? href({ what: "shell", kind: null, hour: null }) : "/club/book"}>{needsKind ? "Change shell size" : "All categories"}</Link>
             </p>
             <p className="club-book-context-label" data-testid="browse-label">
               {browseLive.label}
@@ -152,22 +184,26 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           </div>
 
           <div className="club-book-day">
-            <div className="club-book-day-now">
-              <p className="club-book-day-label">{day === today ? "Today" : shortDay(day)}</p>
-              <p className="club-book-day-long" data-testid="day-heading">
-                {formatDayLong(day)}
-              </p>
-            </div>
-            <details className="club-book-day-more" open={Boolean(dayNote) || day !== today}>
-              <summary>{day === today ? "Pick another day" : "Change day"}</summary>
-              <nav aria-label="Pick a day" className="club-chips club-chips-days">
-                {days.map((d) => (
-                  <Link key={d} href={href({ day: d })} aria-current={d === day ? "page" : undefined}>
-                    {d === today ? "Today" : shortDay(d)}
-                  </Link>
-                ))}
-              </nav>
-            </details>
+            <p className="club-book-day-long" data-testid="day-heading">
+              {day === today ? `Today · ${formatDayLong(day)}` : formatDayLong(day)}
+            </p>
+            <DaySelect
+              days={days}
+              day={day}
+              today={today}
+              labels={dayLabels}
+              hrefs={Object.fromEntries(days.map((d) => [d, href({ day: d })]))}
+            />
+            {hours.length > 0 && (
+              <HourSelect
+                hours={hours}
+                hour={hourActive}
+                hrefs={{
+                  all: href({ hour: null }),
+                  byHour: Object.fromEntries(hours.map((h) => [h.value, href({ hour: h.value })])),
+                }}
+              />
+            )}
           </div>
 
           <ul className="club-legend club-book-legend" aria-label="Legend">
@@ -188,7 +224,12 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           {items.length === 0 && <p className="club-empty-inline">Nothing of that type is free to show yet.</p>}
           <div className="club-book-list">
             {items.map((item) => {
-              const openSlots = item.slots.filter((s) => s.state !== "past");
+              const openSlots = item.slots.filter((s) => {
+                if (s.state === "past") return false;
+                if (hourActive === null) return true;
+                return Math.floor(pacificMinutes(new Date(s.startsAt)) / 60) === hourActive;
+              });
+              if (openSlots.length === 0) return null;
               return (
                 <article key={item.item.id} className="club-book-item" aria-label={item.item.name} data-testid="item-card" data-item={item.item.name}>
                   <header className="club-book-item-head">
@@ -197,8 +238,8 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                       {item.isPrivate && <span className="club-tag">Private</span>}
                     </h3>
                     <p className="club-meta">
-                      {item.className}
-                      {item.seats > 1 ? ` · ${item.seats} seats` : ""}
+                      {kind ? kind.label : item.className}
+                      {item.item.maxWeightLbs != null ? ` · max ${item.item.maxWeightLbs} lb` : ""}
                       {item.places > 1 ? ` · ${item.places} places` : ""}
                       {item.needs ? ` · needs ${item.needs}` : ""}
                     </p>
@@ -220,12 +261,18 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                       Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
                     </p>
                   )}
-                  <ol className="slots">
+                  <ol className="slots club-slots-compact">
                     {openSlots.map((slot) => {
                       const counted = slot.placesLeft !== null && !slot.heldFor && (slot.state === "free" || slot.state === "booked" || slot.state === "yours");
-                      const words = slot.heldFor ? `${slot.heldFor} class` : counted && slot.state !== "yours" ? `${slot.placesLeft} of ${item.places} places left` : SLOT_WORDS[slot.state].toLowerCase();
+                      const words = slot.heldFor
+                        ? `${slot.heldFor} class`
+                        : counted && slot.state !== "yours"
+                          ? `${slot.placesLeft} of ${item.places} places left`
+                          : SLOT_WORDS[slot.state].toLowerCase();
                       const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${words}`;
                       const taken = slot.state === "booked" || slot.state === "class" || slot.state === "practice" || slot.state === "out_of_service" || slot.state === "not_open";
+                      const shortTaken =
+                        slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state]);
                       return (
                         <li key={slot.startsAt}>
                           {slot.state === "free" && !item.locked ? (
@@ -241,7 +288,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                               title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}
                             >
                               {formatClock(slot.startsAt)}
-                              <small>{slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state])}</small>
+                              <small>{shortTaken}</small>
                             </span>
                           )}
                         </li>
@@ -266,7 +313,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 const first = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
 function chooseHint(b: BookBrowse): string {
-  if (b.id === "shell") return "Singles, doubles, quads";
+  if (b.id === "shell") return "1x, 2x, 4x";
   if (b.id === "paddle") return "Kayaks and paddle boards";
   if (b.id === "dock") return "Warm months";
   if (b.id === "gym") return "Ergs and floor";

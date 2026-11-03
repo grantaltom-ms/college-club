@@ -20,20 +20,22 @@ interface SampleItem {
   places?: number;
   /** Retired from the start, with this reason: nobody sees it but staff, on the Equipment page's retired list. */
   retired?: string;
+  /** Optional max combined rower weight in pounds (shells). */
+  maxWeightLbs?: number;
 }
 
 export const SAMPLE_ITEMS: SampleItem[] = [
-  { name: "Heron", classCode: "shell-single" },
-  { name: "Osprey", classCode: "shell-single" },
-  { name: "Kingfisher", classCode: "shell-single" },
-  { name: "Cormorant", classCode: "shell-single" },
-  { name: "Merganser", classCode: "shell-single" },
-  { name: "Grebe", classCode: "shell-single" },
-  { name: "Loon", classCode: "shell-double" },
-  { name: "Pelican", classCode: "shell-double" },
+  { name: "Heron", classCode: "shell-single", maxWeightLbs: 190 },
+  { name: "Osprey", classCode: "shell-single", maxWeightLbs: 200 },
+  { name: "Kingfisher", classCode: "shell-single", maxWeightLbs: 175 },
+  { name: "Cormorant", classCode: "shell-single", maxWeightLbs: 210 },
+  { name: "Merganser", classCode: "shell-single", maxWeightLbs: 195 },
+  { name: "Grebe", classCode: "shell-single", maxWeightLbs: 185 },
+  { name: "Loon", classCode: "shell-double", maxWeightLbs: 360 },
+  { name: "Pelican", classCode: "shell-double", maxWeightLbs: 380 },
   // One item with its own rule, to show an item can override its class: this double is limited to 90 minutes.
-  { name: "Tern", classCode: "shell-double", ruleOverrides: { maxMinutes: 90 } },
-  { name: "Albatross", classCode: "shell-quad" },
+  { name: "Tern", classCode: "shell-double", ruleOverrides: { maxMinutes: 90 }, maxWeightLbs: 340 },
+  { name: "Albatross", classCode: "shell-quad", maxWeightLbs: 720 },
   { name: "Otter", classCode: "kayak" },
   { name: "Mink", classCode: "kayak" },
   { name: "Beaver", classCode: "kayak" },
@@ -50,11 +52,11 @@ export const SAMPLE_ITEMS: SampleItem[] = [
   { name: "Weight room", classCode: "gym-space", places: 3 },
   // Private boats. Only their owners and the people an owner has invited can see or book them, and their skill level is not checked
   // (Ines Castellanos holds no qualification and can still use Starling). Wren has no owner, so it is locked until staff add one.
-  { name: "Kestrel", classCode: "shell-single", private: { owners: ["Nora Abernathy"], invited: ["Tomas Vandermeer"] } },
-  { name: "Starling", classCode: "shell-double", private: { owners: ["Erik Lindqvist"], invited: ["Ines Castellanos"] } },
-  { name: "Wren", classCode: "shell-single", private: { owners: [], invited: [] } },
+  { name: "Kestrel", classCode: "shell-single", private: { owners: ["Nora Abernathy"], invited: ["Tomas Vandermeer"] }, maxWeightLbs: 180 },
+  { name: "Starling", classCode: "shell-double", private: { owners: ["Erik Lindqvist"], invited: ["Ines Castellanos"] }, maxWeightLbs: 350 },
+  { name: "Wren", classCode: "shell-single", private: { owners: [], invited: [] }, maxWeightLbs: 170 },
   // A boat the club no longer has. It is on staff's retired list, with a line in its file, and nowhere else.
-  { name: "Gannet", classCode: "shell-single", retired: "Sold to another club" },
+  { name: "Gannet", classCode: "shell-single", retired: "Sold to another club", maxWeightLbs: 190 },
 ];
 
 /**
@@ -72,6 +74,7 @@ export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<
       const item: Item = { id: newId(), name: i.name, classCode: i.classCode, ruleOverrides: i.ruleOverrides ?? {} };
       if (i.private) item.isPrivate = true;
       if (i.places && i.places > 1) item.places = i.places;
+      if (i.maxWeightLbs != null) item.maxWeightLbs = i.maxWeightLbs;
       if (i.retired) {
         item.retired = { at: now.toISOString(), by: SAMPLE_STAFF, reason: i.retired };
         s.itemLog.push({ id: newId(), itemId: item.id, at: now.toISOString(), kind: "retired", by: SAMPLE_STAFF, text: `Retired by ${SAMPLE_STAFF.label}. Reason: ${i.retired}. Nothing was booked on it.`, details: { reason: i.retired } });

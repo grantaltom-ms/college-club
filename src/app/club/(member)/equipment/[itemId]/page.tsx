@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
-import { itemPage, skillKey } from "@/club/engine/equipment-edit";
+import { itemPage, skillKey, weightWords } from "@/club/engine/equipment-edit";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { RULE_BOOK, classOf } from "@/club/settings/rulebook";
@@ -49,6 +49,7 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
         ],
       };
   const places = !retired && line.pool ? line.places : null;
+  const weightEditable = !retired && (cls.type === "Shell" || cls.type === "Kayak" || cls.type === "Paddle Board");
 
   return (
     <section>
@@ -68,6 +69,9 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
           {line.pool ? ` · ${plural(line.places, "place")}, counted rather than numbered` : ` · ${plural(line.seats, "seat")}`}
         </p>
         <p data-testid="item-skill">Skill level needed: {line.isPrivate ? "not checked on a private boat" : line.skill}</p>
+        {(cls.type === "Shell" || cls.type === "Kayak" || cls.type === "Paddle Board") && (
+          <p data-testid="item-weight">Max weight: {weightWords(line.maxWeightLbs)}</p>
+        )}
         <p data-testid="item-status">
           {retired
             ? `Retired ${line.retired ? formatMoment(line.retired.at) : ""} by ${line.retired?.by}: ${line.retired?.reason}`
@@ -82,7 +86,14 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
       {line.isPrivate && !retired && (
         <p className="club-meta">Whether a boat is private cannot be changed. If it was loaded the wrong way, retire it and add it again under another name.</p>
       )}
-      <EditItemForm itemId={item.id} name={item.name} seats={seats} skill={skill} places={places} />
+      <EditItemForm
+        itemId={item.id}
+        name={item.name}
+        seats={seats}
+        skill={skill}
+        places={places}
+        maxWeightLbs={weightEditable ? (item.maxWeightLbs ?? null) : undefined}
+      />
 
       {retired ? (
         <>

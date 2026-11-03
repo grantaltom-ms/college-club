@@ -142,7 +142,7 @@ interface HouseholdRow { id: string; display_name: string; membership_type: Memb
 interface MemberRow { id: string; household_id: string; first_name: string; last_name: string; email: string; phone: string; role: MemberRole; status: MemberStatus; brivo_credential_id: string | null; mailchimp_contact_id: string | null; login_id: string | null; is_coach: boolean }
 interface MemberQualificationRow { member_id: string; qualification_code: string; granted_by_label: string; granted_at: Date }
 interface HistoryRow { id: string; household_id: string; at: Date; kind: HistoryKind; summary: string; actor_kind: string; actor_id: string | null; actor_label: string; details: HistoryEntry["details"] }
-interface ItemRow { id: string; name: string; class_code: string; rule_overrides: Partial<RuleValues>; qualification_mode: "class" | "none" | "code"; required_qualification: string | null; is_private: boolean; places: number; retired_at: Date | null; retired_by_label: string | null; retired_reason: string | null }
+interface ItemRow { id: string; name: string; class_code: string; rule_overrides: Partial<RuleValues>; qualification_mode: "class" | "none" | "code"; required_qualification: string | null; is_private: boolean; places: number; max_weight_lbs: number | null; retired_at: Date | null; retired_by_label: string | null; retired_reason: string | null }
 interface ItemLogRow { id: string; item_id: string; at: Date; kind: ItemLogKind; by_label: string; text: string; details: Record<string, string | number | null> }
 interface BoatAccessRow { id: string; item_id: string; member_id: string; kind: BoatAccessKind; added_at: Date; added_by_kind: string; added_by_id: string | null; added_by_label: string; ended_at: Date | null; ended_by_kind: string | null; ended_by_id: string | null; ended_by_label: string | null; ended_reason: string | null }
 interface DamageReportRow { id: string; item_id: string; reported_by_kind: string; reported_by_id: string | null; reported_by_label: string; reported_at: Date; description: string; location: string; how_it_happened: string; major: boolean; priority: number; status: DamageStatus; updated_at: Date; assigned_to: string | null; closed_at: Date | null; repaired_on: string | null; repaired_by: string | null; repair_minutes: number | null; cost_cents: number | null; repair_notes: string | null; dismissed_reason: string | null }
@@ -222,6 +222,7 @@ function toItem(r: ItemRow): Item {
   else if (r.qualification_mode === "code") item.requiredQualification = r.required_qualification;
   if (r.is_private) item.isPrivate = true;
   if (r.places > 1) item.places = r.places;
+  if (r.max_weight_lbs != null) item.maxWeightLbs = r.max_weight_lbs;
   if (r.retired_at !== null) item.retired = { at: iso(r.retired_at), by: { kind: "staff", label: r.retired_by_label ?? "Staff" }, reason: r.retired_reason ?? "" };
   return item;
 }
@@ -528,7 +529,7 @@ async function loadState(c: Queryable, historyStart: Date): Promise<ClubState> {
   const qualifications = await rows<Qualification>(c, `select code, name, track, rank from club.qualifications order by code`);
   const memberQualifications = await rows<MemberQualificationRow>(c, `select member_id, qualification_code, granted_by_label, granted_at from club.member_qualifications order by seq`);
   const history = await rows<HistoryRow>(c, `select id, household_id, at, kind, summary, actor_kind, actor_id, actor_label, details from club.household_history order by seq`);
-  const items = await rows<ItemRow>(c, `select id, name, class_code, rule_overrides, qualification_mode, required_qualification, is_private, places, retired_at, retired_by_label, retired_reason from club.items order by seq`);
+  const items = await rows<ItemRow>(c, `select id, name, class_code, rule_overrides, qualification_mode, required_qualification, is_private, places, max_weight_lbs, retired_at, retired_by_label, retired_reason from club.items order by seq`);
   const itemLogRows = await rows<ItemLogRow>(c, `select id, item_id, at, kind, by_label, text, details from club.item_log order by seq`);
   const access = await rows<BoatAccessRow>(c, `select id, item_id, member_id, kind, added_at, added_by_kind, added_by_id, added_by_label, ended_at, ended_by_kind, ended_by_id, ended_by_label, ended_reason from club.item_access order by seq`);
   const practiceRows = await rows<PracticeRow>(c, `select id, name, notes, starts_at, ends_at, status, coach_id, created_at, created_by_kind, created_by_id, created_by_label, status_changed_at, cancelled_by_kind, cancelled_by_id, cancelled_by_label, cancel_reason from club.practices order by seq`);
@@ -705,10 +706,10 @@ async function save(c: PoolClient, before: ClubState, after: ClubState): Promise
     await run(`insert into club.household_history (id, household_id, at, kind, summary, actor_kind, actor_id, actor_label, details) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [e.id, e.householdId, e.at, e.kind, e.summary, e.actor.kind, actorId(e.actor), e.actor.label, JSON.stringify(e.details)]);
   }
 
-  const itemSql = (i: Item) => [i.name, i.classCode, JSON.stringify(i.ruleOverrides), i.requiredQualification === undefined ? "class" : i.requiredQualification === null ? "none" : "code", i.requiredQualification ?? null, i.isPrivate === true, i.places ?? 1, i.retired?.at ?? null, i.retired?.by.label ?? null, i.retired?.reason ?? null];
+  const itemSql = (i: Item) => [i.name, i.classCode, JSON.stringify(i.ruleOverrides), i.requiredQualification === undefined ? "class" : i.requiredQualification === null ? "none" : "code", i.requiredQualification ?? null, i.isPrivate === true, i.places ?? 1, i.maxWeightLbs ?? null, i.retired?.at ?? null, i.retired?.by.label ?? null, i.retired?.reason ?? null];
   const ii = compare("items", before.items, after.items);
-  for (const i of ii.added) await run(`insert into club.items (id, name, class_code, rule_overrides, qualification_mode, required_qualification, is_private, places, retired_at, retired_by_label, retired_reason) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [i.id, ...itemSql(i)]);
-  for (const i of ii.updated) await run(`update club.items set name=$2, class_code=$3, rule_overrides=$4, qualification_mode=$5, required_qualification=$6, is_private=$7, places=$8, retired_at=$9, retired_by_label=$10, retired_reason=$11 where id=$1`, [i.id, ...itemSql(i)]);
+  for (const i of ii.added) await run(`insert into club.items (id, name, class_code, rule_overrides, qualification_mode, required_qualification, is_private, places, max_weight_lbs, retired_at, retired_by_label, retired_reason) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [i.id, ...itemSql(i)]);
+  for (const i of ii.updated) await run(`update club.items set name=$2, class_code=$3, rule_overrides=$4, qualification_mode=$5, required_qualification=$6, is_private=$7, places=$8, max_weight_lbs=$9, retired_at=$10, retired_by_label=$11, retired_reason=$12 where id=$1`, [i.id, ...itemSql(i)]);
   // The file of each item: fixes, retirements and returns. Lines are only added, never changed. They go in after the items they are about.
   const il0 = compare("item file lines", before.itemLog, after.itemLog);
   if (il0.updated.length > 0) throw new Error("An item's file can only be added to, never changed.");

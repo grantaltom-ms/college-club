@@ -138,6 +138,21 @@ for (const kind of STORE_KINDS) {
       });
     });
 
+    describe("max weight in pounds", () => {
+      it("sets, clears and refuses a silly number on a shell", async () => {
+        const f = await fixture();
+        const weight = await edit(f, "Heron", { maxWeightLbs: 205 });
+        expect(weight.item.maxWeightLbs).toBe(205);
+        expect(weight.changes).toEqual([{ field: "maxWeight", label: "Max weight", from: "not set", to: "205 lb" }]);
+        expect((await state(f)).itemLog.at(-1)?.details).toMatchObject({ maxWeightFrom: "", maxWeightTo: "205" });
+        await edit(f, "Heron", { maxWeightLbs: null });
+        expect((await state(f)).items.find((i) => i.id === f.i.Heron)?.maxWeightLbs).toBeUndefined();
+        expect(await problemsOf(updateItem(f.store, f.book, staffCtx(), f.i.Heron, { maxWeightLbs: 20 }))).toEqual([
+          "Max weight must be a whole number from 50 to 800 pounds, or left blank.",
+        ]);
+      });
+    });
+
     describe("the seats", () => {
       it("turns a single into a double, changing its class and so who may crew it, and says its usual skill level moves with it", async () => {
         const f = await fixture();

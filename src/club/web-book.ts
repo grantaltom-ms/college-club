@@ -23,11 +23,11 @@ export const BOOK_BROWSE: readonly BookBrowse[] = [
   { id: "work", label: "Work space", types: ["Work Space"] },
 ];
 
-/** Shell seat choices after someone picks Shells. */
+/** Shell seat choices after someone picks Shells. Labels are the usual rowing shorthand. */
 export const SHELL_KINDS = [
-  { id: "single", label: "Single", seats: 1 },
-  { id: "double", label: "Double", seats: 2 },
-  { id: "quad", label: "Quad or four", seats: 4 },
+  { id: "single", label: "1x", seats: 1, hint: "Single" },
+  { id: "double", label: "2x", seats: 2, hint: "Double" },
+  { id: "quad", label: "4x", seats: 4, hint: "Quad or four" },
 ] as const;
 
 export type ShellKindId = (typeof SHELL_KINDS)[number]["id"];

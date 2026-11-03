@@ -29,6 +29,9 @@ import { occupancy, placesOf } from "./pools";
 export const MAX_ITEM_NAME = 80;
 export const MAX_RETIRE_REASON = 200;
 export const MAX_POOL_PLACES = 500;
+/** Soft bounds for a boat's max combined rower weight in pounds. */
+export const MIN_MAX_WEIGHT_LBS = 50;
+export const MAX_MAX_WEIGHT_LBS = 800;
 
 const CONTROL = /[\u0000-\u001f\u007f]/;
 const clean = (value: string) => value.replace(/\s+/g, " ").trim();
@@ -80,9 +83,17 @@ export interface ItemEdit {
   skill?: EquipmentSkill;
   /** Pools only. */
   places?: number;
+  /**
+   * Max combined rower weight in pounds. Pass `null` to clear. Only meaningful for boats (shells first); other kinds refuse it.
+   */
+  maxWeightLbs?: number | null;
 }
 
-export type ItemChangeField = "name" | "seats" | "skill" | "places";
+export type ItemChangeField = "name" | "seats" | "skill" | "places" | "maxWeight";
+
+export function weightWords(lbs: number | null | undefined): string {
+  return lbs == null ? "not set" : `${lbs} lb`;
+}
 
 /** One thing that would change, in words. */
 export interface ItemChange {
@@ -104,7 +115,7 @@ export interface ItemEditPlan {
 }
 
 interface Computed extends ItemEditPlan {
-  after: { name: string; classCode: string; requiredQualification: string | null | undefined; places: number };
+  after: { name: string; classCode: string; requiredQualification: string | null | undefined; places: number; maxWeightLbs: number | null };
   /** Old and new values for the database's "no change without a line" check. */
   details: Record<string, string | number | null>;
 }
@@ -115,7 +126,13 @@ function compute(state: ClubState, book: RuleBook, now: Date, itemId: string, ed
   const notices: string[] = [];
   const changes: ItemChange[] = [];
   const details: Record<string, string | number | null> = {};
-  const after = { name: item.name, classCode: item.classCode, requiredQualification: item.requiredQualification, places: placesOf(item) };
+  const after = {
+    name: item.name,
+    classCode: item.classCode,
+    requiredQualification: item.requiredQualification,
+    places: placesOf(item),
+    maxWeightLbs: item.maxWeightLbs ?? null,
+  };
   const retired = isRetired(item);
   const cls = classOf(book, item);
   let onlyNameWhileRetired = false;
@@ -229,6 +246,23 @@ function compute(state: ClubState, book: RuleBook, now: Date, itemId: string, ed
     }
   }
 
+  // Max combined rower weight (pounds). Shells first; other on-water boats can hold one too.
+  if (edit.maxWeightLbs !== undefined) {
+    const current = item.maxWeightLbs ?? null;
+    const next = edit.maxWeightLbs;
+    if (cls.type !== "Shell" && cls.type !== "Kayak" && cls.type !== "Paddle Board") {
+      problems.push(`${item.name} is a ${cls.type.toLowerCase()}, so it has no rower weight limit to set.`);
+    } else if (next !== null && (!Number.isInteger(next) || next < MIN_MAX_WEIGHT_LBS || next > MAX_MAX_WEIGHT_LBS)) {
+      problems.push(`Max weight must be a whole number from ${MIN_MAX_WEIGHT_LBS} to ${MAX_MAX_WEIGHT_LBS} pounds, or left blank.`);
+    } else if (next !== current) {
+      onlyNameWhileRetired = true;
+      changes.push({ field: "maxWeight", label: "Max weight", from: weightWords(current), to: weightWords(next) });
+      details.maxWeightFrom = current == null ? "" : String(current);
+      details.maxWeightTo = next == null ? "" : String(next);
+      after.maxWeightLbs = next;
+    }
+  }
+
   if (retired && onlyNameWhileRetired) {
     problems.push(`${item.name} has been retired, so only its name can be changed. Bring it back to change anything else.`);
   }
@@ -261,6 +295,8 @@ export async function updateItem(store: ClubStore, book: RuleBook, ctx: Ctx, ite
     if (plan.after.requiredQualification === undefined) delete item.requiredQualification;
     else item.requiredQualification = plan.after.requiredQualification;
     if (placesOf(item) > 1) item.places = plan.after.places;
+    if (plan.after.maxWeightLbs == null) delete item.maxWeightLbs;
+    else item.maxWeightLbs = plan.after.maxWeightLbs;
     const said = plan.changes.map((c) => `${c.label.toLowerCase()} from ${c.field === "name" ? quoted(c.from) : c.from} to ${c.field === "name" ? quoted(c.to) : c.to}`);
     s.itemLog.push(logLine(newId, ctx, item.id, "changed", `Changed by ${ctx.actor.label}: ${said.join("; ")}.`, plan.details));
     return { item: structuredClone(item), changes: plan.changes, notices: plan.notices };
@@ -350,6 +386,8 @@ export interface EquipmentLine {
   pool: boolean;
   isPrivate: boolean;
   skill: string;
+  /** Max combined rower weight in pounds, when set. */
+  maxWeightLbs: number | null;
   status: "in_service" | "out_of_service" | "retired";
   /** The out-of-service period now in force. */
   out: { periodId: string; reason: string; expectedReturn: string | null } | null;
@@ -381,6 +419,7 @@ function lineOf(state: ClubState, book: RuleBook, now: Date, item: Item): Equipm
     pool: places > 1,
     isPrivate: isPrivate(item),
     skill: skillWords(state, book, item),
+    maxWeightLbs: item.maxWeightLbs ?? null,
     status: isRetired(item) ? "retired" : out ? "out_of_service" : "in_service",
     out: out ? { periodId: out.id, reason: out.reason, expectedReturn: out.expectedReturn } : null,
     retired: item.retired ? { at: item.retired.at, by: item.retired.by.label, reason: item.retired.reason } : null,

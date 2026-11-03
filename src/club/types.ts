@@ -188,6 +188,11 @@ export interface Item {
    * the record (old bookings still name it) and staff can bring it back. Undefined while the item is in use.
    */
   retired?: ItemRetirement;
+  /**
+   * Optional maximum combined rower weight in pounds. Staff set this on shells (1x, 2x, 4x) so members can see which boat fits.
+   * Undefined or null means it has not been set yet.
+   */
+  maxWeightLbs?: number | null;
 }
 
 /** When, by whom and why an item was retired. */
