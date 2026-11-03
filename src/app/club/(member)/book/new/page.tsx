@@ -113,62 +113,6 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
         </p>
       )}
 
-      {canBook && (
-        <div className="club-confirm-primary" data-testid="check">
-          <p data-testid="check-ok">{waived.length > 0 ? "This can be booked as a staff override." : "This booking meets the rules."}</p>
-          {waived.length > 0 && (
-            <ul data-testid="waived-rules">
-              {waived.map((r) => (
-                <li key={r.code} data-code={r.code}>
-                  {r.message}
-                </li>
-              ))}
-            </ul>
-          )}
-          <form method="post" action="/api/club/bookings">
-            <input type="hidden" name="item" value={item.id} />
-            <input type="hidden" name="start" value={start.toISOString()} />
-            <input type="hidden" name="minutes" value={minutes} />
-            {forId && <input type="hidden" name="for" value={forId} />}
-            {crewIds.map((id) => (
-              <input key={id} type="hidden" name="crew" value={id} />
-            ))}
-            {overriding && <input type="hidden" name="override" value="1" />}
-            {overriding && <input type="hidden" name="reason" value={reason} />}
-            <button type="submit" className="club-button club-button-primary club-button-xl">
-              Book {item.name}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {!canBook && (
-        <section aria-label="Booking check" className="club-card club-confirm-status" data-testid="check">
-          {!forId && <p>Choose who this booking is for, then check.</p>}
-          {problem && (
-            <p role="alert" data-testid="check-problem">
-              {problem}
-            </p>
-          )}
-          {reasons && blocking.length > 0 && (
-            <>
-              <h2>This booking cannot go ahead as chosen</h2>
-              <ul data-testid="refusal-reasons">
-                {blocking.map((r) => (
-                  <li key={r.code + r.message} data-code={r.code}>
-                    {r.message}
-                  </li>
-                ))}
-              </ul>
-              <p className="club-meta" data-testid="refusal-help">
-                Change your choices below and check again. Skill levels are granted by club staff, so if one of these looks wrong, ask them to check your record.
-              </p>
-            </>
-          )}
-          {wantsOverride && !reason && <p role="alert">Say why the rules are being set aside; the reason is kept in the record.</p>}
-        </section>
-      )}
-
       <LiveChoicesForm action="/club/book/new" className="club-form club-confirm-choices">
         <input type="hidden" name="item" value={item.id} />
         <input type="hidden" name="start" value={start.toISOString()} />
@@ -241,6 +185,62 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
           Check my choices
         </button>
       </LiveChoicesForm>
+
+      {canBook && (
+        <div className="club-confirm-primary" data-testid="check">
+          <p data-testid="check-ok">{waived.length > 0 ? "This can be booked as a staff override." : "This booking meets the rules."}</p>
+          {waived.length > 0 && (
+            <ul data-testid="waived-rules">
+              {waived.map((r) => (
+                <li key={r.code} data-code={r.code}>
+                  {r.message}
+                </li>
+              ))}
+            </ul>
+          )}
+          <form method="post" action="/api/club/bookings">
+            <input type="hidden" name="item" value={item.id} />
+            <input type="hidden" name="start" value={start.toISOString()} />
+            <input type="hidden" name="minutes" value={minutes} />
+            {forId && <input type="hidden" name="for" value={forId} />}
+            {crewIds.map((id) => (
+              <input key={id} type="hidden" name="crew" value={id} />
+            ))}
+            {overriding && <input type="hidden" name="override" value="1" />}
+            {overriding && <input type="hidden" name="reason" value={reason} />}
+            <button type="submit" className="club-button club-button-primary club-button-xl">
+              Book {item.name}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {!canBook && (
+        <section aria-label="Booking check" className="club-card club-confirm-status" data-testid="check">
+          {!forId && <p>Choose who this booking is for, then check.</p>}
+          {problem && (
+            <p role="alert" data-testid="check-problem">
+              {problem}
+            </p>
+          )}
+          {reasons && blocking.length > 0 && (
+            <>
+              <h2>This booking cannot go ahead as chosen</h2>
+              <ul data-testid="refusal-reasons">
+                {blocking.map((r) => (
+                  <li key={r.code + r.message} data-code={r.code}>
+                    {r.message}
+                  </li>
+                ))}
+              </ul>
+              <p className="club-meta" data-testid="refusal-help">
+                Change your choices above and check again. Skill levels are granted by club staff, so if one of these looks wrong, ask them to check your record.
+              </p>
+            </>
+          )}
+          {wantsOverride && !reason && <p role="alert">Say why the rules are being set aside; the reason is kept in the record.</p>}
+        </section>
+      )}
 
       <section aria-label="Rules" className="club-rules-quiet">
         <h2>{explained.heading}</h2>
