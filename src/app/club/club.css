@@ -2019,3 +2019,89 @@ details summary {
 .club-confirm-choices .club-button-quiet {
   margin-top: 8px;
 }
+
+.club-done-wait {
+  background: #f6e7e2;
+  border-color: #c4a89f;
+}
+
+/* Fitness classes bulletin: one row per class; tap opens its upcoming dates. */
+.club-class-catalog {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.club-class-catalog-card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card-lg, var(--radius-card));
+  padding: 16px 18px;
+  box-shadow: var(--shadow-xs);
+}
+
+.club-class-catalog-card h2 {
+  margin: 0 0 4px;
+  font-family: var(--display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.club-class-catalog-card h2 a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.club-class-catalog-when {
+  margin: 0 0 4px;
+  font-family: var(--ui);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.club-class-catalog-blurb {
+  margin: 8px 0 0;
+  font-family: var(--ui);
+  font-size: 0.95rem;
+  color: var(--slate, var(--muted));
+}
+
+.club-class-of-dates {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.club-class-of-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--grid, var(--hairline));
+}
+
+.club-class-of-date:last-child {
+  border-bottom: 0;
+}
+
+.club-class-of-when {
+  margin: 0 0 2px;
+  font-family: var(--ui);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.club-class-of-date .club-meta {
+  margin: 0;
+}
