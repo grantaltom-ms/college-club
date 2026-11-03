@@ -62,7 +62,10 @@ export default async function ManageClasses({ searchParams }: { searchParams: Pr
     <section>
       <h1>Set up classes</h1>
       <ClassPlaceholderNote />
-      <p className="club-meta">Add a kind of class, then schedule dates for it. A scheduled class holds its room: members cannot book that gym or room while it runs.</p>
+      <p className="club-meta">
+        Add a kind of class, then schedule dates for it. A scheduled class holds its room: members cannot book that gym or room while it runs. To cancel a date, open it from{" "}
+        <Link href="/club/classes">Fitness classes</Link> and use Cancel class — everyone signed up or waiting is emailed the reason.
+      </p>
       {idParam(query.created) && (
         <p className="club-success" role="status" data-testid="created-note">
           Class added. Now schedule its dates below.

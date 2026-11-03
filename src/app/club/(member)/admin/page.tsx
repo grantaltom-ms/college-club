@@ -247,6 +247,9 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
               <Link href="/club/classes/manage">Add a class or schedule sessions</Link>
             </li>
             <li>
+              <Link href="/club/classes">Cancel a class (open it, then Cancel class)</Link>
+            </li>
+            <li>
               <Link href="/club/events/manage">Add an event</Link>
             </li>
           </ul>

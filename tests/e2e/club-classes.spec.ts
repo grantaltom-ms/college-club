@@ -160,15 +160,21 @@ test("a full class: join the waiting list, and when someone leaves the first in 
   await declan.goto("/club/my-classes");
   await expect(upcomingRows(declan).filter({ hasText: name })).toContainText("1st in line");
 
-  // Staff see all the names, and cancelling the class takes everyone off and lists who to contact.
+  // Staff see all the names; cancelling takes everyone off, emails them, and lists who was told.
   await openClassSession(page, name);
   await expect(page.getByTestId("sheet")).toContainText("Britta Eriksen");
   await expect(page.getByTestId("sheet")).toContainText("Declan Halloran");
-  await page.getByLabel("Cancel this class (members will see the reason)").fill("Instructor is ill");
+  await page.getByLabel(/Cancel this class/).fill("Instructor is ill");
   await page.getByRole("button", { name: /^Cancel .*Drill/ }).click();
   await expect(page.getByTestId("class-cancelled")).toContainText("Instructor is ill");
+  await expect(page.getByTestId("class-changed")).toContainText("We emailed all 2 people who were signed up or waiting.");
   await expect(page.getByTestId("affected")).toContainText("Britta Eriksen");
   await expect(page.getByTestId("affected")).toContainText("Declan Halloran");
+  await expect(page.getByTestId("affected")).toContainText("People who were emailed");
+  await page.goto("/club/outbox");
+  await expect(page.getByTestId("outbox-message").filter({ hasText: "To britta.eriksen@example.com" }).filter({ hasText: "Class cancelled" })).toHaveCount(1);
+  await expect(page.getByTestId("outbox-message").filter({ hasText: "To declan.halloran@example.com" }).filter({ hasText: "Class cancelled" })).toHaveCount(1);
+  await expect(page.getByTestId("outbox-message").filter({ hasText: "Instructor is ill" }).first()).toBeVisible();
   await britta.goto("/club/my-classes");
   await expect(britta.getByRole("list", { name: "Past classes" }).getByTestId("class-row").filter({ hasText: name })).toContainText("Class cancelled");
   await britta.context().close();
@@ -243,7 +249,7 @@ test("staff: a class that would clash with another in the gym is explained in wo
   // Cancelling the class gives the room back.
   await actAs(page, "Test staff");
   await openClassSession(page, name);
-  await page.getByLabel("Cancel this class (members will see the reason)").fill("Test finished");
+  await page.getByLabel(/Cancel this class/).fill("Test finished");
   await page.getByRole("button", { name: /^Cancel .*Core/ }).click();
   await expect(page.getByTestId("class-cancelled")).toBeVisible();
   await actAs(page, "Tomas Vandermeer");
