@@ -65,7 +65,7 @@ async function seat(page: Page, name: string, side: "port" | "starboard" | "" = 
 
 /** The member books the free slot at the given time from the day view, as a person would, and ends on My bookings. */
 async function book(page: Page, boat: string, day: string, range: string) {
-  await page.goto(`/club/book?day=${day}&type=Shell`);
+  await page.goto(`/club/book?day=${day}&what=shell&kind=single`);
   await slot(page, boat, range, "free").click();
   await expect(page.getByRole("heading", { level: 1, name: `Book ${boat}` })).toBeVisible();
   await expect(page.getByTestId("check-ok")).toBeVisible();
@@ -151,7 +151,7 @@ test.describe("setting a practice up and seating people", () => {
     expect((await page.goto(practiceUrl))?.status()).toBe(404);
 
     // The boat is a "Practice" slot while it runs, free before and after, and the legend says what the colour means.
-    await page.goto("/club/book?day=2026-11-04&type=Shell");
+    await page.goto("/club/book?day=2026-11-04&what=shell&kind=single");
     await expect(page.getByRole("list", { name: "Legend" })).toContainText("Practice");
     await expect(slot(page, boat, "7:00 to 7:30 am", "practice")).toBeVisible();
     await expect(slot(page, boat, "8:30 to 9:00 am", "practice")).toBeVisible();
@@ -215,7 +215,7 @@ test.describe("setting a practice up and seating people", () => {
     await expect(page.locator(`[data-testid="practice-card"][data-practice="${name}"]`)).toHaveAttribute("data-status", "cancelled");
 
     await actAs(page, "Hollis Whitcombe");
-    await page.goto("/club/book?day=2026-11-10&type=Shell");
+    await page.goto("/club/book?day=2026-11-10&what=shell&kind=single");
     await expect(slot(page, boat, "7:00 to 7:30 am", "free")).toBeVisible();
   });
 });

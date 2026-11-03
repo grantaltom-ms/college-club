@@ -73,13 +73,22 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const options = visibleBrowse(state, RULE_BOOK, now, (i) => itemVisibleTo(state, i, viewer));
   const browse = (whatRaw ? browseById(whatRaw) : null) ?? browseFromType(askedType);
   const browseLive = browse && (options.some((o) => o.id === browse.id) || Boolean(whatRaw || askedType)) ? browse : null;
-  const needsKind = Boolean(browseLive && "kinds" in browseLive && browseLive.kinds && !askedType);
+  // Shells always need a size (1x/2x/4x/8x) before times — including legacy ?type=Shell links. The full fleet is 100+ boats.
+  const needsKind = Boolean(browseLive && "kinds" in browseLive && browseLive.kinds);
   const kind = shellKindById(kindRaw);
   const ready = Boolean(browseLive && (!needsKind || kind));
 
   const typeFilter = askedType && browseLive?.types.length === 1 ? askedType : browseLive?.types.length === 1 ? browseLive.types[0] : null;
+  // When a shell size is chosen, only build slots for that size.
+  const seatsFilter = needsKind && kind ? kind.seats : null;
   const view = ready
-    ? dayView(state, RULE_BOOK, { day, now, viewer, type: typeFilter && browseLive!.types.includes(typeFilter as never) ? typeFilter : null })
+    ? dayView(state, RULE_BOOK, {
+        day,
+        now,
+        viewer,
+        type: typeFilter && browseLive!.types.includes(typeFilter as never) ? typeFilter : null,
+        seats: seatsFilter,
+      })
     : { day, items: [] };
   const items = ready
     ? view.items

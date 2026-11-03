@@ -125,7 +125,7 @@ test.describe("checking and adding", () => {
 
     // A member with no qualification is refused the single with the usual level, and can book the one that needs none.
     await actAs(page, "Ines Castellanos");
-    const day = "/club/book?day=2026-11-03&type=Shell";
+    const day = "/club/book?day=2026-11-03&what=shell&kind=single";
     await page.goto(day);
     const singleHref = (await slot(page, single, "7:00 to 7:30 am", "free").getAttribute("href"))!;
     await page.goto(singleHref);

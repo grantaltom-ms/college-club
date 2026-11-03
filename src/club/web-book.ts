@@ -66,7 +66,7 @@ export function browseFromType(type: BookingType | null): BookBrowse | null {
 export function itemMatchesBrowse(book: RuleBook, item: Item, browse: BookBrowse, kind: (typeof SHELL_KINDS)[number] | null): boolean {
   const cls = classOf(book, item);
   if (!(browse.types as readonly string[]).includes(cls.type)) return false;
-  // Seat filter only when the person picked 1x / 2x / 4x / 8x. A plain Shells (or legacy type=Shell) link shows every shell.
+  // Seat filter when the person picked 1x / 2x / 4x / 8x. Without a size, the Book page shows the size strip first.
   if ("kinds" in browse && browse.kinds && kind) return cls.seats === kind.seats;
   return true;
 }

@@ -53,11 +53,16 @@ export interface DayView {
 }
 
 /** One day of what is free and booked, by item. Slots are stepped in real time, so the 25-hour day on Nov 1 has no lost or doubled slot. */
-export function dayView(state: ClubState, book: RuleBook, input: { day: string; now: Date; viewer: Viewer; type?: BookingType | null }): DayView {
+export function dayView(
+  state: ClubState,
+  book: RuleBook,
+  input: { day: string; now: Date; viewer: Viewer; type?: BookingType | null; /** When set, only items with this many seats (e.g. 1x / 2x / 4x / 8x). */ seats?: number | null },
+): DayView {
   const { day, now, viewer } = input;
   const items = state.items
     .filter((item) => itemVisibleTo(state, item, viewer))
     .filter((item) => !input.type || classOf(book, item).type === input.type)
+    .filter((item) => input.seats == null || classOf(book, item).seats === input.seats)
     .map((item): ItemDayView => {
       const { cls, rules, requiredQualification } = rulesFor(book, item);
       const { open, close } = dayWindow(day, rules.dayStart, rules.dayEnd);

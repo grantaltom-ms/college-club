@@ -115,7 +115,7 @@ test.describe("fixing an item", () => {
     const line = page.getByTestId("item-file-line");
     await expect(line).toHaveCount(1);
     await expect(line).toContainText(`Changed by Test staff: name from "${name}" to "Pw renamed ${t}".`);
-    await page.goto("/club/book?day=2026-11-04&type=Shell");
+    await page.goto("/club/book?day=2026-11-04&what=shell&kind=single");
     await expect(slot(page, `Pw renamed ${t}`, "7:00 to 7:30 am", "free")).toBeVisible();
     await expect(page.locator(`[aria-label^="${name}, "]`)).toHaveCount(0);
   });
@@ -190,7 +190,7 @@ test.describe("retiring an item", () => {
 
     // A member books it, so there is something to stay in place.
     await actAs(page, "Rafael Castellanos");
-    const day = "/club/book?day=2026-11-10&type=Shell";
+    const day = "/club/book?day=2026-11-10&what=shell&kind=single";
     await page.goto(day);
     await slot(page, name, "6:00 to 6:30 am", "free").click();
     await expect(page.getByTestId("check-ok")).toBeVisible();
@@ -303,7 +303,7 @@ test.describe("bringing an item back", () => {
     await page.getByTestId("retire-form").getByLabel("Why is it being retired?").fill("Sold");
     await page.getByRole("button", { name: `Retire ${name}` }).click();
     await expect(page.getByTestId("item-summary")).toHaveAttribute("data-status", "retired");
-    await page.goto("/club/book?day=2026-11-04&type=Shell");
+    await page.goto("/club/book?day=2026-11-04&what=shell&kind=single");
     await expect(page.locator(`[aria-label^="${name}, "]`)).toHaveCount(0);
 
     await page.goto(path);
@@ -314,7 +314,7 @@ test.describe("bringing an item back", () => {
     await expect(page.getByTestId("item-file-line").first()).toContainText("Brought back by Test staff. It can be booked again.");
     await expect(page.getByTestId("item-file-line").nth(1)).toContainText("Retired by Test staff. Reason: Sold. Nothing was booked on it.");
     await expect(page.getByRole("button", { name: `Retire ${name}` })).toBeVisible();
-    await page.goto("/club/book?day=2026-11-04&type=Shell");
+    await page.goto("/club/book?day=2026-11-04&what=shell&kind=single");
     await expect(slot(page, name, "7:00 to 7:30 am", "free")).toBeVisible();
   });
 });

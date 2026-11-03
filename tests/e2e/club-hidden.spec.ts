@@ -26,7 +26,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         `/club/household/${FIRST_HOUSEHOLD}`,
         "/club/anything-else",
         "/club/book",
-        "/club/book?day=2026-10-29&type=Shell",
+        "/club/book?day=2026-10-29&what=shell&kind=single",
         `/club/book/new?item=${FIRST_HOUSEHOLD}&start=2026-10-29T14:00:00.000Z`,
         "/club/my-bookings",
         "/club/equipment",
