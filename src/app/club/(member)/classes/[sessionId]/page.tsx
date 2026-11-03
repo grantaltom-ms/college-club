@@ -67,7 +67,7 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
   return (
     <section>
       <p>
-        <Link href={`/club/classes?day=${pacificDate(new Date(session.startsAt))}`}>All classes this day</Link>
+        <Link href="/club/classes">All fitness classes</Link>
       </p>
       <h1>{template.name}</h1>
       <ClassPlaceholderNote />

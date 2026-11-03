@@ -31,10 +31,11 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
   await actAs(page, "Rafael Castellanos");
   await leaveAll(page);
 
-  await page.goto("/club/classes?day=2026-10-30");
-  await expect(page.getByTestId("day-heading")).toHaveText("Friday, Oct 30");
+  await page.goto("/club/classes");
+  await expect(page.getByRole("heading", { level: 1, name: "Fitness classes" })).toBeVisible();
   await expect(page.getByTestId("placeholder-note")).toBeVisible();
-  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("10 places left");
+  await expect(card(page, "Stretch & Mobility").getByTestId("class-schedule")).toContainText(/Fridays/);
+  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs").first()).toHaveText("10 places left");
   await card(page, "Stretch & Mobility").getByRole("link", { name: "Stretch & Mobility" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Stretch & Mobility" })).toBeVisible();
@@ -50,8 +51,8 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
 
   // Anyone else sees one fewer chair, and not the name.
   await actAs(page, "Walter Pemberton");
-  await page.goto("/club/classes?day=2026-10-30");
-  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("9 places left");
+  await page.goto("/club/classes");
+  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs").first()).toHaveText("9 places left");
   await page.goto(await card(page, "Stretch & Mobility").getByRole("link", { name: "Stretch & Mobility" }).getAttribute("href").then((h) => h!));
   await expect(page.locator("body")).not.toContainText("Castellanos");
 
@@ -60,8 +61,8 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
   await upcomingRows(page).filter({ hasText: "Stretch & Mobility" }).getByRole("button", { name: /^Leave / }).click();
   await expect(page.getByTestId("left-note")).toContainText("Your place is free for others.");
   await expect(page.getByTestId("no-upcoming-classes")).toBeVisible();
-  await page.goto("/club/classes?day=2026-10-30");
-  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("10 places left");
+  await page.goto("/club/classes");
+  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs").first()).toHaveText("10 places left");
 });
 
 test("a full class: join the waiting list, and when someone leaves the first in line gets the chair at once", async ({ page, browser }) => {
@@ -83,8 +84,11 @@ test("a full class: join the waiting list, and when someone leaves the first in 
   await expect(page.getByTestId("scheduled-note")).toHaveText(/Scheduled 1 session/);
 
   const open = async (p: Page) => {
-    await p.goto("/club/classes?day=2026-11-03");
-    await card(p, name).getByRole("link", { name }).click();
+    await p.goto("/club/classes");
+    const href = await card(p, name).getByRole("link", { name, exact: true }).getAttribute("href");
+    expect(href).toMatch(/\/club\/classes\/[0-9a-f-]{36}$/);
+    await p.goto(href!);
+    await expect(p.getByRole("heading", { level: 1, name })).toBeVisible();
   };
   const as = async (who: string) => {
     const ctx = await browser.newContext();
@@ -123,8 +127,8 @@ test("a full class: join the waiting list, and when someone leaves the first in 
   await expect(upcomingRows(declan).filter({ hasText: name })).toContainText("1st in line");
 
   // Staff see all the names, and cancelling the class takes everyone off and lists who to contact.
-  await page.goto("/club/classes?day=2026-11-03");
-  await card(page, name).getByRole("link", { name }).click();
+  await page.goto("/club/classes");
+  await card(page, name).getByRole("link", { name, exact: true }).click();
   await expect(page.getByTestId("sheet")).toContainText("Britta Eriksen");
   await expect(page.getByTestId("sheet")).toContainText("Declan Halloran");
   await page.getByLabel("Cancel this class (members will see the reason)").fill("Instructor is ill");
@@ -158,7 +162,7 @@ test("one place at a time: a class is refused when a boat is booked then, and a 
   await page.getByRole("button", { name: "Book Heron", exact: true }).click();
   await expect(page.getByTestId("booked-note")).toBeVisible();
 
-  await page.goto("/club/classes?day=2026-10-30");
+  await page.goto("/club/classes");
   await card(page, "Stretch & Mobility").getByRole("link", { name: "Stretch & Mobility" }).click();
   await expect(page).toHaveURL(/\/club\/classes\/[0-9a-f-]{36}$/);
   const classPage = page.url();
@@ -207,8 +211,8 @@ test("staff: a class that would clash with another in the gym is explained in wo
 
   // Cancelling the class gives the room back.
   await actAs(page, "Test staff");
-  await page.goto("/club/classes?day=2026-10-29");
-  await card(page, name).getByRole("link", { name }).click();
+  await page.goto("/club/classes");
+  await card(page, name).getByRole("link", { name, exact: true }).click();
   await page.getByLabel("Cancel this class (members will see the reason)").fill("Test finished");
   await page.getByRole("button", { name: /^Cancel .*Core/ }).click();
   await expect(page.getByTestId("class-cancelled")).toBeVisible();
@@ -219,15 +223,16 @@ test("staff: a class that would clash with another in the gym is explained in wo
 
 test("a full class shows its waiting list to staff but only counts to members", async ({ page }) => {
   await actAs(page, "Declan Halloran");
-  await page.goto("/club/classes?day=2026-10-29");
-  await expect(card(page, "Erg Conditioning").getByTestId("class-chairs")).toHaveText("Full, 2 waiting");
+  await page.goto("/club/classes");
+  await expect(card(page, "Erg Conditioning").getByTestId("class-schedule")).toContainText(/Thursdays/);
+  await expect(card(page, "Erg Conditioning").getByTestId("class-chairs").first()).toHaveText("Full, 2 waiting");
   await card(page, "Erg Conditioning").getByRole("link", { name: "Erg Conditioning" }).click();
   await expect(page.locator("body")).not.toContainText("Bellweather");
   await expect(page.locator("body")).not.toContainText("Lindqvist");
   await expect(page.getByRole("button", { name: "Join the waiting list" })).toBeVisible();
 
   await actAs(page, "Test staff");
-  await page.goto("/club/classes?day=2026-10-29");
+  await page.goto("/club/classes");
   await card(page, "Erg Conditioning").getByRole("link", { name: "Erg Conditioning" }).click();
   const sheet = page.getByTestId("sheet");
   await expect(sheet).toContainText("Erik Lindqvist");
@@ -239,7 +244,7 @@ test.describe("on a phone", () => {
   test("the class pages fit the screen", async ({ page }) => {
     await actAs(page, "Nora Abernathy");
     const noSidewaysScroll = () => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
-    await page.goto("/club/classes?day=2026-10-29");
+    await page.goto("/club/classes");
     expect(await noSidewaysScroll()).toBe(true);
     await card(page, "Erg Conditioning").getByRole("link", { name: "Erg Conditioning" }).click();
     expect(await noSidewaysScroll()).toBe(true);

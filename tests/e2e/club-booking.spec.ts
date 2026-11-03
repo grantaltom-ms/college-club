@@ -463,9 +463,8 @@ test("a day outside the booking window is not shown silently as another day: the
   await expect(page.getByTestId("day-note")).toHaveCount(0);
   await page.goto("/club/book?day=banana&type=Shell");
   await expect(page.getByTestId("day-note")).toHaveCount(0);
-  // Classes work the same way.
-  await page.goto("/club/classes?day=2027-03-01");
-  await expect(page.getByTestId("day-note")).toContainText("is further ahead than you can book yet");
+  // Classes are a bulletin of usual days now, not a day strip — no day-note there.
   await page.goto("/club/classes");
   await expect(page.getByTestId("day-note")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Fitness classes" })).toBeVisible();
 });
