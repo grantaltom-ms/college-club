@@ -1458,10 +1458,10 @@ details summary {
   }
 }
 
-/* Shell size: three square tiles in a row (1x · 2x · 4x). */
+/* Shell size: four square tiles in a row (1x · 2x · 4x · 8x). */
 .club-book-shell-sizes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 8px 0 28px;
 }
@@ -1762,11 +1762,15 @@ details summary {
   color: var(--white);
 }
 
+/* Beat .club-form select (width/min-height) so this stays off-screen and does not widen the page. */
+.club-form select.club-length-select,
 .club-length-select {
   /* Kept for Playwright and no-JS; chips are the visible control. */
   position: absolute;
   width: 1px;
   height: 1px;
+  min-height: 0;
+  max-width: none;
   padding: 0;
   margin: -1px;
   overflow: hidden;
