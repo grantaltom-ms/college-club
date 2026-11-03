@@ -115,13 +115,22 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
   const practices = viewerId && !staff ? myPractices(state, viewerId, now) : [];
 
   return (
-    <section>
-      <h1>{staff ? "All bookings" : "My bookings"}</h1>
+    <section className="club-bookings">
+      <header className="club-launch-head">
+        <p className="club-kicker">{staff ? "Desk" : "Yours"}</p>
+        <h1>{staff ? "All bookings" : "My bookings"}</h1>
+      </header>
       <PlaceholderNote />
       {booked && (
-        <p className="club-success" role="status" data-testid="booked-note">
-          Booked: {nameOf(booked)}, {formatDayLong(pacificDate(new Date(booked.startsAt)))}, {formatRange(booked.startsAt, booked.endsAt)}.
-        </p>
+        <div className="club-done" role="status">
+          <p className="club-done-title">You are booked</p>
+          <p data-testid="booked-note">
+            Booked: {nameOf(booked)}, {formatDayLong(pacificDate(new Date(booked.startsAt)))}, {formatRange(booked.startsAt, booked.endsAt)}.
+          </p>
+          <p className="club-quiet-links">
+            <Link href="/club/book">Book another</Link>
+          </p>
+        </div>
       )}
       {checkedIn && (
         <p className="club-success" role="status" data-testid="checkedin-note">
@@ -129,11 +138,18 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
         </p>
       )}
       {cancelled && (
-        <p className="club-success" role="status" data-testid="cancelled-note">
-          {cancelled.status === "late_cancelled"
-            ? `Cancelled ${nameOf(cancelled)}. It was after the cutoff, so it is recorded as a late cancellation.`
-            : `Cancelled ${nameOf(cancelled)}. The time is free for others again.`}
-        </p>
+        <div className="club-done club-done-quiet" role="status">
+          <p data-testid="cancelled-note">
+            {cancelled.status === "late_cancelled"
+              ? `Cancelled ${nameOf(cancelled)}. It was after the cutoff, so it is recorded as a late cancellation.`
+              : `Cancelled ${nameOf(cancelled)}. The time is free for others again.`}
+          </p>
+          {!staff && (
+            <p className="club-quiet-links">
+              <Link href="/club/book">Book again</Link>
+            </p>
+          )}
+        </div>
       )}
       {notice && (
         <p className="club-alert" role="alert">
@@ -161,7 +177,14 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
 
       <h2>Upcoming</h2>
       {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">Nothing booked.</p>
+        <p className="club-empty-inline" data-testid="no-upcoming">
+          Nothing booked.{" "}
+          {!staff && (
+            <Link href="/club/book" className="club-inline-cta">
+              Make a reservation
+            </Link>
+          )}
+        </p>
       ) : (
         <ul className="club-cards" aria-label="Upcoming bookings">
           {upcoming.map((b) => (

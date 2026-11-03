@@ -398,7 +398,7 @@ test.describe("on a phone", () => {
   test("the day view, the booking form and My bookings fit without sideways scrolling, with tappable slots", async ({ page }) => {
     const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
     await actAs(page, "Hollis Whitcombe");
-    await openDay(page, "2026-10-30");
+    await openDay(page, "2026-10-30", "Shell");
     expect(await fits()).toBe(true);
     const box = await slot(page, "Heron", "9:00 to 9:30 am", "free").boundingBox();
     expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -410,28 +410,52 @@ test.describe("on a phone", () => {
     await actAs(page, "Test staff");
     await page.goto("/club/equipment");
     expect(await fits()).toBe(true);
-    await openDay(page, "2026-10-30");
+    await openDay(page, "2026-10-30", "Shell");
     expect(await fits()).toBe(true);
   });
+});
+
+test("Reservations opens on categories first: gym before shells, kayaks with boards, no dock in October, then shell size before times", async ({ page }) => {
+  await actAs(page, "Nora Abernathy");
+  await page.goto("/club/book");
+  await expect(page.getByRole("heading", { level: 1, name: "Reservations" })).toBeVisible();
+  await expect(page.getByTestId("book-choose")).toBeVisible();
+  await expect(page.getByTestId("item-card")).toHaveCount(0);
+  const choose = page.getByTestId("book-choose").getByRole("link");
+  await expect(choose.first()).toHaveAttribute("data-browse", "gym");
+  await expect(choose.nth(1)).toHaveAttribute("data-browse", "shell");
+  await expect(page.getByTestId("book-choose").locator("[data-browse=paddle]")).toBeVisible();
+  await expect(page.getByTestId("book-choose").locator("[data-browse=dock]")).toHaveCount(0);
+
+  await page.getByTestId("book-choose").locator("[data-browse=shell]").click();
+  await expect(page.getByTestId("shell-kinds")).toBeVisible();
+  await expect(page.getByTestId("item-card")).toHaveCount(0);
+  await page.getByTestId("shell-kinds").locator("[data-kind=single]").click();
+  await expect(page.getByTestId("browse-label")).toHaveText(/Shells · Single/);
+  await expect(page.getByTestId("day-heading")).toBeVisible();
+  await expect(page.getByTestId("item-card").first()).toBeVisible();
+  // Singles only: a known double stays off this list.
+  await expect(page.locator('[data-testid=item-card][data-item=Loon]')).toHaveCount(0);
+  await expect(page.locator('[data-testid=item-card][data-item=Heron]')).toBeVisible();
 });
 
 test("a day outside the booking window is not shown silently as another day: the page says so", async ({ page }) => {
   await actAs(page, "Nora Abernathy");
   // Far too late: the last day open is shown, with a sentence that names both days.
-  await page.goto("/club/book?day=2026-12-25");
+  await page.goto("/club/book?day=2026-12-25&type=Shell");
   await expect(page.getByTestId("day-note")).toHaveText(/^Friday, Dec 25 is further ahead than you can book yet\. Showing \w+, Nov \d+, the last day open\.$/);
   const days = page.getByRole("navigation", { name: "Pick a day" }).getByRole("link");
   await expect(days.last()).toHaveAttribute("aria-current", "page");
   // Already gone: today, with the other sentence.
-  await page.goto("/club/book?day=2026-10-20");
+  await page.goto("/club/book?day=2026-10-20&type=Shell");
   await expect(page.getByTestId("day-note")).toHaveText(/^Tuesday, Oct 20 has already passed\. Showing \w+, Oct \d+\.$/);
   await expect(days.first()).toHaveAttribute("aria-current", "page");
   // A day on offer, nothing asked for, and nonsense in the address: no note.
-  await page.goto("/club/book?day=2026-10-30");
+  await page.goto("/club/book?day=2026-10-30&type=Shell");
   await expect(page.getByTestId("day-note")).toHaveCount(0);
   await page.goto("/club/book");
   await expect(page.getByTestId("day-note")).toHaveCount(0);
-  await page.goto("/club/book?day=banana");
+  await page.goto("/club/book?day=banana&type=Shell");
   await expect(page.getByTestId("day-note")).toHaveCount(0);
   // Classes work the same way.
   await page.goto("/club/classes?day=2027-03-01");

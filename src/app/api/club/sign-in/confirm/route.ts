@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
   const signedIn = await confirmSignIn(await getLoginDeps(), { secret: field(form, "token", 100), identity: field(form, "identity", 400), now: clubNow() });
   if (!signedIn) return see(request, "/club/sign-in?notice=signin_link");
 
-  const response = see(request, "/club");
+  // Members land on Book — the job they came to do. Staff land on the household list.
+  const home = signedIn.identity.kind === "staff" ? "/club" : "/club/book";
+  const response = see(request, home);
   const secure = request.nextUrl.protocol === "https:";
   // The cookie's life is counted by the browser's own clock from now, so a frozen test clock cannot make it expire at once.
   response.cookies.set(SESSION_COOKIE, signedIn.sessionSecret, { httpOnly: true, sameSite: "lax", path: "/", secure, maxAge: LOGIN_RULES.defaults.sessionDays * DAY });

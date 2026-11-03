@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { bookingBlockReason } from "@/club/engine/eligibility";
 import { fullName, historyOf, membersOf, qualificationsOf } from "@/club/engine/queries";
 import { formatDay, formatMoment } from "@/club/time";
@@ -60,23 +61,54 @@ function MemberCard({ state, member, household, staff }: { state: ClubState; mem
 export function HouseholdView({ state, household, viewerIsStaff }: { state: ClubState; household: Household; viewerIsStaff: boolean }) {
   const members = membersOf(state, household.id);
   const history = historyOf(state, household.id);
+  const canBook = !viewerIsStaff && household.status === "active" && members.some((m) => !bookingBlockReason(m, household));
+
   return (
-    <article>
-      <h1 data-testid="household-name">{household.displayName}</h1>
-      <p className="club-meta" data-testid="household-facts">
-        {household.membershipType} · joined {formatDay(household.joinedOn)} ·{" "}
-        {household.status === "ended" ? (
-          <strong>membership ended {formatDay(household.endedOn!)}</strong>
-        ) : (
-          <span className="club-chip club-chip-active">Active</span>
-        )}
-      </p>
+    <article className={viewerIsStaff ? undefined : "club-launch"}>
+      <header className="club-launch-head">
+        <p className="club-kicker">{viewerIsStaff ? "Household" : "Your household"}</p>
+        <h1 data-testid="household-name">{household.displayName}</h1>
+        <p className="club-meta" data-testid="household-facts">
+          {household.membershipType} · joined {formatDay(household.joinedOn)} ·{" "}
+          {household.status === "ended" ? (
+            <strong>membership ended {formatDay(household.endedOn!)}</strong>
+          ) : (
+            <span className="club-chip club-chip-active">Active</span>
+          )}
+        </p>
+      </header>
+
       {viewerIsStaff && (
         <dl className="club-slots" aria-label="Household records">
           <Slot label="QuickBooks ID" value={household.quickbooksId} />
           <dt>Notes</dt>
           <dd>{household.notes || "none"}</dd>
         </dl>
+      )}
+
+      {!viewerIsStaff && household.status === "active" && (
+        <div className="club-hero-action">
+          {canBook ? (
+            <>
+              <p className="club-lead">Ready when you are.</p>
+              <p className="club-actions">
+                <Link href="/club/book" className="club-button club-button-primary club-button-link club-button-xl">
+                  Make a reservation
+                </Link>
+              </p>
+              <nav className="club-quiet-links" aria-label="Other things to do">
+                <Link href="/club/classes">Classes</Link>
+                <Link href="/club/events">Events</Link>
+                <Link href="/club/my-bookings">My bookings</Link>
+                <Link href="/club/damage">Report damage</Link>
+              </nav>
+            </>
+          ) : (
+            <p className="club-alert" role="status">
+              This household cannot make new bookings right now.
+            </p>
+          )}
+        </div>
       )}
 
       <h2>Adults</h2>

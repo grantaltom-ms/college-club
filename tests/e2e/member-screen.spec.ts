@@ -162,7 +162,7 @@ test.describe("the sign-in screen at 390 pixels wide", () => {
 });
 
 test.describe("the sign-in screen when someone is already signed in", () => {
-  test("says who, offers the club, and signs out", async ({ page, browser, baseURL }) => {
+  test("says who, offers Reservations, and signs out", async ({ page, browser, baseURL }) => {
     // Make a household with its own address, so nothing else is disturbed, then sign in as its adult.
     const email = `screen.${tag()}@example.com`;
     const staffContext = await browser.newContext({ baseURL });
@@ -188,7 +188,7 @@ test.describe("the sign-in screen when someone is already signed in", () => {
     await page.goto("/club/sign-in");
     await expect(page.getByTestId("already-signed-in")).toHaveText("You are signed in as Sasha Screen.");
     await expect(page.getByTestId("sign-in-form")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Go to the club" })).toHaveAttribute("href", "/club");
+    await expect(page.getByRole("link", { name: "Make a reservation" })).toHaveAttribute("href", "/club/book");
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page.getByTestId("signed-out-note")).toHaveText("You are signed out.");
     await expect(page.getByTestId("sign-in-form")).toBeVisible();

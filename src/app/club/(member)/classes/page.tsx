@@ -31,16 +31,23 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
 
   return (
     <section>
-      <h1>Fitness classes</h1>
+      <header className="club-page-head">
+        <div>
+          <h1>Fitness classes</h1>
+          <p className="club-meta">Pick a day, see chairs left, and take a place.</p>
+        </div>
+        {actor.kind === "staff" && (
+          <p className="club-page-actions">
+            <Link href="/club/classes/manage" className="club-button club-button-link">
+              Set up classes and sessions
+            </Link>
+          </p>
+        )}
+      </header>
       <ClassPlaceholderNote />
       {dayNote && (
         <p className="club-alert" role="status" data-testid="day-note">
           {dayNote}
-        </p>
-      )}
-      {actor.kind === "staff" && (
-        <p>
-          <Link href="/club/classes/manage">Set up classes and sessions</Link>
         </p>
       )}
 
@@ -54,7 +61,11 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
       </nav>
 
       <h2 data-testid="day-heading">{formatDayLong(day)}</h2>
-      {sessions.length === 0 && <p data-testid="no-classes">No classes this day.</p>}
+      {sessions.length === 0 && (
+        <p className="club-empty-inline" data-testid="no-classes">
+          No classes this day.
+        </p>
+      )}
       <ul className="club-cards" aria-label="Classes">
         {sessions.map((session) => {
           const view = sessionView(state, session, viewer);

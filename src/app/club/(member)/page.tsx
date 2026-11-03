@@ -12,16 +12,21 @@ export default async function ClubHome() {
   const actor = await getCurrentActor();
   if (!actor) {
     return (
-      <section>
+      <section className="club-empty">
         <h1>Welcome</h1>
-        <p>
-          <Link href="/club/sign-in">Sign in</Link> with your email address to see your household, book boats and spaces, and join classes and events.
+        <p className="club-lead">
+          Sign in to see your household, book boats and spaces, and join classes and events. There is no password: the club emails you a one-time link.
         </p>
-        {pickerEnabled() && (
-          <p>
-            Just trying it out? <Link href="/club/act-as">Choose a test member</Link> to see the club the way they would.
-          </p>
-        )}
+        <p className="club-actions">
+          <Link href="/club/sign-in" className="club-button club-button-link">
+            Sign in
+          </Link>
+          {pickerEnabled() && (
+            <Link href="/club/act-as" className="club-button club-button-quiet club-button-link">
+              Choose a test member
+            </Link>
+          )}
+        </p>
       </section>
     );
   }
@@ -35,13 +40,17 @@ export default async function ClubHome() {
   const households = [...state.households].sort((a, b) => a.displayName.localeCompare(b.displayName));
   return (
     <section>
-      <h1>Households</h1>
-      <p className="club-meta">{households.length} test households. Staff see all of them.</p>
-      <p>
-        <Link href="/club/admin/households/new" className="club-button" data-testid="add-household-link">
-          Add a household
-        </Link>
-      </p>
+      <header className="club-page-head">
+        <div>
+          <h1>Households</h1>
+          <p className="club-meta">{households.length} test households. Staff see all of them.</p>
+        </div>
+        <p className="club-page-actions">
+          <Link href="/club/admin/households/new" className="club-button club-button-link" data-testid="add-household-link">
+            Add a household
+          </Link>
+        </p>
+      </header>
       <ul className="club-cards" aria-label="All households">
         {households.map((h) => {
           const adults = membersOf(state, h.id).filter((m) => m.status === "active").length;

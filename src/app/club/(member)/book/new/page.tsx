@@ -12,13 +12,16 @@ import { getCurrentActor, toEngineActor } from "@/club/identity";
 import { RULE_BOOK, rulesFor } from "@/club/settings/rulebook";
 import { getClubStore } from "@/club/store/instance";
 import { formatDayLong, formatRange, pacificDate } from "@/club/time";
-import { idParam, idsParam, intParam, lengthChoices, momentParam, NOTICES } from "@/club/web";
+import { bookingFormHref, idParam, idsParam, intParam, lengthChoices, momentParam, NOTICES } from "@/club/web";
 import { blockedReason, viewerOf } from "@/club/web-actor";
+import { LiveChoicesForm } from "../../LiveChoicesForm";
 import { PlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
+
+const lengthLabel = (m: number) => (m < 60 ? `${m} minutes` : m % 60 === 0 ? `${m / 60} hour${m === 60 ? "" : "s"}` : `${Math.floor(m / 60)} hour ${m % 60} minutes`);
 
 export default async function NewBooking({ searchParams }: { searchParams: Promise<Search> }) {
   await requireClub();
@@ -73,10 +76,31 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   const explained = describeRules(state, RULE_BOOK, item);
   const memberBlocked = blockedReason(actor);
   const notice = NOTICES[one(params.notice) ?? ""];
+  const choiceHref = (nextMinutes: number) =>
+    bookingFormHref({
+      itemId: item.id,
+      start: start.toISOString(),
+      minutes: nextMinutes,
+      crew: crewIds,
+      forId: staff ? forId : null,
+      override: wantsOverride,
+      reason,
+    });
 
   return (
-    <section>
-      <h1>Book {item.name}</h1>
+    <section className="club-confirm">
+      <p className="club-back">
+        <Link href={`/club/book?day=${pacificDate(start)}`}>← Back to times</Link>
+      </p>
+      <header className="club-launch-head">
+        <p className="club-kicker">Confirm</p>
+        <h1>Book {item.name}</h1>
+        <p className="club-confirm-when" data-testid="booking-when">
+          <strong>
+            {formatDayLong(pacificDate(start))}, {formatRange(start, end)}
+          </strong>
+        </p>
+      </header>
       <PlaceholderNote />
       {notice && (
         <p className="club-alert" role="alert">
@@ -88,14 +112,8 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
           You cannot make new bookings. {memberBlocked}
         </p>
       )}
-      <p data-testid="booking-when">
-        <strong>{formatDayLong(pacificDate(start))}</strong>, {formatRange(start, end)}
-      </p>
-      <p className="club-meta">
-        <Link href={`/club/book?day=${pacificDate(start)}`}>Pick a different time</Link>
-      </p>
 
-      <form method="get" action="/club/book/new" className="club-form">
+      <LiveChoicesForm action="/club/book/new" className="club-form club-confirm-choices">
         <input type="hidden" name="item" value={item.id} />
         <input type="hidden" name="start" value={start.toISOString()} />
         {staff && (
@@ -103,30 +121,47 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
             <label htmlFor="for">Booking for</label>
             <select id="for" name="for" defaultValue={forId ?? ""}>
               <option value="">Choose a member</option>
-              {activeMembers.filter((m) => !item.isPrivate || accessKind(state, item.id, m.id) !== null).map((m) => (
-                <option key={m.id} value={m.id}>
-                  {fullName(m)} ({householdOf(state, m.householdId)?.displayName})
-                </option>
-              ))}
+              {activeMembers
+                .filter((m) => !item.isPrivate || accessKind(state, item.id, m.id) !== null)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {fullName(m)} ({householdOf(state, m.householdId)?.displayName})
+                  </option>
+                ))}
             </select>
           </p>
         )}
-        <p>
-          <label htmlFor="minutes">Length</label>
-          <select id="minutes" name="minutes" defaultValue={String(minutes)}>
+        <div className="club-length">
+          <p className="club-length-label" id="length-label">
+            Length
+          </p>
+          <div className="club-length-chips">
+            {lengths.map((m) => (
+              <Link key={m} href={choiceHref(m)} className="club-length-chip" aria-current={m === minutes ? "page" : undefined}>
+                {lengthLabel(m)}
+              </Link>
+            ))}
+          </div>
+          {/* Kept for the browser tests and for no-JS length changes with Check my choices. */}
+          <label htmlFor="minutes" className="sr-only">
+            Length
+          </label>
+          <select id="minutes" name="minutes" className="club-length-select" defaultValue={String(minutes)}>
             {lengths.map((m) => (
               <option key={m} value={m}>
-                {m < 60 ? `${m} minutes` : m % 60 === 0 ? `${m / 60} hour${m === 60 ? "" : "s"}` : `${Math.floor(m / 60)} hour ${m % 60} minutes`}
+                {lengthLabel(m)}
               </option>
             ))}
           </select>
-        </p>
+        </div>
         {cls.seats > 1 && (
           <fieldset>
             <legend>
               Crew (up to {cls.seats - 1} other{cls.seats === 2 ? "" : "s"})
             </legend>
-            {crewChoices.length === 0 && <p className="club-meta">{item.isPrivate ? "No other owner or invited member can crew this boat." : "No other member holds the qualification this boat needs."}</p>}
+            {crewChoices.length === 0 && (
+              <p className="club-meta">{item.isPrivate ? "No other owner or invited member can crew this boat." : "No other member holds the qualification this boat needs."}</p>
+            )}
             {crewChoices.map((m) => (
               <label key={m.id} className="club-check">
                 <input type="checkbox" name="crew" value={m.id} defaultChecked={crewIds.includes(m.id)} /> {fullName(m)}
@@ -149,34 +184,12 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
         <button type="submit" className="club-button club-button-quiet">
           Check my choices
         </button>
-      </form>
+      </LiveChoicesForm>
 
-      <section aria-label="Booking check" className="club-card" data-testid="check">
-        {!forId && <p>Choose who this booking is for, then check.</p>}
-        {problem && (
-          <p role="alert" data-testid="check-problem">
-            {problem}
-          </p>
-        )}
-        {reasons && blocking.length > 0 && (
-          <>
-            <h2>This booking cannot go ahead as chosen</h2>
-            <ul data-testid="refusal-reasons">
-              {blocking.map((r) => (
-                <li key={r.code + r.message} data-code={r.code}>
-                  {r.message}
-                </li>
-              ))}
-            </ul>
-            <p className="club-meta" data-testid="refusal-help">
-              Change your choices above and check again. Skill levels are granted by club staff, so if one of these looks wrong, ask them to check your record.
-            </p>
-          </>
-        )}
-        {wantsOverride && !reason && <p role="alert">Say why the rules are being set aside; the reason is kept in the record.</p>}
-        {waived.length > 0 && (
-          <>
-            <h2>Rules that will be set aside</h2>
+      {canBook && (
+        <div className="club-confirm-primary" data-testid="check">
+          <p data-testid="check-ok">{waived.length > 0 ? "This can be booked as a staff override." : "This booking meets the rules."}</p>
+          {waived.length > 0 && (
             <ul data-testid="waived-rules">
               {waived.map((r) => (
                 <li key={r.code} data-code={r.code}>
@@ -184,30 +197,52 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
                 </li>
               ))}
             </ul>
-          </>
-        )}
-        {canBook && (
-          <>
-            <p data-testid="check-ok">{waived.length > 0 ? "This can be booked as a staff override." : "This booking meets the rules."}</p>
-            <form method="post" action="/api/club/bookings">
-              <input type="hidden" name="item" value={item.id} />
-              <input type="hidden" name="start" value={start.toISOString()} />
-              <input type="hidden" name="minutes" value={minutes} />
-              {forId && <input type="hidden" name="for" value={forId} />}
-              {crewIds.map((id) => (
-                <input key={id} type="hidden" name="crew" value={id} />
-              ))}
-              {overriding && <input type="hidden" name="override" value="1" />}
-              {overriding && <input type="hidden" name="reason" value={reason} />}
-              <button type="submit" className="club-button">
-                Book {item.name}
-              </button>
-            </form>
-          </>
-        )}
-      </section>
+          )}
+          <form method="post" action="/api/club/bookings">
+            <input type="hidden" name="item" value={item.id} />
+            <input type="hidden" name="start" value={start.toISOString()} />
+            <input type="hidden" name="minutes" value={minutes} />
+            {forId && <input type="hidden" name="for" value={forId} />}
+            {crewIds.map((id) => (
+              <input key={id} type="hidden" name="crew" value={id} />
+            ))}
+            {overriding && <input type="hidden" name="override" value="1" />}
+            {overriding && <input type="hidden" name="reason" value={reason} />}
+            <button type="submit" className="club-button club-button-primary club-button-xl">
+              Book {item.name}
+            </button>
+          </form>
+        </div>
+      )}
 
-      <section aria-label="Rules" className="club-card">
+      {!canBook && (
+        <section aria-label="Booking check" className="club-card club-confirm-status" data-testid="check">
+          {!forId && <p>Choose who this booking is for, then check.</p>}
+          {problem && (
+            <p role="alert" data-testid="check-problem">
+              {problem}
+            </p>
+          )}
+          {reasons && blocking.length > 0 && (
+            <>
+              <h2>This booking cannot go ahead as chosen</h2>
+              <ul data-testid="refusal-reasons">
+                {blocking.map((r) => (
+                  <li key={r.code + r.message} data-code={r.code}>
+                    {r.message}
+                  </li>
+                ))}
+              </ul>
+              <p className="club-meta" data-testid="refusal-help">
+                Change your choices above and check again. Skill levels are granted by club staff, so if one of these looks wrong, ask them to check your record.
+              </p>
+            </>
+          )}
+          {wantsOverride && !reason && <p role="alert">Say why the rules are being set aside; the reason is kept in the record.</p>}
+        </section>
+      )}
+
+      <section aria-label="Rules" className="club-rules-quiet">
         <h2>{explained.heading}</h2>
         {explained.placeholder && <p className="club-meta">These numbers are placeholders until club staff confirm them.</p>}
         <ul>
