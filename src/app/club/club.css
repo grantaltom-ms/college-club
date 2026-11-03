@@ -1624,6 +1624,198 @@ details summary {
   color: var(--book-taken-ink);
 }
 
+/* Dense shell picker (F + I + J): sticky window, thin free-only rows, weight trailing. */
+.club-shell-window {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--book-card);
+  border: 1px solid var(--book-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-xs);
+  /* Sit under the sticky member header (.club-header). */
+  position: sticky;
+  top: 3.5rem;
+  z-index: 2;
+}
+
+.club-shell-window-label {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--book-lake);
+}
+
+.club-shell-window-value {
+  margin: 2px 0 0;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  color: var(--book-ink);
+}
+
+.club-shell-window-change {
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--book-lake-deep);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.club-shell-window-change:hover {
+  text-decoration: underline;
+}
+
+.club-shell-pick-hour {
+  margin: 8px 0 16px;
+  padding: 14px 16px;
+  background: var(--book-wash);
+  border: 1px dashed var(--book-line);
+  border-radius: var(--radius-card);
+  font-family: var(--ui);
+  font-size: 0.95rem;
+  color: var(--book-muted);
+}
+
+.club-shell-dense-count {
+  margin: 0 0 8px;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--book-muted);
+}
+
+.club-shell-dense-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--book-line);
+  border-radius: var(--radius-card);
+  background: var(--book-card);
+  overflow: hidden;
+}
+
+.club-shell-row {
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--book-line);
+}
+
+.club-shell-row:first-child {
+  border-top: 0;
+}
+
+.club-shell-row-quiet {
+  background: var(--book-wash);
+}
+
+.club-shell-row-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.club-shell-row-name {
+  display: block;
+  font-family: var(--display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--book-ink);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.club-shell-row-meta {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--ui);
+  font-size: 0.78rem;
+  color: var(--book-muted);
+  overflow-wrap: anywhere;
+}
+
+.club-shell-row-weight {
+  font-family: var(--ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--book-muted);
+  text-align: right;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.club-shell-row-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.club-shell-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 3.4rem;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1.1;
+}
+
+.club-shell-chip small {
+  font-size: 0.65rem;
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+.club-shell-chip-free {
+  background: var(--book-lake);
+  color: #fff;
+}
+
+.club-shell-chip-free:hover {
+  background: var(--book-lake-deep);
+}
+
+.club-shell-chip-yours {
+  background: var(--book-yours-wash);
+  border: 1px solid var(--book-yours);
+  color: var(--book-ink);
+}
+
+.club-shell-chip-taken,
+.club-shell-chip-muted {
+  background: var(--book-taken);
+  color: var(--book-taken-ink);
+}
+
+.club-shell-row-foot {
+  margin: 6px 0 0;
+  font-family: var(--ui);
+  font-size: 0.78rem;
+}
+
+.club-shell-row-foot a {
+  color: var(--book-muted);
+  text-decoration: none;
+}
+
+.club-shell-row-foot a:hover {
+  text-decoration: underline;
+  color: var(--book-lake-deep);
+}
+
 .club-book-list {
   display: grid;
   gap: 20px;

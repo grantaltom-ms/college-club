@@ -30,11 +30,12 @@ async function upload(page: Page, ...rows: string[]) {
 }
 
 const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
-const card = (page: Page, item: string) => page.locator(`[data-testid="item-card"][data-item="${item}"]`);
+const shellRow = (page: Page, item: string) => page.locator(`[data-testid="shell-row"][data-item="${item}"]`);
 const boatCard = (page: Page, item: string) => page.locator(`[data-testid="private-boat"][aria-label="${item}"]`);
 const myBoat = (page: Page, item: string) => page.locator(`[data-testid="my-boat"][aria-label="${item}"]`);
-const dayOf = (day: number, kind: "single" | "double" | "quad" = "single") =>
-  `/club/book?day=2026-11-0${day}&what=shell&kind=${kind}`;
+/** Dense shell list needs an hour. Default 7 am matches the free slots these tests tap. */
+const dayOf = (day: number, kind: "single" | "double" | "quad" = "single", hour = 7) =>
+  `/club/book?day=2026-11-0${day}&what=shell&kind=${kind}&hour=${hour}`;
 
 /** The member searches for someone on their boat's invite form and presses Invite beside the first match. */
 async function invite(page: Page, boat: string, typed: string, name: string) {
@@ -55,9 +56,9 @@ test.describe("what members see", () => {
     const boat = `Playwright Private ${tag()}`;
     await upload(page, privateRow(boat, "1", "Lars Eriksen"));
 
-    // Staff see it in the day view, marked Private. They also copy its booking address from a free slot.
+    // Staff see it in the dense hour list, marked Private. They also copy its booking address from a free slot.
     await page.goto(dayOf(3));
-    await expect(card(page, boat).locator(".club-tag")).toHaveText("Private");
+    await expect(shellRow(page, boat).locator(".club-tag")).toHaveText("Private");
     const href = (await slot(page, boat, "7:00 to 7:30 am", "free").getAttribute("href"))!;
     expect(href).toContain("/club/book/new?item=");
     // Staff's "Booking for" list on a private boat is only the people on its list.
@@ -69,8 +70,8 @@ test.describe("what members see", () => {
     // The owner sees it, with its free slots and no skill requirement mentioned.
     await actAs(page, "Lars Eriksen");
     await page.goto(dayOf(3));
-    await expect(card(page, boat)).toBeVisible();
-    await expect(card(page, boat)).not.toContainText("needs ");
+    await expect(shellRow(page, boat)).toBeVisible();
+    await expect(shellRow(page, boat)).not.toContainText("needs ");
     await expect(page.getByTestId("my-boats-link")).toContainText("You can use private boats");
     // The menu offers "My boats" to an owner, on every page, and the link goes to the right place.
     const menu = page.getByRole("navigation", { name: "Member area" });
@@ -81,8 +82,8 @@ test.describe("what members see", () => {
     // Someone who is not on the list never sees the boat, and cannot open its booking form by its address.
     await actAs(page, "Rafael Castellanos");
     await page.goto(dayOf(3));
-    await expect(page.getByTestId("item-card").first()).toBeVisible();
-    await expect(card(page, boat)).toHaveCount(0);
+    await expect(page.getByTestId("shell-row").first()).toBeVisible();
+    await expect(shellRow(page, boat)).toHaveCount(0);
     await expect(page.getByText(boat)).toHaveCount(0);
     await expect(page.getByTestId("my-boats-link")).toHaveCount(0);
     // ...and the menu does not offer "My boats" to someone with no private boat.
@@ -98,7 +99,7 @@ test.describe("what members see", () => {
     // A club quad needs level 3. Britta Eriksen holds no qualification at all.
     await upload(page, privateRow(boat, "4", "Britta Eriksen"));
     await actAs(page, "Britta Eriksen");
-    await page.goto(dayOf(3, "quad"));
+    await page.goto(dayOf(3, "quad", 8));
     await slot(page, boat, "8:00 to 8:30 am", "free").click();
     await expect(page.getByTestId("check-ok")).toHaveText("This booking meets the rules.");
     await expect(page.getByRole("region", { name: "Rules" })).toContainText("This is a private boat. Its owners and the people an owner has invited can use it, and its skill level is not checked");
@@ -113,7 +114,7 @@ test.describe("what members see", () => {
     const boat = `Playwright Double ${tag()}`;
     await upload(page, privateRow(boat, "2", "Lars Eriksen; Britta Eriksen"));
     await actAs(page, "Lars Eriksen");
-    await page.goto(dayOf(4, "double"));
+    await page.goto(dayOf(4, "double", 9));
     await slot(page, boat, "9:00 to 9:30 am", "free").click();
     const crew = page.locator("fieldset", { hasText: "Crew" });
     await expect(crew.getByLabel("Britta Eriksen")).toBeVisible();
@@ -172,7 +173,7 @@ test.describe("an owner invites and takes off", () => {
     await page.goto("/club/my-bookings");
     await expect(page.locator(`[data-testid="booking-row"][data-item="${boat}"]`)).toHaveAttribute("data-status", "cancelled");
     await page.goto(dayOf(4));
-    await expect(card(page, boat)).toHaveCount(0);
+    await expect(shellRow(page, boat)).toHaveCount(0);
     await page.goto("/club/my-boats");
     await expect(page.getByText(boat)).toHaveCount(0);
   });
@@ -206,7 +207,7 @@ test.describe("staff", () => {
     await expect(boatCard(page, boat).getByTestId("boat-locked")).toHaveText("Locked");
     await expect(boatCard(page, boat).getByTestId("boat-no-owners")).toBeVisible();
     await page.goto(dayOf(3));
-    await expect(card(page, boat).getByTestId("boat-locked-note")).toBeVisible();
+    await expect(shellRow(page, boat).getByTestId("boat-locked-note")).toBeVisible();
     await expect(slot(page, boat, "7:00 to 7:30 am", "free")).not.toHaveAttribute("href", /.+/);
 
     // Staff find a member by name and make them an owner.

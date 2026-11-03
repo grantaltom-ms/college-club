@@ -2,15 +2,21 @@
 
 import { useRouter } from "next/navigation";
 
-/** Compact hour dropdown. Choosing an hour reloads the page with ?hour= so the server can slim the grid. */
+/**
+ * Compact hour dropdown. Choosing an hour reloads the page with ?hour=.
+ * For shells (`requireHour`), an hour is required before the dense free list appears;
+ * the empty option says "Choose an hour" instead of "All open hours".
+ */
 export function HourSelect({
   hours,
   hour,
   hrefs,
+  requireHour = false,
 }: {
   hours: { value: number; label: string }[];
   hour: number | null;
   hrefs: { all: string; byHour: Record<number, string> };
+  requireHour?: boolean;
 }) {
   const router = useRouter();
   return (
@@ -28,7 +34,7 @@ export function HourSelect({
           router.push(v === "" ? hrefs.all : hrefs.byHour[Number(v)] ?? hrefs.all);
         }}
       >
-        <option value="">All open hours</option>
+        <option value="">{requireHour ? "Choose an hour" : "All open hours"}</option>
         {hours.map((h) => (
           <option key={h.value} value={String(h.value)}>
             {h.label}

@@ -152,8 +152,8 @@ test("one place at a time: a class is refused when a boat is booked then, and a 
   await cancelBoats();
   await leaveAll(page);
 
-  // A single booked over the Stretch class hour.
-  await page.goto("/club/book?day=2026-10-30&what=shell&kind=single");
+  // A single booked over the Stretch class hour (dense list needs the hour).
+  await page.goto("/club/book?day=2026-10-30&what=shell&kind=single&hour=12");
   await page.locator('[aria-label="Heron, 12:00 to 12:30 pm, free"]').click();
   await page.getByRole("button", { name: "Book Heron", exact: true }).click();
   await expect(page.getByTestId("booked-note")).toBeVisible();
@@ -170,7 +170,7 @@ test("one place at a time: a class is refused when a boat is booked then, and a 
   await page.goto(classPage);
   await page.getByRole("button", { name: "Sign up", exact: true }).click();
   await expect(page.getByTestId("joined-note")).toBeVisible();
-  await page.goto("/club/book?day=2026-10-30&what=shell&kind=single");
+  await page.goto("/club/book?day=2026-10-30&what=shell&kind=single&hour=12");
   await page.locator('[aria-label="Heron, 12:00 to 12:30 pm, free"]').click();
   await expect(page.getByTestId("refusal-reasons")).toContainText("You are signed up for Stretch & Mobility from 12:00 to 12:30 pm.");
   await leaveAll(page);
