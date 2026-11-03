@@ -234,11 +234,11 @@ export function readEquipment(text: string): EquipmentReading {
     // An individual item: boat, kayak, paddle board or work room.
     let seats: number | null = null;
     if (seatsText === "") {
-      if (type === "Shell" || type === "Kayak") say(`Seats is empty. A ${type.toLowerCase()} needs its number of seats (${type === "Shell" ? "1, 2 or 4" : "1 or 2"}).`);
+      if (type === "Shell" || type === "Kayak") say(`Seats is empty. A ${type.toLowerCase()} needs its number of seats (${type === "Shell" ? "1, 2, 4 or 8" : "1 or 2"}).`);
     } else if (!/^\d{1,2}$/.test(seatsText)) say(`Seats "${seatsText}" is not a number.`);
     else seats = Number(seatsText);
     if (seats !== null) {
-      if (type === "Shell" && ![1, 2, 4].includes(seats)) say(`Seats ${seats} does not fit a shell: use 1 (single), 2 (double) or 4 (quad or four).`);
+      if (type === "Shell" && ![1, 2, 4, 8].includes(seats)) say(`Seats ${seats} does not fit a shell: use 1 (single), 2 (double), 4 (quad or four) or 8 (eight).`);
       if (type === "Kayak" && ![1, 2].includes(seats)) say(`Seats ${seats} does not fit a kayak: use 1 or 2.`);
       if ((type === "Paddle Board" || type === "Work Space") && seats !== 1) say(`Seats ${seats} does not fit a ${type.toLowerCase()}: leave it empty or use 1.`);
     }
@@ -279,7 +279,7 @@ export function readEquipment(text: string): EquipmentReading {
     if (!listedOnce()) continue;
 
     let classCode: string;
-    if (type === "Shell") classCode = seats === 1 ? "shell-single" : seats === 2 ? "shell-double" : "shell-quad";
+    if (type === "Shell") classCode = seats === 1 ? "shell-single" : seats === 2 ? "shell-double" : seats === 4 ? "shell-quad" : "shell-eight";
     else if (type === "Kayak") classCode = seats === 2 ? "kayak-double" : "kayak";
     else if (type === "Paddle Board") classCode = "paddle-board";
     else classCode = "work-space";

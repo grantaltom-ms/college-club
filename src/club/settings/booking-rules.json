@@ -41,6 +41,14 @@
       "rules": {}
     },
     {
+      "code": "shell-eight",
+      "type": "Shell",
+      "name": "Eight",
+      "seats": 8,
+      "requiredQualification": "scull-3",
+      "rules": {}
+    },
+    {
       "code": "kayak",
       "type": "Kayak",
       "name": "Kayak",

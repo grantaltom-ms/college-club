@@ -30,6 +30,7 @@ describe("reading an equipment file", () => {
         "",
         row("Test Double", "Shell", "2"),
         row("Test Quad", "shell", "4"),
+        row("Test Eight", "Shell", "8"),
         row("Test Kayak", "Kayak", "1"),
         row("Test Twin Kayak", "Kayak", "2"),
         row("Test Board", "Paddle Board"),
@@ -37,15 +38,16 @@ describe("reading an equipment file", () => {
       ),
     );
     expect(reading.problems).toEqual([]);
-    expect(reading.rowCount).toBe(7);
+    expect(reading.rowCount).toBe(8);
     expect(reading.rows.map((r) => [r.row, r.name, r.classCode, r.seats])).toEqual([
       [2, "Test Single", "shell-single", 1],
       [4, "Test Double", "shell-double", 2],
       [5, "Test Quad", "shell-quad", 4],
-      [6, "Test Kayak", "kayak", 1],
-      [7, "Test Twin Kayak", "kayak-double", 2],
-      [8, "Test Board", "paddle-board", 1],
-      [9, "Test Room", "work-space", 1],
+      [6, "Test Eight", "shell-eight", 8],
+      [7, "Test Kayak", "kayak", 1],
+      [8, "Test Twin Kayak", "kayak-double", 2],
+      [9, "Test Board", "paddle-board", 1],
+      [10, "Test Room", "work-space", 1],
     ]);
   });
 
@@ -114,10 +116,10 @@ describe("reading an equipment file", () => {
       "Row 5: Type \"Canoe\" is not one of: Shell, Kayak, Paddle Board, Work Space, Dock Space, Room Space, Gym Space.",
       "Row 6: Type is empty. Use one of: Shell, Kayak, Paddle Board, Work Space, Dock Space, Room Space, Gym Space.",
       'Row 7: Type "Fitness": cardio machines are not reserved in the new system, so remove this row.',
-      "Row 8: Seats is empty. A shell needs its number of seats (1, 2 or 4).",
+      "Row 8: Seats is empty. A shell needs its number of seats (1, 2, 4 or 8).",
       "Row 9: Seats is empty. A kayak needs its number of seats (1 or 2).",
       'Row 10: Seats "x" is not a number.',
-      "Row 11: Seats 3 does not fit a shell: use 1 (single), 2 (double) or 4 (quad or four).",
+      "Row 11: Seats 3 does not fit a shell: use 1 (single), 2 (double), 4 (quad or four) or 8 (eight).",
       "Row 12: Seats 4 does not fit a kayak: use 1 or 2.",
       "Row 13: Seats 2 does not fit a paddle board: leave it empty or use 1.",
       expect.stringContaining('Row 14: Skill level needed "level 9" is not one the system knows.'),

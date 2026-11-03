@@ -2,6 +2,7 @@ import Link from "next/link";
 import { dayView, pickableDays, type ItemDayView, type SlotView } from "@/club/engine/availability";
 import { itemVisibleTo } from "@/club/engine/boat-access";
 import { noticeWords, openDamageNotices } from "@/club/engine/damage";
+import { weightRangeWords } from "@/club/engine/equipment-edit";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { clubNow } from "@/club/clock";
@@ -50,6 +51,168 @@ function hourLabel(hour: number): string {
   return `${hour - 12} pm`;
 }
 
+function slotsInHour(row: ItemDayView, hour: number): SlotView[] {
+  return row.slots.filter((s) => {
+    if (s.state === "past") return false;
+    return Math.floor(pacificMinutes(new Date(s.startsAt)) / 60) === hour;
+  });
+}
+
+/**
+ * Shells use a dense picker once an hour is chosen (F + I + J): sticky window, free-only thin
+ * rows, weight on the right. Without an hour, only the day/hour controls show — no card wall.
+ */
+function ShellDenseList({
+  items,
+  hour,
+  kindLabel,
+  staff,
+  state,
+}: {
+  items: ItemDayView[];
+  hour: number;
+  kindLabel: string | null;
+  staff: boolean;
+  state: Awaited<ReturnType<typeof readClubOnce>>;
+}) {
+  const rows = items
+    .map((item) => {
+      const inHour = slotsInHour(item, hour);
+      if (inHour.length === 0) return null;
+      const free = inHour.filter((s) => s.state === "free");
+      const yours = inHour.filter((s) => s.state === "yours");
+      const taken = inHour.filter((s) => s.state === "booked" || s.state === "class" || s.state === "practice" || s.state === "out_of_service" || s.state === "not_open");
+      // Members: free or yours only. Staff also see boats that are fully taken this hour.
+      if (free.length === 0 && yours.length === 0 && !(staff && taken.length > 0)) return null;
+      if (item.locked && free.length === 0 && yours.length === 0) return null;
+      return { item, free, yours, taken, inHour };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  const freeCount = rows.filter((r) => r.free.length > 0 && !r.item.locked).length;
+
+  return (
+    <div className="club-shell-dense" data-testid="shell-dense">
+      <p className="club-shell-dense-count" data-testid="shell-dense-count">
+        {freeCount === 0 ? "No shells free in this hour." : `${freeCount} free in this hour`}
+      </p>
+      <ul className="club-shell-dense-list" aria-label="Shells free this hour">
+        {rows.map(({ item, free, yours, taken }) => {
+          const weight = weightRangeWords(item.item.minWeightLbs, item.item.maxWeightLbs);
+          const maker = item.item.manufacturer?.trim() || null;
+          const skill = item.needs ? item.needs.replace(/\s*\(placeholder\)\s*$/i, "") : null;
+          const meta = [skill, maker].filter(Boolean).join(" · ");
+          const notices = openDamageNotices(state, item.item.id);
+          // Still offer free-slot links when unqualified — the booking form explains the refusal in words.
+          const bookable = free.length > 0 && !item.locked;
+
+          return (
+            <li
+              key={item.item.id}
+              className={`club-shell-row${bookable ? "" : " club-shell-row-quiet"}`}
+              data-testid="shell-row"
+              data-item={item.item.name}
+            >
+              <div className="club-shell-row-top">
+                <div className="club-shell-row-identity">
+                  <span className="club-shell-row-name">
+                    {item.item.name}
+                    {item.isPrivate && <span className="club-tag">Private</span>}
+                  </span>
+                  {(meta || kindLabel) && (
+                    <span className="club-shell-row-meta">
+                      {kindLabel ? `${kindLabel}` : ""}
+                      {kindLabel && meta ? " · " : ""}
+                      {meta}
+                    </span>
+                  )}
+                </div>
+                <span className="club-shell-row-weight" data-testid="shell-weight">
+                  {weight}
+                </span>
+              </div>
+
+              {item.qualified === false && <p className="club-meta">You do not hold that qualification yet, so you cannot book this one.</p>}
+              {item.locked && (
+                <p className="club-meta" data-testid="boat-locked-note">
+                  Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
+                </p>
+              )}
+              {notices.length > 0 && (
+                <div className={`club-damage${notices.some((n) => n.major) ? " club-damage-major" : ""}`} data-testid="damage-notice">
+                  {notices.map((n) => (
+                    <p key={n.reportId}>{noticeWords(n)}</p>
+                  ))}
+                </div>
+              )}
+
+              <div className="club-shell-row-times">
+                {free.map((slot) => {
+                  const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, free`;
+                  if (!bookable) {
+                    return (
+                      <span key={slot.startsAt} className="club-shell-chip club-shell-chip-muted" aria-label={label}>
+                        {formatClock(slot.startsAt)}
+                      </span>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={slot.startsAt}
+                      className="club-shell-chip club-shell-chip-free"
+                      href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })}
+                      aria-label={label}
+                    >
+                      {formatClock(slot.startsAt)}
+                    </Link>
+                  );
+                })}
+                {yours.map((slot) => (
+                  <span
+                    key={slot.startsAt}
+                    className="club-shell-chip club-shell-chip-yours"
+                    aria-label={`${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, yours`}
+                    data-state="yours"
+                  >
+                    {formatClock(slot.startsAt)}
+                    <small>Yours</small>
+                  </span>
+                ))}
+                {staff &&
+                  free.length === 0 &&
+                  yours.length === 0 &&
+                  taken.map((slot) => {
+                    const short =
+                      slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" ? "Booked" : SLOT_WORDS[slot.state]);
+                    return (
+                      <span
+                        key={slot.startsAt}
+                        className="club-shell-chip club-shell-chip-taken"
+                        aria-label={`${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${SLOT_WORDS[slot.state].toLowerCase()}`}
+                        data-state={slot.state}
+                        title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}
+                      >
+                        {formatClock(slot.startsAt)}
+                        <small>{short}</small>
+                      </span>
+                    );
+                  })}
+              </div>
+
+              <p className="club-shell-row-foot">
+                <Link href={`/club/damage?item=${item.item.id}`} data-testid="report-damage-link" aria-label={`Report damage on ${item.item.name}`}>
+                  Report damage
+                </Link>
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+      {rows.length === 0 && <p className="club-empty-inline">Nothing free in this hour. Try another hour, or another day.</p>}
+    </div>
+  );
+}
+
 export default async function BookPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireClub();
   const actor = await getCurrentActor();
@@ -72,13 +235,23 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const options = visibleBrowse(state, RULE_BOOK, now, (i) => itemVisibleTo(state, i, viewer));
   const browse = (whatRaw ? browseById(whatRaw) : null) ?? browseFromType(askedType);
   const browseLive = browse && (options.some((o) => o.id === browse.id) || Boolean(whatRaw || askedType)) ? browse : null;
-  const needsKind = Boolean(browseLive && "kinds" in browseLive && browseLive.kinds && !askedType);
+  // Shells always need a size (1x/2x/4x/8x) before times — including legacy ?type=Shell links. The full fleet is 100+ boats.
+  const needsKind = Boolean(browseLive && "kinds" in browseLive && browseLive.kinds);
   const kind = shellKindById(kindRaw);
   const ready = Boolean(browseLive && (!needsKind || kind));
+  const denseShells = Boolean(needsKind && kind);
 
   const typeFilter = askedType && browseLive?.types.length === 1 ? askedType : browseLive?.types.length === 1 ? browseLive.types[0] : null;
+  // When a shell size is chosen, only build slots for that size.
+  const seatsFilter = needsKind && kind ? kind.seats : null;
   const view = ready
-    ? dayView(state, RULE_BOOK, { day, now, viewer, type: typeFilter && browseLive!.types.includes(typeFilter as never) ? typeFilter : null })
+    ? dayView(state, RULE_BOOK, {
+        day,
+        now,
+        viewer,
+        type: typeFilter && browseLive!.types.includes(typeFilter as never) ? typeFilter : null,
+        seats: seatsFilter,
+      })
     : { day, items: [] };
   const items = ready
     ? view.items
@@ -118,12 +291,20 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const hours = [...hourValues].sort((a, b) => a - b).map((h) => ({ value: h, label: hourLabel(h) }));
   const hourActive = hourLive !== null && hours.some((h) => h.value === hourLive) ? hourLive : null;
 
+  const lead = !ready
+    ? needsKind && browseLive
+      ? "Which size of shell?"
+      : "What would you like to reserve?"
+    : denseShells
+      ? "Pick a day and hour, then tap a free shell."
+      : "Pick a day and hour, then tap a free time.";
+
   return (
     <section className="club-book">
       <header className="club-launch-head">
         <p className="club-kicker">Book</p>
         <h1>Reservations</h1>
-        <p className="club-lead">{ready ? "Pick a day and hour, then tap a free time." : needsKind && browseLive ? "Which size of shell?" : "What would you like to reserve?"}</p>
+        <p className="club-lead">{lead}</p>
       </header>
       <PlaceholderNote />
       {blocked && (
@@ -198,6 +379,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
               <HourSelect
                 hours={hours}
                 hour={hourActive}
+                requireHour={denseShells}
                 hrefs={{
                   all: href({ hour: null }),
                   byHour: Object.fromEntries(hours.map((h) => [h.value, href({ hour: h.value })])),
@@ -206,104 +388,134 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             )}
           </div>
 
-          <ul className="club-legend club-book-legend" aria-label="Legend">
-            <li>
-              <span className="slot slot-free" aria-hidden="true" /> Free
-            </li>
-            <li>
-              <span className="slot slot-yours" aria-hidden="true" /> Yours
-            </li>
-            <li>
-              <span className="slot slot-booked" aria-hidden="true" /> Taken
-            </li>
-            <li>
-              <span className="slot slot-practice" aria-hidden="true" /> Practice
-            </li>
-          </ul>
+          {denseShells && hourActive !== null && (
+            <div className="club-shell-window" data-testid="shell-window">
+              <div>
+                <p className="club-shell-window-label">Window</p>
+                <p className="club-shell-window-value">
+                  {day === today ? "Today" : formatDayLong(day)} · {hourLabel(hourActive)}
+                </p>
+              </div>
+              <Link href={href({ hour: null })} className="club-shell-window-change">
+                Change hour
+              </Link>
+            </div>
+          )}
 
-          {items.length === 0 && <p className="club-empty-inline">Nothing of that type is free to show yet.</p>}
-          <div className="club-book-list">
-            {items.map((item) => {
-              const openSlots = item.slots.filter((s) => {
-                if (s.state === "past") return false;
-                if (hourActive === null) return true;
-                return Math.floor(pacificMinutes(new Date(s.startsAt)) / 60) === hourActive;
-              });
-              if (openSlots.length === 0) return null;
-              return (
-                <article key={item.item.id} className="club-book-item" aria-label={item.item.name} data-testid="item-card" data-item={item.item.name}>
-                  <header className="club-book-item-head">
-                    <h3>
-                      {item.item.name}
-                      {item.isPrivate && <span className="club-tag">Private</span>}
-                    </h3>
-                    <p className="club-meta">
-                      {kind ? kind.label : item.className}
-                      {item.item.maxWeightLbs != null ? ` · max ${item.item.maxWeightLbs} lb` : ""}
-                      {item.places > 1 ? ` · ${item.places} places` : ""}
-                      {item.needs ? ` · needs ${item.needs}` : ""}
-                    </p>
-                  </header>
-                  {item.qualified === false && <p className="club-meta">You do not hold that qualification yet, so you cannot book this one.</p>}
-                  {item.note && <p className="club-meta">{item.note}</p>}
-                  {(() => {
-                    const notices = openDamageNotices(state, item.item.id);
-                    return notices.length === 0 ? null : (
-                      <div className={`club-damage${notices.some((n) => n.major) ? " club-damage-major" : ""}`} data-testid="damage-notice">
-                        {notices.map((n) => (
-                          <p key={n.reportId}>{noticeWords(n)}</p>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                  {item.locked && (
-                    <p className="club-meta" data-testid="boat-locked-note">
-                      Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
-                    </p>
-                  )}
-                  <ol className="slots club-slots-compact">
-                    {openSlots.map((slot) => {
-                      const counted = slot.placesLeft !== null && !slot.heldFor && (slot.state === "free" || slot.state === "booked" || slot.state === "yours");
-                      const words = slot.heldFor
-                        ? `${slot.heldFor} class`
-                        : counted && slot.state !== "yours"
-                          ? `${slot.placesLeft} of ${item.places} places left`
-                          : SLOT_WORDS[slot.state].toLowerCase();
-                      const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${words}`;
-                      const taken = slot.state === "booked" || slot.state === "class" || slot.state === "practice" || slot.state === "out_of_service" || slot.state === "not_open";
-                      const shortTaken =
-                        slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state]);
-                      return (
-                        <li key={slot.startsAt}>
-                          {slot.state === "free" && !item.locked ? (
-                            <Link className="slot slot-free" href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })} aria-label={label}>
-                              {formatClock(slot.startsAt)}
-                              {slot.placesLeft !== null && <small>{slot.placesLeft} left</small>}
-                            </Link>
-                          ) : (
-                            <span
-                              className={`slot slot-${slot.state}${taken ? " slot-taken" : ""}`}
-                              aria-label={label}
-                              data-state={slot.state}
-                              title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}
-                            >
-                              {formatClock(slot.startsAt)}
-                              <small>{shortTaken}</small>
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                  <p className="club-book-item-foot">
-                    <Link href={`/club/damage?item=${item.item.id}`} data-testid="report-damage-link" aria-label={`Report damage on ${item.item.name}`}>
-                      Report damage
-                    </Link>
-                  </p>
-                </article>
-              );
-            })}
-          </div>
+          {denseShells && hourActive === null && (
+            <p className="club-shell-pick-hour" data-testid="pick-hour-note" role="status">
+              Choose an hour to see free shells. Only boats open in that hour are listed.
+            </p>
+          )}
+
+          {denseShells && hourActive !== null && (
+            <ShellDenseList items={items} hour={hourActive} kindLabel={kind?.label ?? null} staff={staff} state={state} />
+          )}
+
+          {!denseShells && (
+            <>
+              <ul className="club-legend club-book-legend" aria-label="Legend">
+                <li>
+                  <span className="slot slot-free" aria-hidden="true" /> Free
+                </li>
+                <li>
+                  <span className="slot slot-yours" aria-hidden="true" /> Yours
+                </li>
+                <li>
+                  <span className="slot slot-booked" aria-hidden="true" /> Taken
+                </li>
+                <li>
+                  <span className="slot slot-practice" aria-hidden="true" /> Practice
+                </li>
+              </ul>
+
+              {items.length === 0 && <p className="club-empty-inline">Nothing of that type is free to show yet.</p>}
+              <div className="club-book-list">
+                {items.map((item) => {
+                  const openSlots = item.slots.filter((s) => {
+                    if (s.state === "past") return false;
+                    if (hourActive === null) return true;
+                    return Math.floor(pacificMinutes(new Date(s.startsAt)) / 60) === hourActive;
+                  });
+                  if (openSlots.length === 0) return null;
+                  return (
+                    <article key={item.item.id} className="club-book-item" aria-label={item.item.name} data-testid="item-card" data-item={item.item.name}>
+                      <header className="club-book-item-head">
+                        <h3>
+                          {item.item.name}
+                          {item.isPrivate && <span className="club-tag">Private</span>}
+                        </h3>
+                        <p className="club-meta">
+                          {kind ? kind.label : item.className}
+                          {classOf(RULE_BOOK, item.item).type === "Shell" || item.item.minWeightLbs != null || item.item.maxWeightLbs != null
+                            ? ` · ${weightRangeWords(item.item.minWeightLbs, item.item.maxWeightLbs)}`
+                            : ""}
+                          {item.places > 1 ? ` · ${item.places} places` : ""}
+                          {item.needs ? ` · needs ${item.needs}` : ""}
+                        </p>
+                      </header>
+                      {item.qualified === false && <p className="club-meta">You do not hold that qualification yet, so you cannot book this one.</p>}
+                      {item.note && <p className="club-meta">{item.note}</p>}
+                      {(() => {
+                        const notices = openDamageNotices(state, item.item.id);
+                        return notices.length === 0 ? null : (
+                          <div className={`club-damage${notices.some((n) => n.major) ? " club-damage-major" : ""}`} data-testid="damage-notice">
+                            {notices.map((n) => (
+                              <p key={n.reportId}>{noticeWords(n)}</p>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      {item.locked && (
+                        <p className="club-meta" data-testid="boat-locked-note">
+                          Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
+                        </p>
+                      )}
+                      <ol className="slots club-slots-compact">
+                        {openSlots.map((slot) => {
+                          const counted = slot.placesLeft !== null && !slot.heldFor && (slot.state === "free" || slot.state === "booked" || slot.state === "yours");
+                          const words = slot.heldFor
+                            ? `${slot.heldFor} class`
+                            : counted && slot.state !== "yours"
+                              ? `${slot.placesLeft} of ${item.places} places left`
+                              : SLOT_WORDS[slot.state].toLowerCase();
+                          const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${words}`;
+                          const taken = slot.state === "booked" || slot.state === "class" || slot.state === "practice" || slot.state === "out_of_service" || slot.state === "not_open";
+                          const shortTaken =
+                            slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state]);
+                          return (
+                            <li key={slot.startsAt}>
+                              {slot.state === "free" && !item.locked ? (
+                                <Link className="slot slot-free" href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })} aria-label={label}>
+                                  {formatClock(slot.startsAt)}
+                                  {slot.placesLeft !== null && <small>{slot.placesLeft} left</small>}
+                                </Link>
+                              ) : (
+                                <span
+                                  className={`slot slot-${slot.state}${taken ? " slot-taken" : ""}`}
+                                  aria-label={label}
+                                  data-state={slot.state}
+                                  title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}
+                                >
+                                  {formatClock(slot.startsAt)}
+                                  <small>{shortTaken}</small>
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                      <p className="club-book-item-foot">
+                        <Link href={`/club/damage?item=${item.item.id}`} data-testid="report-damage-link" aria-label={`Report damage on ${item.item.name}`}>
+                          Report damage
+                        </Link>
+                      </p>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </>
       )}
     </section>
@@ -313,7 +525,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 const first = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
 function chooseHint(b: BookBrowse): string {
-  if (b.id === "shell") return "1x, 2x, 4x";
+  if (b.id === "shell") return "1x, 2x, 4x, 8x";
   if (b.id === "paddle") return "Kayaks and paddle boards";
   if (b.id === "dock") return "Warm months";
   if (b.id === "gym") return "Ergs and floor";

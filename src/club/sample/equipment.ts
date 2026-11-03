@@ -1,14 +1,17 @@
 import { createBooking, takeOutOfService } from "../engine/bookings";
 import { fullName } from "../engine/queries";
-import { RULE_BOOK } from "../settings/rulebook";
+import { RULE_BOOK, classOf } from "../settings/rulebook";
 import type { ClubStore } from "../store/memory";
 import { addDays, pacificDate, pacificWall } from "../time";
 import type { BoatAccess, Item, RuleValues } from "../types";
 import { SAMPLE_STAFF } from "./club";
+import { ICREW_SHELL_FLEET, shellClassForSeats, skillForIcrewShell, type IcrewShell } from "./icrew-shell-fleet";
 
 /**
- * Invented boats and spaces. Shell names are the ones already used in the dashboard's sample data
- * (src/lib/shells.ts); the rest are made up. Nothing here is real club equipment.
+ * Invented boats and spaces used by booking/check-in tests, plus the full iCrew shell fleet (103 boats) with
+ * size, skill, weight class and manufacturer from the Nov 2, 2026 shell list. Shell names that already appear
+ * in the invented list (Heron) take their weight and maker from the fleet; invented shells that are not in
+ * iCrew stay for the tests. Private vs club is not inferred from the fleet list.
  */
 interface SampleItem {
   name: string;
@@ -20,12 +23,30 @@ interface SampleItem {
   places?: number;
   /** Retired from the start, with this reason: nobody sees it but staff, on the Equipment page's retired list. */
   retired?: string;
-  /** Optional max combined rower weight in pounds (shells). */
-  maxWeightLbs?: number;
+  minWeightLbs?: number | null;
+  maxWeightLbs?: number | null;
+  manufacturer?: string | null;
+  /** Explicit skill override; undefined follows the class. */
+  requiredQualification?: string | null;
 }
 
-export const SAMPLE_ITEMS: SampleItem[] = [
-  { name: "Heron", classCode: "shell-single", maxWeightLbs: 190 },
+function applyFleetFields(item: SampleItem, shell: IcrewShell): SampleItem {
+  const classCode = shellClassForSeats(shell.seats);
+  const usual = classOf(RULE_BOOK, { classCode }).requiredQualification;
+  const skill = skillForIcrewShell(shell, usual);
+  return {
+    ...item,
+    classCode,
+    minWeightLbs: shell.minWeightLbs,
+    maxWeightLbs: shell.maxWeightLbs,
+    manufacturer: shell.manufacturer,
+    ...(skill !== undefined ? { requiredQualification: skill } : {}),
+  };
+}
+
+/** Invented test boats (and spaces). Heron is also on the iCrew list — fleet fields overwrite its weight/maker below. */
+const INVENTED_ITEMS: SampleItem[] = [
+  { name: "Heron", classCode: "shell-single" },
   { name: "Osprey", classCode: "shell-single", maxWeightLbs: 200 },
   { name: "Kingfisher", classCode: "shell-single", maxWeightLbs: 175 },
   { name: "Cormorant", classCode: "shell-single", maxWeightLbs: 210 },
@@ -59,6 +80,28 @@ export const SAMPLE_ITEMS: SampleItem[] = [
   { name: "Gannet", classCode: "shell-single", retired: "Sold to another club", maxWeightLbs: 190 },
 ];
 
+function buildSampleItems(): SampleItem[] {
+  const byName = new Map(INVENTED_ITEMS.map((i) => [i.name.toLowerCase(), { ...i }]));
+  // Overlay fleet fields onto invented shells that share an exact full name (Heron). Do not change private from the list.
+  for (const shell of ICREW_SHELL_FLEET) {
+    const existing = byName.get(shell.name.toLowerCase());
+    if (existing && existing.classCode.startsWith("shell-")) {
+      const seats = classOf(RULE_BOOK, existing).seats;
+      if (seats === shell.seats) byName.set(shell.name.toLowerCase(), applyFleetFields(existing, shell));
+    }
+  }
+  const items = [...byName.values()];
+  // Add every fleet shell that is not already in the invented list (match exact full name + size).
+  for (const shell of ICREW_SHELL_FLEET) {
+    const already = items.some((i) => i.name === shell.name && classOf(RULE_BOOK, i).seats === shell.seats);
+    if (already) continue;
+    items.push(applyFleetFields({ name: shell.name, classCode: shellClassForSeats(shell.seats) }, shell));
+  }
+  return items;
+}
+
+export const SAMPLE_ITEMS: SampleItem[] = buildSampleItems();
+
 /**
  * Adds the sample boats, a few bookings in the days ahead, and one boat out of service, through the same
  * engine real changes use. `now` is a parameter so tests are exact. The household sample must be seeded first.
@@ -75,6 +118,9 @@ export async function seedSampleEquipment(store: ClubStore, now: Date): Promise<
       if (i.private) item.isPrivate = true;
       if (i.places && i.places > 1) item.places = i.places;
       if (i.maxWeightLbs != null) item.maxWeightLbs = i.maxWeightLbs;
+      if (i.minWeightLbs != null) item.minWeightLbs = i.minWeightLbs;
+      if (i.manufacturer != null) item.manufacturer = i.manufacturer;
+      if (i.requiredQualification !== undefined) item.requiredQualification = i.requiredQualification;
       if (i.retired) {
         item.retired = { at: now.toISOString(), by: SAMPLE_STAFF, reason: i.retired };
         s.itemLog.push({ id: newId(), itemId: item.id, at: now.toISOString(), kind: "retired", by: SAMPLE_STAFF, text: `Retired by ${SAMPLE_STAFF.label}. Reason: ${i.retired}. Nothing was booked on it.`, details: { reason: i.retired } });

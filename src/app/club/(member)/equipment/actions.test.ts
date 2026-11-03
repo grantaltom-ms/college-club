@@ -97,7 +97,7 @@ describe("fixing an item", () => {
     expect(await changeItem(form({ item: heron.id, name: "Heron", seats: "1", skill: "class" }))).toEqual({ kind: "error", message: "Nothing was changed: what you entered is what Heron already has." });
     expect(await changeItem(form({ item: heron.id, name: "  ", seats: "3", skill: "nope", places: "9" }))).toEqual({
       kind: "error",
-      message: 'The name cannot be empty. A shell can have 1, 2 or 4 seats, not 3. "nope" is not a skill level the club uses. Heron has a single place, so it is not a pool and has no number of places to change.',
+      message: 'The name cannot be empty. A shell can have 1, 2, 4 or 8 seats, not 3. "nope" is not a skill level the club uses. Heron has a single place, so it is not a pool and has no number of places to change.',
     });
     expect(await boat("Heron")).toMatchObject({ name: "Heron", classCode: "shell-single" });
   });
