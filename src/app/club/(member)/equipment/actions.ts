@@ -38,6 +38,16 @@ function editFrom(form: FormData): ItemEdit | string {
     else if (!/^\d{2,3}$/.test(weight)) return "Max weight must be a whole number of pounds, or left blank.";
     else edit.maxWeightLbs = Number(weight);
   }
+  if (form.has("minWeightLbs")) {
+    const weight = textOf(form, "minWeightLbs", 6).trim();
+    if (weight === "") edit.minWeightLbs = null;
+    else if (!/^\d{2,3}$/.test(weight)) return "Min weight must be a whole number of pounds, or left blank.";
+    else edit.minWeightLbs = Number(weight);
+  }
+  if (form.has("manufacturer")) {
+    const maker = textOf(form, "manufacturer", 120).trim();
+    edit.manufacturer = maker === "" ? null : maker;
+  }
   return edit;
 }
 

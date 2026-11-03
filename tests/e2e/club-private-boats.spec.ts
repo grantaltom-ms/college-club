@@ -33,7 +33,8 @@ const slot = (page: Page, item: string, range: string, state: string) => page.lo
 const card = (page: Page, item: string) => page.locator(`[data-testid="item-card"][data-item="${item}"]`);
 const boatCard = (page: Page, item: string) => page.locator(`[data-testid="private-boat"][aria-label="${item}"]`);
 const myBoat = (page: Page, item: string) => page.locator(`[data-testid="my-boat"][aria-label="${item}"]`);
-const dayOf = (day: number) => `/club/book?day=2026-11-0${day}&type=Shell`;
+const dayOf = (day: number, kind: "single" | "double" | "quad" = "single") =>
+  `/club/book?day=2026-11-0${day}&what=shell&kind=${kind}`;
 
 /** The member searches for someone on their boat's invite form and presses Invite beside the first match. */
 async function invite(page: Page, boat: string, typed: string, name: string) {
@@ -97,7 +98,7 @@ test.describe("what members see", () => {
     // A club quad needs level 3. Britta Eriksen holds no qualification at all.
     await upload(page, privateRow(boat, "4", "Britta Eriksen"));
     await actAs(page, "Britta Eriksen");
-    await page.goto(dayOf(3));
+    await page.goto(dayOf(3, "quad"));
     await slot(page, boat, "8:00 to 8:30 am", "free").click();
     await expect(page.getByTestId("check-ok")).toHaveText("This booking meets the rules.");
     await expect(page.getByRole("region", { name: "Rules" })).toContainText("This is a private boat. Its owners and the people an owner has invited can use it, and its skill level is not checked");
@@ -112,7 +113,7 @@ test.describe("what members see", () => {
     const boat = `Playwright Double ${tag()}`;
     await upload(page, privateRow(boat, "2", "Lars Eriksen; Britta Eriksen"));
     await actAs(page, "Lars Eriksen");
-    await page.goto(dayOf(4));
+    await page.goto(dayOf(4, "double"));
     await slot(page, boat, "9:00 to 9:30 am", "free").click();
     const crew = page.locator("fieldset", { hasText: "Crew" });
     await expect(crew.getByLabel("Britta Eriksen")).toBeVisible();
