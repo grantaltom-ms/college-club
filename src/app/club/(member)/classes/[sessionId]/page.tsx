@@ -64,15 +64,19 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
   const explained = describeClassRules(CLASS_RULES, template);
   const yours = yoursText(view.yours);
 
+  const whenWords = `${formatDayLong(pacificDate(new Date(session.startsAt)))}, ${formatRange(session.startsAt, session.endsAt)}`;
+
   return (
     <section>
       <p>
+        <Link href={`/club/classes/of/${template.id}`}>All {template.name} dates</Link>
+        {" · "}
         <Link href="/club/classes">All fitness classes</Link>
       </p>
       <h1>{template.name}</h1>
       <ClassPlaceholderNote />
       <p data-testid="class-when">
-        {formatDayLong(pacificDate(new Date(session.startsAt)))}, {formatRange(session.startsAt, session.endsAt)}
+        {whenWords}
         {view.roomName ? ` · ${view.roomName}` : ""}
         {template.instructor ? ` · with ${template.instructor}` : ""}
       </p>
@@ -87,9 +91,21 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
         </p>
       )}
       {joined && (
-        <p className="club-success" role="status" data-testid="joined-note">
-          {joined.status === "enrolled" ? (staff ? "Signed up with a place." : "You are in. You have a place.") : `On the waiting list, ${ordinal(joinedPlace)} in line. If a place frees up, the first in line gets it at once.`}
-        </p>
+        <div className={joined.status === "enrolled" ? "club-done" : "club-done club-done-wait"} role="status" id="joined">
+          <p className="club-done-title">{joined.status === "enrolled" ? (staff ? "Signed up" : "You're in") : "On the waiting list"}</p>
+          <p data-testid="joined-note">
+            {joined.status === "enrolled"
+              ? staff
+                ? "Signed up with a place."
+                : `You are in. You have a place. ${template.name} on ${whenWords}.`
+              : `On the waiting list, ${ordinal(joinedPlace)} in line. If a place frees up, the first in line gets it at once.`}
+          </p>
+          <p className="club-quiet-links">
+            <Link href="/club/my-classes">My classes</Link>
+            {" · "}
+            <Link href={`/club/classes/of/${template.id}`}>More dates</Link>
+          </p>
+        </div>
       )}
       {one(query.changed) && (
         <p className="club-success" role="status">

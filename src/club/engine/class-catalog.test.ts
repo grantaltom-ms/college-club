@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CLASS_RULES } from "../settings/class-rules";
 import { addDays, pacificDate, pacificWall } from "../time";
-import { classCatalog, schedulePatternWords } from "./class-catalog";
+import { CLASS_CATALOG_DAYS_AHEAD, classCatalog, schedulePatternWords } from "./class-catalog";
 import { createClass, scheduleSessions, signUp } from "./classes";
 import { NOW, TODAY, addMembers, fixture, memberCtx, staffCtx } from "./testkit";
 
@@ -70,14 +70,17 @@ describe("classCatalog", () => {
 
     const state = await f.store.read();
     const catalog = classCatalog(state, NOW, { kind: "member", memberId: f.m.Eli });
+    expect(CLASS_CATALOG_DAYS_AHEAD).toBe(42);
     expect(catalog.map((c) => c.template.name)).toEqual(["Erg Conditioning", "Morning Yoga"]);
     expect(catalog[0].scheduleWords).toBe("Thursdays · 5:00 to 5:45 pm");
     expect(catalog[0].roomName).toBe("Boathouse gym");
+    expect(catalog[0].summaryWords).toBe("Thursdays · 5:00 to 5:45 pm · Boathouse gym · 4 places");
     expect(catalog[0].upcoming[0].full).toBe(true);
     expect(catalog[0].upcoming[0].yours).toMatchObject({ status: "waitlisted", place: 1 });
     expect(catalog[0].upcoming[0].sheet).toEqual([]);
     expect(JSON.stringify(catalog[0])).not.toContain("Quill");
     expect(catalog[1].scheduleWords).toBe("Fridays · 7:00 to 8:00 am");
+    expect(catalog[1].summaryWords).toBe("Fridays · 7:00 to 8:00 am · Clubhouse room · 12 places");
     expect(catalog[1].upcoming).toHaveLength(2);
 
     const asStaff = classCatalog(state, NOW, { kind: "staff" });
@@ -118,5 +121,24 @@ describe("classCatalog", () => {
     const catalog = classCatalog(await f.store.read(), NOW, { kind: "member", memberId: extra });
     expect(catalog).toHaveLength(1);
     expect(catalog[0].scheduleWords).toBe("Tuesday, Nov 3 · 10:00 to 10:45 am");
+    expect(catalog[0].summaryWords).toBe("Tuesday, Nov 3 · 10:00 to 10:45 am · 1 place");
+  });
+
+  it("still lists a class whose only date sits past the old two-week strip, inside six weeks", async () => {
+    const f = await withRooms();
+    const [extra] = await addMembers(f, 1);
+    const late = await createClass(f.store, f.book, CLASS_RULES, staffCtx(), {
+      name: "Late Drill",
+      description: "",
+      instructor: "Coach",
+      defaultCapacity: 6,
+      defaultMinutes: 45,
+      roomItemId: f.i["Boathouse gym"],
+    });
+    // Day 21 is past the old 14-day sign-up strip for listing, but inside the bulletin's 42-day window.
+    await scheduleSessions(f.store, f.book, staffCtx(), { classId: late.id, startsAt: at(21, 10) });
+    const catalog = classCatalog(await f.store.read(), NOW, { kind: "member", memberId: extra });
+    expect(catalog.map((c) => c.template.name)).toContain("Late Drill");
+    expect(catalog.find((c) => c.template.name === "Late Drill")!.summaryWords).toMatch(/Boathouse gym · 6 places$/);
   });
 });

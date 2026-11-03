@@ -1,35 +1,48 @@
 import Link from "next/link";
 import { clubNow } from "@/club/clock";
 import { classCatalog } from "@/club/engine/class-catalog";
+import { sessionView } from "@/club/engine/classes";
 import { chairsText, yoursText } from "@/club/engine/class-words";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
+import { CLASS_RULES } from "@/club/settings/class-rules";
 import { getClubStore } from "@/club/store/instance";
-import { formatDayLong, formatRange, pacificDate } from "@/club/time";
+import { addDays, formatDay, formatDayLong, formatRange, pacificDate, weekdayName } from "@/club/time";
+import type { ClubState } from "@/club/types";
+import { pickDay } from "@/club/web";
 import { viewerOf } from "@/club/web-actor";
 import { ClassPlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
 
+type Search = Record<string, string | string[] | undefined>;
+const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
+
+const shortDay = (day: string) => `${weekdayName(day).slice(0, 3)} ${formatDay(day).replace(/, \d{4}$/, "")}`;
+
 /**
- * Fitness classes bulletin: every kind of class with its usual days and times, read from the
- * dated sessions staff have scheduled. Tap a date to sign up. (Google Calendar connect is later.)
+ * Fitness classes: a bulletin of every class with its usual days (primary), or the day-by-day board
+ * (secondary). Usual days come from dated sessions staff have already scheduled — not from Google Calendar.
  */
-export default async function ClassesPage() {
+export default async function ClassesPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requireClub();
   const actor = await getCurrentActor();
   if (!actor) return <SignedOut />;
 
   const now = clubNow();
   const state = await (await getClubStore()).read();
+  const params = await searchParams;
   const viewer = viewerOf(actor);
-  const catalog = classCatalog(state, now, viewer);
+  // ?view=day (or a leftover ?day= bookmark) opens the day board; otherwise the bulletin.
+  const byDay = one(params.view) === "day" || one(params.day) != null;
 
   return (
-    <section className="club-classes-catalog">
+    <section className={byDay ? "club-classes-day" : "club-classes-catalog"}>
       <header className="club-page-head">
         <div>
           <h1>Fitness classes</h1>
-          <p className="club-meta">Every class with its usual days. Tap a date to take a place.</p>
+          <p className="club-meta">
+            {byDay ? "Pick a day, see places left, and take a place." : "Every class with its usual days. Tap a class to see dates and sign up."}
+          </p>
         </div>
         {actor.kind === "staff" && (
           <p className="club-page-actions">
@@ -41,51 +54,102 @@ export default async function ClassesPage() {
       </header>
       <ClassPlaceholderNote />
 
+      <nav aria-label="How to browse classes" className="club-chips" data-testid="classes-view-toggle">
+        <Link href="/club/classes" aria-current={byDay ? undefined : "page"}>
+          Classes
+        </Link>
+        <Link href="/club/classes?view=day" aria-current={byDay ? "page" : undefined}>
+          By day
+        </Link>
+      </nav>
+
+      {byDay ? <DayBoard state={state} now={now} viewer={viewer} params={params} /> : <ClassBulletin state={state} now={now} viewer={viewer} />}
+    </section>
+  );
+}
+
+function ClassBulletin({ state, now, viewer }: { state: ClubState; now: Date; viewer: ReturnType<typeof viewerOf> }) {
+  const catalog = classCatalog(state, now, viewer);
+
+  return (
+    <>
       {catalog.length === 0 && (
         <p className="club-empty-inline" data-testid="no-classes">
-          No classes are scheduled in the next two weeks.
+          No classes are scheduled in the next six weeks.
         </p>
       )}
 
       <ul className="club-class-catalog" aria-label="Fitness classes">
-        {catalog.map((entry) => {
-          const next = entry.upcoming[0];
-          return (
-            <li key={entry.template.id} className="club-class-catalog-card" data-testid="class-card" data-class={entry.template.name}>
-              <header className="club-class-catalog-head">
-                <h2>
-                  <Link href={`/club/classes/${next.session.id}`}>{entry.template.name}</Link>
-                </h2>
-                <p className="club-class-catalog-when" data-testid="class-schedule">
-                  {entry.scheduleWords}
-                </p>
-                <p className="club-meta">
-                  {[entry.roomName, entry.template.instructor].filter(Boolean).join(" · ")}
-                </p>
-                {entry.template.description ? <p className="club-class-catalog-blurb">{entry.template.description}</p> : null}
-              </header>
+        {catalog.map((entry) => (
+          <li key={entry.template.id} className="club-class-catalog-card" data-testid="class-card" data-class={entry.template.name}>
+            <h2>
+              <Link href={`/club/classes/of/${entry.template.id}`}>{entry.template.name}</Link>
+            </h2>
+            <p className="club-class-catalog-when" data-testid="class-schedule">
+              {entry.summaryWords}
+            </p>
+            {entry.template.instructor ? <p className="club-meta">with {entry.template.instructor}</p> : null}
+            {entry.template.description ? <p className="club-class-catalog-blurb">{entry.template.description}</p> : null}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
-              <ul className="club-class-catalog-dates" aria-label={`Upcoming ${entry.template.name}`}>
-                {entry.upcoming.map((view) => {
-                  const yours = yoursText(view.yours);
-                  const label = `${formatDayLong(pacificDate(new Date(view.session.startsAt)))}, ${formatRange(view.session.startsAt, view.session.endsAt)}`;
-                  return (
-                    <li key={view.session.id} className="club-class-catalog-date" data-testid="class-session" data-session={view.session.id}>
-                      <Link href={`/club/classes/${view.session.id}`} className="club-class-catalog-date-link">
-                        {label}
-                      </Link>
-                      <p className="club-meta">
-                        <span data-testid="class-chairs">{chairsText(view)}</span>
-                        {yours ? ` · ${yours}` : ""}
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
+function DayBoard({ state, now, viewer, params }: { state: ClubState; now: Date; viewer: ReturnType<typeof viewerOf>; params: Search }) {
+  const today = pacificDate(now);
+  const days = Array.from({ length: CLASS_RULES.defaults.signUpDaysAhead + 1 }, (_, n) => addDays(today, n));
+  const { day, note: dayNote } = pickDay(params.day, days);
+  const sessions = state.sessions.filter((x) => pacificDate(new Date(x.startsAt)) === day).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const busyDays = new Set(state.sessions.filter((x) => x.status === "scheduled").map((x) => pacificDate(new Date(x.startsAt))));
+
+  return (
+    <>
+      {dayNote && (
+        <p className="club-alert" role="status" data-testid="day-note">
+          {dayNote}
+        </p>
+      )}
+
+      <nav aria-label="Pick a day" className="club-chips">
+        {days.map((d) => (
+          <Link key={d} href={`/club/classes?view=day&day=${d}`} aria-current={d === day ? "page" : undefined}>
+            {d === today ? "Today" : shortDay(d)}
+            {busyDays.has(d) ? "" : " ·"}
+          </Link>
+        ))}
+      </nav>
+
+      <h2 data-testid="day-heading">{formatDayLong(day)}</h2>
+      {sessions.length === 0 && (
+        <p className="club-empty-inline" data-testid="no-classes">
+          No classes this day.
+        </p>
+      )}
+      <ul className="club-cards" aria-label="Classes this day">
+        {sessions.map((session) => {
+          const view = sessionView(state, session, viewer);
+          const yours = yoursText(view.yours);
+          return (
+            <li key={session.id} className="club-card" data-testid="class-card" data-class={view.template.name} data-session={session.id}>
+              <h3>
+                <Link href={`/club/classes/${session.id}`}>{view.template.name}</Link>
+              </h3>
+              <p>
+                {formatRange(session.startsAt, session.endsAt)}
+                {view.roomName ? ` · ${view.roomName}` : ""}
+                {view.template.instructor ? ` · ${view.template.instructor}` : ""}
+              </p>
+              <p className="club-meta">
+                <span data-testid="class-chairs">{chairsText(view)}</span>
+                {session.status === "cancelled" && session.cancelReason ? `: ${session.cancelReason}` : ""}
+                {yours ? ` · ${yours}` : ""}
+              </p>
             </li>
           );
         })}
       </ul>
-    </section>
+    </>
   );
 }

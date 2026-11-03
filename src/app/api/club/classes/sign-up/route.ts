@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
   const forQuery = actor.kind === "staff" ? `for=${memberId}` : "";
   try {
     const { signUp: line } = await signUp(store, RULE_BOOK, CLASS_RULES, ctx, { sessionId, memberId });
-    return see(request, `${page}?joined=${line.id}${forQuery ? `&${forQuery}` : ""}`);
+    // Land on the session page with an explicit on-screen confirmation (no silent redirect).
+    return see(request, `${page}?joined=${line.id}${forQuery ? `&${forQuery}` : ""}#joined`);
   } catch (e) {
     if (e instanceof SignUpRefused) return see(request, `${page}${forQuery ? `?${forQuery}` : ""}`);
     return see(request, `${page}?notice=${noticeCode(e)}${forQuery ? `&${forQuery}` : ""}`);
