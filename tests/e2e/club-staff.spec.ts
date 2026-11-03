@@ -30,7 +30,7 @@ const searchFor = async (page: Page, q: string) => {
 };
 
 test.describe("the staff office board", () => {
-  test("shows what needs a look, what is on today, what is out of service, and how check-in works", async ({ page }) => {
+  test("shows today, what needs attention, tools, and keeps missed check-ins off the front desk", async ({ page }) => {
     await actAs(page, "Test staff");
     await page.getByRole("link", { name: "Staff office" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Staff office" })).toBeVisible();
@@ -38,24 +38,40 @@ test.describe("the staff office board", () => {
     // Today: four bookings made for today plus two finished ones; the exact count is not the point, the links are.
     await expect(page.getByTestId("today")).toContainText("boat and space booking");
     await expect(page.getByTestId("today").getByRole("link", { name: /class/ })).toBeVisible();
+    // Front desk does not chase automatic boat no-shows.
+    await expect(page.getByTestId("needs-look")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
     // Merganser is out of service.
     await expect(page.getByTestId("out-of-service")).toContainText("Merganser");
     await expect(page.getByTestId("out-of-service")).toContainText("Rigger being repaired");
-    // Tools and the rules in words, with the placeholder warning.
-    for (const name of ["Households", "Add a household", "Import households", "Check someone in", "All bookings", "Equipment", "Add an event"]) {
+    // Tools, including the reservations attendance page.
+    for (const name of [
+      "Households",
+      "Add a household",
+      "Import households",
+      "Check someone in",
+      "All bookings",
+      "Reservation attendance",
+      "Equipment",
+      "Add an event",
+    ]) {
       await expect(page.getByTestId("tools").getByRole("link", { name, exact: true })).toBeVisible();
     }
+    // Check-in rules live on Reservation attendance, not the front desk board.
+    await page.getByTestId("tools").getByRole("link", { name: "Reservation attendance", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Reservation attendance" })).toBeVisible();
     await expect(page.getByTestId("placeholder-note")).toBeVisible();
     await expect(page.getByTestId("attendance-rules")).toContainText("Check-in opens 30 minutes before the start.");
     await expect(page.getByTestId("attendance-rules")).toContainText("becomes a no-show the moment it ends");
     await expect(page.getByTestId("attendance-rules")).toContainText("Room Space and Work Space reservations do not need a check-in");
     await expect(page.getByTestId("attendance-rules")).toContainText("Events are not marked automatically");
+    await expect(page.getByTestId("attendance-rules")).toContainText("does not need a staff chase");
   });
 
   test("is staff only: a member does not find it", async ({ page }) => {
     await actAs(page, "Nora Abernathy");
     await expect(page.getByRole("link", { name: "Staff office" })).toHaveCount(0);
-    for (const path of ["/club/admin", "/club/admin/check-in", "/club/admin/households/new"]) {
+    for (const path of ["/club/admin", "/club/admin/check-in", "/club/admin/reservations", "/club/admin/households/new"]) {
       expect((await page.goto(path))?.status(), path).toBe(404);
     }
     await page.goto("/club/admin/households/00000000-0000-4000-8000-000000000001/end");
@@ -98,9 +114,9 @@ test.describe("the staff office board", () => {
     expect(look.off.bg).not.toBe(look.on.bg);
   });
 
-  test("a booking over with nobody checked in is a no-show on its own, and staff can put it right, once, on the record", async ({ page }) => {
+  test("a booking over with nobody checked in is a no-show on its own, and staff can put it right from Reservation attendance", async ({ page }) => {
     await actAs(page, "Test staff");
-    await page.goto("/club/admin");
+    await page.goto("/club/admin/reservations");
     const row = attendanceRow(page.getByTestId("needs-look"), "Cormorant");
     await expect(row).toContainText("Alex Brooks");
     await expect(row.getByTestId("attendance-status")).toHaveText("No-show (marked automatically)");
@@ -109,9 +125,9 @@ test.describe("the staff office board", () => {
     await page.goto("/club/my-bookings");
     await expect(page.getByRole("list", { name: "Past bookings" }).getByTestId("booking-row").filter({ hasText: "Cormorant" }).getByTestId("booking-status")).toHaveText("No-show");
 
-    // Staff: the iPad was down, they were there.
+    // Staff: the iPad was down, they were there — corrected on the reservations page, not the front desk board.
     await actAs(page, "Test staff");
-    await page.goto("/club/admin");
+    await page.goto("/club/admin/reservations");
     await attendanceRow(page.getByTestId("needs-look"), "Cormorant").getByRole("button", { name: /^Change .* to checked in$/ }).click();
     await expect(page.getByTestId("checked")).toBeVisible();
     await expect(page.getByTestId("needs-look").getByText("Cormorant")).toHaveCount(0);
@@ -132,7 +148,7 @@ test.describe("the staff office board", () => {
     const boat = page.getByRole("list", { name: "Past bookings" }).getByTestId("booking-row").filter({ hasText: "Cormorant" }).filter({ hasText: "Alex Brooks" });
     await expect(boat.getByTestId("booking-status")).toHaveText(/No-show|Completed/);
     // It is on neither of the staff lists.
-    await page.goto("/club/admin");
+    await page.goto("/club/admin/reservations");
     await expect(page.getByTestId("needs-look").getByText("Clubhouse room")).toHaveCount(0);
     await page.goto("/club/admin/check-in");
     await expect(page.getByTestId("around-now").getByText("Clubhouse room")).toHaveCount(0);
@@ -144,9 +160,9 @@ test.describe("the staff office board", () => {
     await expect(page.getByRole("list", { name: "Past bookings" }).getByTestId("booking-row").filter({ hasText: "Clubhouse room" }).getByTestId("booking-status")).toHaveText("Finished");
   });
 
-  test("staff can confirm that an automatic no-show was right, which takes it off the list", async ({ page }) => {
+  test("staff can confirm that an automatic no-show was right, which takes it off the reservations list", async ({ page }) => {
     await actAs(page, "Test staff");
-    await page.goto("/club/admin");
+    await page.goto("/club/admin/reservations");
     await attendanceRow(page.getByTestId("needs-look"), "Grebe").getByRole("button", { name: /^Confirm .* was a no-show$/ }).click();
     await expect(page.getByTestId("checked")).toBeVisible();
     await expect(page.getByTestId("needs-look").getByText("Grebe")).toHaveCount(0);

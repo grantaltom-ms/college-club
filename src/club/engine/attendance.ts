@@ -539,6 +539,6 @@ export function describeAttendanceRules(rules: AttendanceRules): string[] {
     ...(rules.defaults.checkInNotNeededFor.length > 0 ? [`${listOf(rules.defaults.checkInNotNeededFor)} reservations do not need a check-in: they are never marked a no-show.`] : []),
     "Members can check themselves in on the front-desk iPad or on their own phone while check-in is open; the record shows which. Events are not checked in by members.",
     "Events are not marked automatically; staff mark who came.",
-    "Staff can correct any of these afterwards. The correction is added to the record; nothing is erased.",
+    "Staff can correct any of these afterwards on Reservation attendance or All bookings. A missed check-in does not need a staff chase; the correction is added to the record and nothing is erased.",
   ];
 }
