@@ -525,7 +525,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 const first = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
 function chooseHint(b: BookBrowse): string {
-  if (b.id === "shell") return "1x, 2x, 4x";
+  if (b.id === "shell") return "1x, 2x, 4x, 8x";
   if (b.id === "paddle") return "Kayaks and paddle boards";
   if (b.id === "dock") return "Warm months";
   if (b.id === "gym") return "Ergs and floor";
