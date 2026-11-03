@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
-import { itemPage, skillKey, weightWords } from "@/club/engine/equipment-edit";
+import { itemPage, manufacturerWords, skillKey, weightRangeWords } from "@/club/engine/equipment-edit";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { RULE_BOOK, classOf } from "@/club/settings/rulebook";
@@ -70,7 +70,10 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
         </p>
         <p data-testid="item-skill">Skill level needed: {line.isPrivate ? "not checked on a private boat" : line.skill}</p>
         {(cls.type === "Shell" || cls.type === "Kayak" || cls.type === "Paddle Board") && (
-          <p data-testid="item-weight">Max weight: {weightWords(line.maxWeightLbs)}</p>
+          <>
+            <p data-testid="item-weight">Weight class: {weightRangeWords(line.minWeightLbs, line.maxWeightLbs)}</p>
+            <p data-testid="item-manufacturer">Manufacturer: {manufacturerWords(line.manufacturer)}</p>
+          </>
         )}
         <p data-testid="item-status">
           {retired
@@ -92,7 +95,15 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
         seats={seats}
         skill={skill}
         places={places}
-        maxWeightLbs={weightEditable ? (item.maxWeightLbs ?? null) : undefined}
+        weight={
+          weightEditable
+            ? {
+                minWeightLbs: item.minWeightLbs ?? null,
+                maxWeightLbs: item.maxWeightLbs ?? null,
+                manufacturer: item.manufacturer ?? null,
+              }
+            : undefined
+        }
       />
 
       {retired ? (

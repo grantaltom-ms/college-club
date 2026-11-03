@@ -2,6 +2,7 @@ import Link from "next/link";
 import { dayView, pickableDays, type ItemDayView, type SlotView } from "@/club/engine/availability";
 import { itemVisibleTo } from "@/club/engine/boat-access";
 import { noticeWords, openDamageNotices } from "@/club/engine/damage";
+import { weightRangeWords } from "@/club/engine/equipment-edit";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { clubNow } from "@/club/clock";
@@ -239,7 +240,9 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                     </h3>
                     <p className="club-meta">
                       {kind ? kind.label : item.className}
-                      {item.item.maxWeightLbs != null ? ` · max ${item.item.maxWeightLbs} lb` : ""}
+                      {classOf(RULE_BOOK, item.item).type === "Shell" || item.item.minWeightLbs != null || item.item.maxWeightLbs != null
+                        ? ` · ${weightRangeWords(item.item.minWeightLbs, item.item.maxWeightLbs)}`
+                        : ""}
                       {item.places > 1 ? ` · ${item.places} places` : ""}
                       {item.needs ? ` · needs ${item.needs}` : ""}
                     </p>

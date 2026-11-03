@@ -189,10 +189,19 @@ export interface Item {
    */
   retired?: ItemRetirement;
   /**
-   * Optional maximum combined rower weight in pounds. Staff set this on shells (1x, 2x, 4x) so members can see which boat fits.
-   * Undefined or null means it has not been set yet.
+   * Optional maximum combined rower weight in pounds. With minWeightLbs this is the weight class shown on Reservations.
+   * Undefined or null with no min means weight is not on file (never treat as zero).
    */
   maxWeightLbs?: number | null;
+  /**
+   * Optional minimum combined rower weight in pounds. A single value from the source is stored as min = max.
+   * Undefined or null with no max means weight is not on file.
+   */
+  minWeightLbs?: number | null;
+  /**
+   * Optional boat manufacturer (Sykes, Filippi, …). Undefined or null means maker not listed.
+   */
+  manufacturer?: string | null;
 }
 
 /** When, by whom and why an item was retired. */

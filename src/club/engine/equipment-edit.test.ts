@@ -138,17 +138,25 @@ for (const kind of STORE_KINDS) {
       });
     });
 
-    describe("max weight in pounds", () => {
-      it("sets, clears and refuses a silly number on a shell", async () => {
+    describe("weight class in pounds", () => {
+      it("sets a range, clears both ends, refuses a silly number, and refuses min above max", async () => {
         const f = await fixture();
-        const weight = await edit(f, "Heron", { maxWeightLbs: 205 });
-        expect(weight.item.maxWeightLbs).toBe(205);
-        expect(weight.changes).toEqual([{ field: "maxWeight", label: "Max weight", from: "not set", to: "205 lb" }]);
-        expect((await state(f)).itemLog.at(-1)?.details).toMatchObject({ maxWeightFrom: "", maxWeightTo: "205" });
-        await edit(f, "Heron", { maxWeightLbs: null });
-        expect((await state(f)).items.find((i) => i.id === f.i.Heron)?.maxWeightLbs).toBeUndefined();
+        const weight = await edit(f, "Heron", { minWeightLbs: 120, maxWeightLbs: 205 });
+        expect(weight.item).toMatchObject({ minWeightLbs: 120, maxWeightLbs: 205 });
+        expect(weight.changes).toEqual([
+          { field: "maxWeight", label: "Max weight", from: "not set", to: "205 lb" },
+          { field: "minWeight", label: "Min weight", from: "not set", to: "120 lb" },
+        ]);
+        await edit(f, "Heron", { minWeightLbs: null, maxWeightLbs: null, manufacturer: "Sykes" });
+        const cleared = (await state(f)).items.find((i) => i.id === f.i.Heron)!;
+        expect(cleared.minWeightLbs).toBeUndefined();
+        expect(cleared.maxWeightLbs).toBeUndefined();
+        expect(cleared.manufacturer).toBe("Sykes");
         expect(await problemsOf(updateItem(f.store, f.book, staffCtx(), f.i.Heron, { maxWeightLbs: 20 }))).toEqual([
           "Max weight must be a whole number from 50 to 800 pounds, or left blank.",
+        ]);
+        expect(await problemsOf(updateItem(f.store, f.book, staffCtx(), f.i.Heron, { minWeightLbs: 200, maxWeightLbs: 150 }))).toEqual([
+          "Min weight cannot be higher than max weight.",
         ]);
       });
     });
@@ -191,7 +199,7 @@ for (const kind of STORE_KINDS) {
 
       it("refuses a number of seats the kind of boat does not come in, in words", async () => {
         const f = await fixture();
-        expect(await problemsOf(edit(f, "Heron", { seats: 3 }))).toEqual(["A shell can have 1, 2 or 4 seats, not 3."]);
+        expect(await problemsOf(edit(f, "Heron", { seats: 3 }))).toEqual(["A shell can have 1, 2, 4 or 8 seats, not 3."]);
         expect(await problemsOf(edit(f, "Otter", { seats: 4 }))).toEqual(["A kayak can have 1 or 2 seats, not 4."]);
         expect(await problemsOf(edit(f, "Skimmer", { seats: 2 }))).toEqual(["Skimmer is a paddle board, which has 1 seat, so its number of seats cannot change."]);
         expect(await problemsOf(edit(f, "Heron", { seats: 1.5 }))).toEqual(["Seats must be a whole number."]);
@@ -401,7 +409,7 @@ for (const kind of STORE_KINDS) {
         const problems = await problemsOf(edit(f, "Heron", { name: "  ", seats: 3, skill: { mode: "code", code: "nope" }, places: 9 }));
         expect(problems).toEqual([
           "The name cannot be empty.",
-          "A shell can have 1, 2 or 4 seats, not 3.",
+          "A shell can have 1, 2, 4 or 8 seats, not 3.",
           '"nope" is not a skill level the club uses.',
           "Heron has a single place, so it is not a pool and has no number of places to change.",
         ]);

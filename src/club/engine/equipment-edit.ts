@@ -78,7 +78,7 @@ const seatsWords = (book: RuleBook, classCode: string): string => {
 /** What staff typed. Anything left out, or equal to what is there now, is left alone. */
 export interface ItemEdit {
   name?: string;
-  /** The number of seats: 1, 2 or 4 for a shell; 1 or 2 for a kayak. */
+  /** The number of seats: 1, 2, 4 or 8 for a shell; 1 or 2 for a kayak. */
   seats?: number;
   skill?: EquipmentSkill;
   /** Pools only. */
@@ -87,12 +87,35 @@ export interface ItemEdit {
    * Max combined rower weight in pounds. Pass `null` to clear. Only meaningful for boats (shells first); other kinds refuse it.
    */
   maxWeightLbs?: number | null;
+  /**
+   * Min combined rower weight in pounds. Pass `null` to clear. A single value from the source is stored as min = max.
+   */
+  minWeightLbs?: number | null;
+  /** Boat manufacturer. Pass `null` to clear (maker not listed). */
+  manufacturer?: string | null;
 }
 
-export type ItemChangeField = "name" | "seats" | "skill" | "places" | "maxWeight";
+export type ItemChangeField = "name" | "seats" | "skill" | "places" | "maxWeight" | "minWeight" | "manufacturer";
 
+/** One end of a weight class, for staff forms that still edit max alone. */
 export function weightWords(lbs: number | null | undefined): string {
   return lbs == null ? "not set" : `${lbs} lb`;
+}
+
+/**
+ * Weight class as members see it: "110-143 lb", "220 lb" when min = max, or "weight not on file" when neither is set.
+ * Never invents zero.
+ */
+export function weightRangeWords(min: number | null | undefined, max: number | null | undefined): string {
+  if (min == null && max == null) return "weight not on file";
+  if (min != null && max != null && min === max) return `${min} lb`;
+  if (min != null && max != null) return `${min}-${max} lb`;
+  if (max != null) return `${max} lb`;
+  return `${min} lb`;
+}
+
+export function manufacturerWords(value: string | null | undefined): string {
+  return value == null || value === "" ? "Maker not listed" : value;
 }
 
 /** One thing that would change, in words. */
@@ -115,7 +138,15 @@ export interface ItemEditPlan {
 }
 
 interface Computed extends ItemEditPlan {
-  after: { name: string; classCode: string; requiredQualification: string | null | undefined; places: number; maxWeightLbs: number | null };
+  after: {
+    name: string;
+    classCode: string;
+    requiredQualification: string | null | undefined;
+    places: number;
+    maxWeightLbs: number | null;
+    minWeightLbs: number | null;
+    manufacturer: string | null;
+  };
   /** Old and new values for the database's "no change without a line" check. */
   details: Record<string, string | number | null>;
 }
@@ -132,6 +163,8 @@ function compute(state: ClubState, book: RuleBook, now: Date, itemId: string, ed
     requiredQualification: item.requiredQualification,
     places: placesOf(item),
     maxWeightLbs: item.maxWeightLbs ?? null,
+    minWeightLbs: item.minWeightLbs ?? null,
+    manufacturer: item.manufacturer ?? null,
   };
   const retired = isRetired(item);
   const cls = classOf(book, item);
@@ -246,20 +279,59 @@ function compute(state: ClubState, book: RuleBook, now: Date, itemId: string, ed
     }
   }
 
-  // Max combined rower weight (pounds). Shells first; other on-water boats can hold one too.
-  if (edit.maxWeightLbs !== undefined) {
-    const current = item.maxWeightLbs ?? null;
-    const next = edit.maxWeightLbs;
-    if (cls.type !== "Shell" && cls.type !== "Kayak" && cls.type !== "Paddle Board") {
+  // Weight class (pounds). Shells first; other on-water boats can hold one too. Min and max may be edited together.
+  const weightEditable = cls.type === "Shell" || cls.type === "Kayak" || cls.type === "Paddle Board";
+  if (edit.maxWeightLbs !== undefined || edit.minWeightLbs !== undefined) {
+    const currentMax = item.maxWeightLbs ?? null;
+    const currentMin = item.minWeightLbs ?? null;
+    const nextMax = edit.maxWeightLbs !== undefined ? edit.maxWeightLbs : currentMax;
+    const nextMin = edit.minWeightLbs !== undefined ? edit.minWeightLbs : currentMin;
+    if (!weightEditable) {
       problems.push(`${item.name} is a ${cls.type.toLowerCase()}, so it has no rower weight limit to set.`);
-    } else if (next !== null && (!Number.isInteger(next) || next < MIN_MAX_WEIGHT_LBS || next > MAX_MAX_WEIGHT_LBS)) {
-      problems.push(`Max weight must be a whole number from ${MIN_MAX_WEIGHT_LBS} to ${MAX_MAX_WEIGHT_LBS} pounds, or left blank.`);
+    } else {
+      const bad = (label: string, next: number | null) =>
+        next !== null && (!Number.isInteger(next) || next < MIN_MAX_WEIGHT_LBS || next > MAX_MAX_WEIGHT_LBS)
+          ? `${label} must be a whole number from ${MIN_MAX_WEIGHT_LBS} to ${MAX_MAX_WEIGHT_LBS} pounds, or left blank.`
+          : null;
+      const maxProblem = bad("Max weight", nextMax);
+      const minProblem = bad("Min weight", nextMin);
+      if (maxProblem) problems.push(maxProblem);
+      if (minProblem) problems.push(minProblem);
+      if (!maxProblem && !minProblem && nextMin != null && nextMax != null && nextMin > nextMax) {
+        problems.push("Min weight cannot be higher than max weight.");
+      } else if (!maxProblem && !minProblem) {
+        if (nextMax !== currentMax) {
+          onlyNameWhileRetired = true;
+          changes.push({ field: "maxWeight", label: "Max weight", from: weightWords(currentMax), to: weightWords(nextMax) });
+          details.maxWeightFrom = currentMax == null ? "" : String(currentMax);
+          details.maxWeightTo = nextMax == null ? "" : String(nextMax);
+          after.maxWeightLbs = nextMax;
+        }
+        if (nextMin !== currentMin) {
+          onlyNameWhileRetired = true;
+          changes.push({ field: "minWeight", label: "Min weight", from: weightWords(currentMin), to: weightWords(nextMin) });
+          details.minWeightFrom = currentMin == null ? "" : String(currentMin);
+          details.minWeightTo = nextMin == null ? "" : String(nextMin);
+          after.minWeightLbs = nextMin;
+        }
+      }
+    }
+  }
+
+  if (edit.manufacturer !== undefined) {
+    const current = item.manufacturer ?? null;
+    const typed = edit.manufacturer === null ? null : clean(edit.manufacturer);
+    const next = typed === "" ? null : typed;
+    if (!weightEditable) {
+      problems.push(`${item.name} is a ${cls.type.toLowerCase()}, so it has no manufacturer to set.`);
+    } else if (next !== null && (next.length > MAX_ITEM_NAME || CONTROL.test(next))) {
+      problems.push(next.length > MAX_ITEM_NAME ? `Manufacturer must be ${MAX_ITEM_NAME} characters or fewer, or left blank.` : "The manufacturer has a character that cannot be saved. Retype it.");
     } else if (next !== current) {
       onlyNameWhileRetired = true;
-      changes.push({ field: "maxWeight", label: "Max weight", from: weightWords(current), to: weightWords(next) });
-      details.maxWeightFrom = current == null ? "" : String(current);
-      details.maxWeightTo = next == null ? "" : String(next);
-      after.maxWeightLbs = next;
+      changes.push({ field: "manufacturer", label: "Manufacturer", from: manufacturerWords(current), to: manufacturerWords(next) });
+      details.manufacturerFrom = current ?? "";
+      details.manufacturerTo = next ?? "";
+      after.manufacturer = next;
     }
   }
 
@@ -297,6 +369,10 @@ export async function updateItem(store: ClubStore, book: RuleBook, ctx: Ctx, ite
     if (placesOf(item) > 1) item.places = plan.after.places;
     if (plan.after.maxWeightLbs == null) delete item.maxWeightLbs;
     else item.maxWeightLbs = plan.after.maxWeightLbs;
+    if (plan.after.minWeightLbs == null) delete item.minWeightLbs;
+    else item.minWeightLbs = plan.after.minWeightLbs;
+    if (plan.after.manufacturer == null) delete item.manufacturer;
+    else item.manufacturer = plan.after.manufacturer;
     const said = plan.changes.map((c) => `${c.label.toLowerCase()} from ${c.field === "name" ? quoted(c.from) : c.from} to ${c.field === "name" ? quoted(c.to) : c.to}`);
     s.itemLog.push(logLine(newId, ctx, item.id, "changed", `Changed by ${ctx.actor.label}: ${said.join("; ")}.`, plan.details));
     return { item: structuredClone(item), changes: plan.changes, notices: plan.notices };
@@ -388,6 +464,10 @@ export interface EquipmentLine {
   skill: string;
   /** Max combined rower weight in pounds, when set. */
   maxWeightLbs: number | null;
+  /** Min combined rower weight in pounds, when set. */
+  minWeightLbs: number | null;
+  /** Maker, when listed. */
+  manufacturer: string | null;
   status: "in_service" | "out_of_service" | "retired";
   /** The out-of-service period now in force. */
   out: { periodId: string; reason: string; expectedReturn: string | null } | null;
@@ -420,6 +500,8 @@ function lineOf(state: ClubState, book: RuleBook, now: Date, item: Item): Equipm
     isPrivate: isPrivate(item),
     skill: skillWords(state, book, item),
     maxWeightLbs: item.maxWeightLbs ?? null,
+    minWeightLbs: item.minWeightLbs ?? null,
+    manufacturer: item.manufacturer ?? null,
     status: isRetired(item) ? "retired" : out ? "out_of_service" : "in_service",
     out: out ? { periodId: out.id, reason: out.reason, expectedReturn: out.expectedReturn } : null,
     retired: item.retired ? { at: item.retired.at, by: item.retired.by.label, reason: item.retired.reason } : null,

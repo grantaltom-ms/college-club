@@ -35,8 +35,9 @@ describe("the shipped booking rules", () => {
 
   it("describe singles, doubles and quads by seat count, with a qualification per boat class", () => {
     const seats = Object.fromEntries(RULE_BOOK.classes.map((c) => [c.code, c.seats]));
-    expect(seats).toMatchObject({ "shell-single": 1, "shell-double": 2, "shell-quad": 4 });
+    expect(seats).toMatchObject({ "shell-single": 1, "shell-double": 2, "shell-quad": 4, "shell-eight": 8 });
     expect(classOf(RULE_BOOK, { classCode: "shell-quad" }).requiredQualification).toBe("scull-3");
+    expect(classOf(RULE_BOOK, { classCode: "shell-eight" }).requiredQualification).toBe("scull-3");
     expect(classOf(RULE_BOOK, { classCode: "kayak" }).requiredQualification).toBeNull();
   });
 

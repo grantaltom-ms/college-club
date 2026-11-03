@@ -150,7 +150,7 @@ test.describe("checking and adding", () => {
     await expect(problems).toContainText("bad.csv has 4 problems");
     await expect(problems).toContainText("Nothing can be added until the file is fixed.");
     await expect(problems.getByRole("listitem")).toHaveText([
-      "Row 2: Seats 3 does not fit a shell: use 1 (single), 2 (double) or 4 (quad or four).",
+      "Row 2: Seats 3 does not fit a shell: use 1 (single), 2 (double), 4 (quad or four) or 8 (eight).",
       'Row 3: Type "Canoe" is not one of: Shell, Kayak, Paddle Board, Work Space, Dock Space, Room Space, Gym Space.',
       /^Row 4: Skill level needed "level 9" is not one the system knows\./,
       "Row 5: Owned by is empty. Write Club or Private.",

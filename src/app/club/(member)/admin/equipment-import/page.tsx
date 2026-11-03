@@ -37,7 +37,7 @@ export default async function EquipmentImportPage() {
           . Columns that start with &ldquo;Hint&rdquo; are for your eyes and are not used.
         </li>
         <li>
-          <strong>Type</strong> is Shell, Kayak, Paddle Board, Work Space, Dock Space, Room Space or Gym Space. <strong>Seats</strong> is 1, 2 or 4 for a shell and 1 or 2 for a kayak. <strong>Skill level needed</strong> can stay empty to use the boat class&rsquo;s usual level, or say None.{" "}
+          <strong>Type</strong> is Shell, Kayak, Paddle Board, Work Space, Dock Space, Room Space or Gym Space. <strong>Seats</strong> is 1, 2, 4 or 8 for a shell and 1 or 2 for a kayak. <strong>Skill level needed</strong> can stay empty to use the boat class&rsquo;s usual level, or say None.{" "}
           <strong>Owned by</strong> is Club or Private. <strong>In service</strong> is Yes or No; a No item is added out of service, with its Notes as the reason.
         </li>
         <li>
