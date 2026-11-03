@@ -440,7 +440,9 @@ test("Reservations opens on categories first: gym before shells, kayaks with boa
   await expect(page.locator('[data-testid=item-card][data-item=Heron]')).toBeVisible();
   // Out-of-commission boats are hidden from members.
   await expect(page.locator('[data-testid=item-card][data-item=Merganser]')).toHaveCount(0);
-  await expect(page.getByTestId("item-card").filter({ hasText: "max" }).first()).toContainText(/max \d+ lb/);
+  // Weight class from the iCrew fleet: ranges like 110-132 lb, or a single value, never "max N lb".
+  await expect(page.locator('[data-testid=item-card][data-item=Heron]')).toContainText(/110-132 lb/);
+  await expect(page.getByTestId("shell-kinds").locator("[data-kind=eight]")).toBeVisible();
 });
 
 test("a day outside the booking window is not shown silently as another day: the page says so", async ({ page }) => {
