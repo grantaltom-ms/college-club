@@ -958,3 +958,25 @@
 .club-app .club-book-shell-size-hint {
   color: var(--app-slate);
 }
+
+/* ---------- Part 2: the rest of the member screens ---------- */
+
+/* Native tick boxes and round choices (the practice and incident forms). The package has no design for them, so they take Waterloo for their accent and edge. */
+.club-app input[type="checkbox"],
+.club-app input[type="radio"] {
+  accent-color: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+}
+
+/* My bill's receipt header: white on its dark block, and the small rule under the month in Oyster (it was the Sun yellow, which is not in this palette). */
+.club-app .club-bill-month {
+  color: #ffffff;
+}
+
+.club-app .club-bill-sun-rule {
+  background: var(--app-oyster);
+}
+
+.club-app .club-bill-dot {
+  background: var(--app-waterloo);
+}

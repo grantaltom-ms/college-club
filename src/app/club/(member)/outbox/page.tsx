@@ -3,6 +3,7 @@ import { outboxMessages } from "@/club/auth/mail";
 import { outboxEnabled } from "@/club/enabled";
 import { requireClub } from "@/club/guard";
 import { formatClock, formatDayLong, pacificDate } from "@/club/time";
+import { PageBand } from "../PageBand";
 
 /**
  * TEST BUILDS ONLY. Nothing leaves the server in a test build; the sign-in "emails" are kept here so the whole sign-in can be
@@ -15,7 +16,7 @@ export default async function Outbox() {
   const messages = outboxMessages();
   return (
     <section>
-      <h1>Test outbox</h1>
+      <PageBand eyebrow="Test build" title="Test outbox" />
       <p className="club-placeholder" data-testid="outbox-warning">
         <strong>Test build.</strong> No real email is sent. Emails the club would send appear here instead, newest first. This page does not exist on the live site.
       </p>

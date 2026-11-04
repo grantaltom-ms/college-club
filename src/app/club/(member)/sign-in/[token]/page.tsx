@@ -6,6 +6,7 @@ import { LINK_PROBLEM_WORDS, previewSignIn, rememberedIdentity } from "@/club/au
 import { clubNow } from "@/club/clock";
 import { requireClub } from "@/club/guard";
 import { REMEMBER_COOKIE } from "@/club/identity";
+import { PageBand } from "../../PageBand";
 
 const describe = (i: SignInIdentity) => (i.kind === "staff" ? `${i.name} (club staff)` : i.name);
 
@@ -22,7 +23,7 @@ export default async function SignInLink({ params }: { params: Promise<{ token: 
   if (!seen) {
     return (
       <section>
-        <h1>Sign in</h1>
+        <PageBand eyebrow="Members" title="Sign in" />
         <p className="club-alert" role="status" data-testid="link-problem">
           {LINK_PROBLEM_WORDS}
         </p>
@@ -42,7 +43,7 @@ export default async function SignInLink({ params }: { params: Promise<{ token: 
 
   return (
     <section>
-      <h1>{several && !remembered ? "Which of you?" : "Sign in"}</h1>
+      <PageBand eyebrow="Members" title={several && !remembered ? "Which of you?" : "Sign in"} />
       <p>
         This link is for <strong>{seen.email}</strong>.
       </p>

@@ -14,6 +14,7 @@ import { idParam, NOTICES } from "@/club/web";
 import { ClassPlaceholderNote } from "../PlaceholderNote";
 import { SelfCheckIn } from "../SelfCheckIn";
 import { SignedOut } from "../SignedOut";
+import { PageBand } from "../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
@@ -78,7 +79,7 @@ export default async function MyClasses({ searchParams }: { searchParams: Promis
   if (actor.kind === "staff") {
     return (
       <section>
-        <h1>My classes</h1>
+        <PageBand eyebrow="Classes" title="My classes" />
         <p>
           Club staff do not hold class places. <Link href="/club/classes">Open Classes</Link> to see the sign-up sheets.
         </p>
@@ -106,7 +107,7 @@ export default async function MyClasses({ searchParams }: { searchParams: Promis
 
   return (
     <section>
-      <h1>My classes</h1>
+      <PageBand eyebrow="Yours" title="My classes" />
       <ClassPlaceholderNote />
       {checkedIn && (
         <p className="club-success" role="status" data-testid="checkedin-note">

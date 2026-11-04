@@ -9,6 +9,7 @@ import { NOTICES } from "@/club/web";
 import { viewerOf } from "@/club/web-actor";
 import { EventPlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
+import { PageBand } from "../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
@@ -26,19 +27,14 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
 
   return (
     <section>
-      <header className="club-page-head">
-        <div>
-          <h1>Events</h1>
-          <p className="club-meta">RSVP for dinners, socials and club gatherings.</p>
-        </div>
+      <PageBand eyebrow="What is coming" title="Events">
         {actor.kind === "staff" && (
-          <p className="club-page-actions">
-            <Link href="/club/events/manage" className="club-button club-button-link">
-              Add an event
-            </Link>
-          </p>
+          <Link href="/club/events/manage" className="club-button club-button-link">
+            Add an event
+          </Link>
         )}
-      </header>
+      </PageBand>
+      <p className="club-meta club-band-facts">RSVP for dinners, socials and club gatherings.</p>
       <EventPlaceholderNote />
       {notice && (
         <p className="club-alert" role="alert">

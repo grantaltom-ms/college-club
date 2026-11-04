@@ -9,6 +9,7 @@ import { idParam } from "@/club/web";
 import { viewerOf } from "@/club/web-actor";
 import { SignedOut } from "../SignedOut";
 import { DamageNoteForm, FileDamageForm } from "./DamageForms";
+import { PageBand } from "../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -28,7 +29,7 @@ export default async function DamagePage({ searchParams }: { searchParams: Promi
 
   return (
     <section>
-      <h1>Report damage</h1>
+      <PageBand eyebrow="Equipment" title="Report damage" />
       <p>
         Tell the club when something is broken or looks unsafe. Staff see every report. Everyone who books a boat reads what is wrong and where on the boat, so those two boxes should not name anyone. <Link href="/club/book">Back to Book</Link>
         {actor.kind === "staff" && (

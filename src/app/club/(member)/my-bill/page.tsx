@@ -11,6 +11,7 @@ import { BILLING_RULES } from "@/club/settings/billing-rules";
 import { getClubStore } from "@/club/store/instance";
 import { formatDay, pacificDate } from "@/club/time";
 import { SignedOut } from "../SignedOut";
+import { PageBand } from "../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
 
@@ -27,8 +28,6 @@ function BillHeader({
 }) {
   return (
     <header className="club-bill-head">
-      <p className="club-bill-eyebrow">My bill</p>
-      <h1 className="sr-only">My bill</h1>
       <p className="club-bill-household" data-testid="bill-household">
         {householdName.replace(/^The\s+/i, "").replace(/\s+household$/i, "")} household
       </p>
@@ -108,13 +107,16 @@ function BillShell({
 }) {
   const monthLabel = month.status === "closed" ? `${month.label} · billed` : `${month.label} · so far`;
   return (
-    <article className="club-bill">
-      <BillHeader householdName={view.householdName} monthLabel={monthLabel} totalCents={month.totalCents} monthTestId={monthTestId} />
-      {note}
-      <BillLines month={month} />
-      {view.placeholder && <PlaceholderNote />}
-      {children}
-    </article>
+    <>
+      <PageBand eyebrow="Household account" title="My bill" />
+      <article className="club-bill">
+        <BillHeader householdName={view.householdName} monthLabel={monthLabel} totalCents={month.totalCents} monthTestId={monthTestId} />
+        {note}
+        <BillLines month={month} />
+        {view.placeholder && <PlaceholderNote />}
+        {children}
+      </article>
+    </>
   );
 }
 
@@ -146,7 +148,7 @@ export default async function MyBillPage({ searchParams }: { searchParams: Promi
   } else {
     return (
       <section>
-        <h1>My bill</h1>
+        <PageBand eyebrow="Household account" title="My bill" />
         <p>
           Members see their household&apos;s charges here. Staff who are looking up one household can open its bill from that household&apos;s page, or{" "}
           <Link href="/club/act-as">act as a test member</Link> to see the screen the way they would. To close a month and make the QuickBooks files, use{" "}

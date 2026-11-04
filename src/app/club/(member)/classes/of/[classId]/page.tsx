@@ -10,6 +10,7 @@ import { formatDayLong, formatRange, pacificDate } from "@/club/time";
 import { viewerOf } from "@/club/web-actor";
 import { ClassPlaceholderNote } from "../../../PlaceholderNote";
 import { SignedOut } from "../../../SignedOut";
+import { PageBand } from "../../../PageBand";
 
 /**
  * One kind of class and its upcoming dated sessions, soonest first. Members pick a date here to sign up.
@@ -33,18 +34,14 @@ export default async function ClassOfPage({ params }: { params: Promise<{ classI
 
   return (
     <section className="club-class-of">
+      <PageBand eyebrow="Fitness class" title={template.name} />
       <p>
         <Link href="/club/classes">All fitness classes</Link>
       </p>
-      <header className="club-page-head">
-        <div>
-          <h1>{template.name}</h1>
-          <p className="club-class-catalog-when" data-testid="class-schedule">
-            {[scheduleWords, roomName].filter(Boolean).join(" · ")}
-          </p>
-          {template.instructor ? <p className="club-meta">with {template.instructor}</p> : null}
-        </div>
-      </header>
+      <p className="club-class-catalog-when" data-testid="class-schedule">
+        {[scheduleWords, roomName].filter(Boolean).join(" · ")}
+      </p>
+      {template.instructor ? <p className="club-meta">with {template.instructor}</p> : null}
       <ClassPlaceholderNote />
       {template.description ? <p className="club-class-catalog-blurb">{template.description}</p> : null}
 

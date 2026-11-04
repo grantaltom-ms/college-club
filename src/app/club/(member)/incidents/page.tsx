@@ -10,6 +10,7 @@ import { formatMoment, pacificDate } from "@/club/time";
 import { viewerOf } from "@/club/web-actor";
 import { SignedOut } from "../SignedOut";
 import { FileIncidentForm, IncidentNoteForm } from "./IncidentForms";
+import { PageBand } from "../PageBand";
 
 /**
  * Report an incident: someone hurt, a capsize, a near miss. For staff and for coaches (members staff have marked), who are the people
@@ -28,7 +29,7 @@ export default async function IncidentsPage() {
 
   return (
     <section>
-      <h1>Report an incident</h1>
+      <PageBand eyebrow="Safety" title="Report an incident" />
       <p>
         Use this when someone is hurt, a boat capsizes, or something nearly goes wrong. Club staff read every report. If anyone needs help right now, call 911 first and fill this in afterwards.
         {actor.kind === "staff" && (

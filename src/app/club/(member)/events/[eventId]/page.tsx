@@ -19,6 +19,7 @@ import { SignedOut } from "../../SignedOut";
 import { rowFor } from "@/club/engine/attendance";
 import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
 import { AttendanceButtons } from "../../AttendanceButtons";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
@@ -74,10 +75,10 @@ export default async function EventPage({ params, searchParams }: { params: Prom
 
   return (
     <section>
+      <PageBand eyebrow="Event" title={event.title} />
       <p>
         <Link href="/club/events">All events</Link>
       </p>
-      <h1>{event.title}</h1>
       <EventPlaceholderNote />
       <p data-testid="event-when">
         {eventWhen(event)} to {formatClock(event.endsAt)}

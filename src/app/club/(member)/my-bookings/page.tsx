@@ -16,6 +16,7 @@ import { AttendanceButtons } from "../AttendanceButtons";
 import { PlaceholderNote } from "../PlaceholderNote";
 import { SelfCheckIn } from "../SelfCheckIn";
 import { SignedOut } from "../SignedOut";
+import { PageBand } from "../PageBand";
 
 const STATUS: Record<Booking["status"], string> = {
   upcoming: "Upcoming",
@@ -116,16 +117,13 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
 
   return (
     <section className="club-bookings">
-      <header className="club-launch-head">
-        <p className="club-kicker">{staff ? "Desk" : "Yours"}</p>
-        <h1>{staff ? "All bookings" : "My bookings"}</h1>
-        {staff && (
-          <p className="club-meta">
-            Correct an automatic no-show on <Link href="/club/admin/reservations">Reservation attendance</Link> — the front desk does not
-            chase missed boat check-ins.
-          </p>
-        )}
-      </header>
+      <PageBand eyebrow={staff ? "Desk" : "Yours"} title={staff ? "All bookings" : "My bookings"} />
+      {staff && (
+        <p className="club-meta club-band-facts">
+          Correct an automatic no-show on <Link href="/club/admin/reservations">Reservation attendance</Link> — the front desk does not
+          chase missed boat check-ins.
+        </p>
+      )}
       <PlaceholderNote />
       {booked && (
         <div className="club-done" role="status">

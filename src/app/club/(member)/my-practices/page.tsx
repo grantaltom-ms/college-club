@@ -6,6 +6,7 @@ import { getCurrentActor } from "@/club/identity";
 import { getClubStore } from "@/club/store/instance";
 import { SignedOut } from "../SignedOut";
 import { whenWords } from "../practices/words";
+import { PageBand } from "../PageBand";
 
 /** The practices a member is seated in, with their boat, seat and side. A record only: a coach or staff change the lineup. */
 export default async function MyPracticesPage() {
@@ -15,7 +16,7 @@ export default async function MyPracticesPage() {
   if (actor.kind === "staff") {
     return (
       <section>
-        <h1>My practices</h1>
+        <PageBand eyebrow="Coaching" title="My practices" />
         <p>
           Staff see every practice on the <Link href="/club/practices">Practices</Link> screen.
         </p>
@@ -27,7 +28,7 @@ export default async function MyPracticesPage() {
 
   return (
     <section>
-      <h1>My practices</h1>
+      <PageBand eyebrow="Yours" title="My practices" />
       <p>
         When a coach or club staff put you in the lineup for a practice, it shows here with your boat, seat and side. Ordinary bookings do not need one. <Link href="/club/my-bookings">My bookings</Link>
       </p>

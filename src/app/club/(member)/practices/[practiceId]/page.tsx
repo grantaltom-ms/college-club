@@ -12,6 +12,7 @@ import { PracticePlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
 import { AddBoatForm, CancelPracticeForm, SeatForm, TakeBoatOffButton, TakeOutButton } from "../PracticeForms";
 import { whenWords } from "../words";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -42,10 +43,7 @@ export default async function PracticePage({ params, searchParams }: { params: P
 
   return (
     <section>
-      <h1>
-        {d.name}
-        {d.status === "cancelled" && <span className="club-tag">Cancelled</span>}
-      </h1>
+      <PageBand eyebrow="Practice" title={d.name} titleTag={d.status === "cancelled" ? "Cancelled" : undefined} />
       <p>
         <Link href={runner ? "/club/practices" : "/club/my-practices"}>{runner ? "Back to practices" : "Back to my practices"}</Link>
       </p>
