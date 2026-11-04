@@ -94,15 +94,17 @@ test.describe("the staff office board", () => {
     await actAs(page, "Test staff");
     await page.goto("/club/admin");
     const look = await page.evaluate(() => {
+      // The probes go inside the members' and staff area (.club-app), because that is where the new look, and so the 42% rule, applies.
+      const host = document.querySelector(".club-app") ?? document.body;
       const b = document.createElement("button");
       b.className = "club-button";
       b.disabled = true;
       b.textContent = "Probe";
-      document.body.appendChild(b);
+      host.appendChild(b);
       const on = document.createElement("button");
       on.className = "club-button";
       on.textContent = "Probe on";
-      document.body.appendChild(on);
+      host.appendChild(on);
       const s = getComputedStyle(b);
       const a = getComputedStyle(on);
       // The design package draws a switched-off button as the same button at 42% strength.

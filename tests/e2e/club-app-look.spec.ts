@@ -46,6 +46,9 @@ test.describe("the members' and staff look", () => {
         await actAs(page, screen.who);
         await page.goto(screen.path);
         await expect(page.locator(".club-band h1")).toBeVisible();
+        // Measure the colours a page settles on, not a link half-way through its 220ms fade because the mouse is resting over it.
+        await page.addStyleTag({ content: "*, *::before, *::after { transition: none !important; animation: none !important; }" });
+        await page.mouse.move(0, 0);
 
         const stray = await page.evaluate((allowed) => {
           const ok = new Set(allowed);
@@ -168,6 +171,23 @@ test.describe("the members' and staff look", () => {
     expect(Math.abs(brand!.y + brand!.height / 2 - (menu!.y + menu!.height / 2))).toBeLessThan(12); // the same row
     expect(acting!.y).toBeGreaterThan(brand!.y + brand!.height - 4); // a row of its own, below
     await expect(page.getByTestId("acting-as")).toHaveText("Acting as Nora Abernathy.");
+  });
+
+  test("on a short phone the open menu ends above the bottom edge, so its last link (Switch test member) can still be reached", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 568 });
+    await actAs(page, "Test staff");
+    await page.goto("/club");
+    await page.getByRole("button", { name: "Menu" }).click();
+    const panel = page.locator("#club-member-nav");
+    await expect(panel).toBeVisible();
+    await panel.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    const last = await panel.getByRole("link", { name: "Switch test member" }).boundingBox();
+    expect(last!.y + last!.height, "the last link's bottom edge, against the 568px screen").toBeLessThanOrEqual(568);
+    // The panel itself stops at the bottom of the screen, and the page behind it does not move.
+    const box = await panel.boundingBox();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(568);
   });
 
   test("the test-build note is a thin strip above the bar, with the same words as before", async ({ page }) => {
