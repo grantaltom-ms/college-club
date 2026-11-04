@@ -54,7 +54,7 @@ function BillLines({ month }: { month: HouseholdBillMonth }) {
   return (
     <ul className="club-bill-lines" aria-label={`${month.label} charges`} data-testid="bill-lines">
       {month.lines.map((l, i) => (
-        <li key={i} className="club-bill-line" data-testid="bill-line" data-kind={l.kind}>
+        <li key={i} className="club-bill-line" data-testid="bill-line" data-kind={l.kind} data-adjustment={l.adjustment ? "1" : undefined}>
           <span className="club-bill-line-desc">
             {l.description}
             {l.amountCents < 0 ? " · credit" : ""}
