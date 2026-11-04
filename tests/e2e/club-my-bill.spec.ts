@@ -36,9 +36,8 @@ test.describe("My bill", () => {
     // Someone else's September snack charge (Whitcombe) and Reed-style tabs never appear.
     await expect(page.getByTestId("bill-lines")).not.toContainText("Whitcombe");
     await expect(page.getByTestId("bill-lines")).not.toContainText("Someone else");
-    await expect(page.getByTestId("bill-total")).toContainText("Total");
     // Dues $154.50 + dinner tickets $90+$45 + bar $38.50 + snack $7.25 + 5 visitors at $10 = $50 → $385.25
-    await expect(page.getByTestId("bill-total")).toContainText(LINDQVIST_OCTOBER);
+    await expect(page.getByTestId("bill-total")).toHaveText(LINDQVIST_OCTOBER);
   });
 
   test("partners in the same household see the same bill; another household's address is page not found", async ({ page, browser, baseURL }) => {
