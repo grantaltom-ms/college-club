@@ -48,7 +48,8 @@ for (const { name, viewport } of [
       const box = (await img.boundingBox())!;
       expect([Math.round(box.width), Math.round(box.height)]).toEqual([36, 36]);
       await expect(link.locator(".ds-wordmark")).toHaveCount(0);
-      expect((await link.boundingBox())!.height, "the link around it is still a 44 pixel tap target").toBeGreaterThanOrEqual(44);
+      const target = (await link.boundingBox())!;
+      expect([target.width >= 44, target.height >= 44], "the link around the picture is a 44 by 44 pixel tap target, not just the 36 pixel picture").toEqual([true, true]);
       await expect(link).toHaveAttribute("href", "/site");
       await expect(page.getByRole("link", { name: LOGO_NAME })).toBeVisible();
     });
