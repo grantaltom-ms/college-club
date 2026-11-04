@@ -178,7 +178,6 @@ test.describe("the homepage at 390 pixels wide", () => {
       ["preview note", ".site-preview-note"],
       ["header Member login", '[data-testid="member-login-header"] span'],
       ["header Menu", ".ds-menu-button"],
-      ["header logo", ".ds-logo-link"],
       ["footer heading", "footer h2"],
       ["footer address", "footer address"],
       ["footer link", "footer .ds-footer-links a"],

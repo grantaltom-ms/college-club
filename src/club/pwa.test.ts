@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -87,7 +89,8 @@ describe("the white logo for the icon", () => {
 
   it("is fetched from this site's own public folder and handed over as a data address once they are", async () => {
     h.logos = true;
-    const fetched = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
+    const png = { "content-type": "image/png" };
+    const fetched = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: png }));
     vi.stubGlobal("fetch", fetched);
     expect(await whiteLogoDataUri("https://club.example.org")).toBe(`data:image/png;base64,${Buffer.from([1, 2, 3]).toString("base64")}`);
     expect(String((fetched.mock.calls[0] as unknown[])[0])).toBe("https://club.example.org/ccs-logo-white.png");
@@ -99,6 +102,26 @@ describe("the white logo for the icon", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
     expect(await whiteLogoDataUri("https://club.example.org")).toBeNull();
     vi.unstubAllGlobals();
+  });
+
+  it("is nothing when the answer is a page and not a picture, as a preview behind Vercel's login wall answers its own request", async () => {
+    h.logos = true;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>Sign in to Vercel</html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } })));
+    expect(await whiteLogoDataUri("https://club.example.org")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 })));
+    expect(await whiteLogoDataUri("https://club.example.org"), "an answer that names no type is not trusted either").toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("is the real white logo file, and an icon drawn with it is a PNG of the right size that differs from the letters-only icon", async () => {
+    const real = readFileSync(join(__dirname, "../../public/ccs-logo-white.png"));
+    const uri = `data:image/png;base64,${real.toString("base64")}`;
+    for (const size of ICON_SIZES) {
+      const withLogo = new Uint8Array(await new ImageResponse(iconElement(size, uri), { width: size, height: size }).arrayBuffer());
+      const letters = new Uint8Array(await new ImageResponse(iconElement(size, null), { width: size, height: size }).arrayBuffer());
+      expect(pngSize(withLogo)).toEqual({ width: size, height: size });
+      expect(Buffer.compare(Buffer.from(withLogo), Buffer.from(letters)), `the ${size} pixel icon must not be the letters-only one`).not.toBe(0);
+    }
   });
 });
 
