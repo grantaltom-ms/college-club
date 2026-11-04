@@ -136,6 +136,8 @@
 .ds-logo-link {
   display: inline-flex;
   align-items: center;
+  /* A 36 pixel picture alone would be a 36 pixel wide target; the link is at least 44 across and the picture sits at its left edge. */
+  min-width: var(--tap-min);
   min-height: 44px;
   color: var(--ink);
   text-decoration: none;

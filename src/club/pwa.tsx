@@ -79,11 +79,16 @@ export function iconElement(size: IconSize, logoDataUri: string | null): ReactEl
   );
 }
 
-/** The white logo as a data address for the icon, fetched from this site's own public folder, or null until the logo file exists. */
+/**
+ * The white logo as a data address for the icon, fetched from this site's own public folder, or null until the logo file exists.
+ * It is also null when the answer is not a PNG: a preview that sits behind Vercel's login wall answers this site's own request
+ * with the sign-in page (a 200 that is not a picture), and drawing that as the logo would break the icon instead of falling back
+ * to the letters CCS.
+ */
 export async function whiteLogoDataUri(origin: string): Promise<string | null> {
   if (!LOGOS_AVAILABLE) return null;
   const res = await fetch(new URL(LOGO_FILES.white, origin));
-  if (!res.ok) return null;
+  if (!res.ok || !(res.headers.get("content-type") ?? "").toLowerCase().startsWith("image/png")) return null;
   return `data:image/png;base64,${Buffer.from(await res.arrayBuffer()).toString("base64")}`;
 }
 

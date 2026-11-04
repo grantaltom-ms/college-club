@@ -136,7 +136,6 @@ test.describe("the sign-in screen at 390 pixels wide", () => {
       expect(box.height, await target.evaluate((el) => el.outerHTML.slice(0, 60))).toBeGreaterThanOrEqual(44);
     }
     const places: [string, string][] = [
-      ["logo stand-in", ".ds-app-band .ds-wordmark"],
       ["Members eyebrow", ".ds-app-band .ds-eyebrow"],
       ["headline", ".ds-app-band h1"],
       ["lead", ".ds-app-lead"],

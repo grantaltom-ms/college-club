@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOGOS_AVAILABLE, LOGO_FILES } from "./brand-assets";
@@ -18,6 +18,22 @@ describe("the logo switch", () => {
 
   it("names the two files the design handoff names", () => {
     expect(LOGO_FILES).toEqual({ black: "/ccs-logo-black.png", white: "/ccs-logo-white.png" });
+  });
+
+  it("is on, since Grant asked for the logos on the public site, the sign-in and demo screens and the phone icons (Nov 4)", () => {
+    expect(LOGOS_AVAILABLE).toBe(true);
+  });
+
+  it.each(["black", "white"] as const)("has a %s logo that is a real PNG, square, big enough for a phone icon and small enough to load fast", (tone) => {
+    const bytes = readFileSync(publicFile(LOGO_FILES[tone]));
+    expect([...bytes.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    const view = new DataView(bytes.buffer, bytes.byteOffset);
+    const [width, height] = [view.getUint32(16), view.getUint32(20)];
+    expect(width, "the picture is drawn into a square box, so it must be square or it would be squashed").toBe(height);
+    expect(width).toBeGreaterThanOrEqual(256);
+    expect(width).toBeLessThanOrEqual(1024);
+    expect(bytes.length).toBeLessThan(100_000);
+    expect(bytes[25], "colour type 6 is RGBA: the picture keeps its transparent background").toBe(6);
   });
 });
 

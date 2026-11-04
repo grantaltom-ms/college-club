@@ -79,7 +79,7 @@ test.describe("the menu", () => {
 
   test("the logo takes you home, and Member login goes to the member sign-in screen", async ({ page }) => {
     await page.goto("/site/contact");
-    await page.getByTestId("site-header").getByRole("link", { name: "College Club Seattle", exact: true }).first().click();
+    await page.getByTestId("site-header").getByRole("link", { name: "College Club Seattle logo", exact: true }).first().click();
     await expect(page).toHaveURL(/\/site$/);
     await page.getByTestId("member-login-header").click();
     await expect(page).toHaveURL(/\/club\/sign-in$/);
