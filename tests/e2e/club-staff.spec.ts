@@ -105,13 +105,15 @@ test.describe("the staff office board", () => {
       document.body.appendChild(on);
       const s = getComputedStyle(b);
       const a = getComputedStyle(on);
-      const out = { off: { bg: s.backgroundColor, cursor: s.cursor }, on: { bg: a.backgroundColor } };
+      // The design package draws a switched-off button as the same button at 42% strength.
+      const out = { off: { opacity: s.opacity, cursor: s.cursor }, on: { opacity: a.opacity } };
       b.remove();
       on.remove();
       return out;
     });
     expect(look.off.cursor).toBe("not-allowed");
-    expect(look.off.bg).not.toBe(look.on.bg);
+    expect(look.off.opacity).toBe("0.42");
+    expect(look.on.opacity).toBe("1");
   });
 
   test("a booking over with nobody checked in is a no-show on its own, and staff can put it right from Reservation attendance", async ({ page }) => {

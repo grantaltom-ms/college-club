@@ -6,6 +6,7 @@ import { getCurrentActor } from "@/club/identity";
 import { readClubOnce } from "@/club/store/read-once";
 import { formatDay } from "@/club/time";
 import { HouseholdView } from "./HouseholdView";
+import { PageBand } from "./PageBand";
 
 export default async function ClubHome() {
   await requireClub();
@@ -13,7 +14,7 @@ export default async function ClubHome() {
   if (!actor) {
     return (
       <section className="club-empty">
-        <h1>Welcome</h1>
+        <PageBand title="Welcome" />
         <p className="club-lead">
           Sign in to see your household, book boats and spaces, and join classes and events. There is no password: the club emails you a one-time link.
         </p>
@@ -40,17 +41,12 @@ export default async function ClubHome() {
   const households = [...state.households].sort((a, b) => a.displayName.localeCompare(b.displayName));
   return (
     <section>
-      <header className="club-page-head">
-        <div>
-          <h1>Households</h1>
-          <p className="club-meta">{households.length} test households. Staff see all of them.</p>
-        </div>
-        <p className="club-page-actions">
-          <Link href="/club/admin/households/new" className="club-button club-button-link" data-testid="add-household-link">
-            Add a household
-          </Link>
-        </p>
-      </header>
+      <PageBand eyebrow="Staff" title="Households">
+        <Link href="/club/admin/households/new" className="club-button club-button-link" data-testid="add-household-link">
+          Add a household
+        </Link>
+      </PageBand>
+      <p className="club-meta club-band-facts">{households.length} test households. Staff see all of them.</p>
       <ul className="club-cards" aria-label="All households">
         {households.map((h) => {
           const adults = membersOf(state, h.id).filter((m) => m.status === "active").length;

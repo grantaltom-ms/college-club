@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -29,11 +30,14 @@ export function MemberNav({
   homeLabel,
   links,
   showSignOut,
+  acting,
 }: {
   homeHref: string;
   homeLabel: string;
   links: MemberNavLink[];
   showSignOut: boolean;
+  /** Who is signed in (or being acted as), written out. It sits at the right of the bar, as in the design package. */
+  acting: string;
 }) {
   const pathname = usePathname() ?? "";
   const [openAt, setOpenAt] = useState<string | null>(null);
@@ -85,12 +89,16 @@ export function MemberNav({
 
   const close = () => setOpenAt(null);
   const allLinks: MemberNavLink[] = [{ href: homeHref, label: homeLabel, group: "mine" }, ...links];
+  /** The page you are on is marked, so the bar can underline it. The home link only counts on its own address. */
+  const isHere = (href: string) => (href === homeHref ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
 
   return (
     <header ref={header} className="club-header" data-open={open ? "" : undefined}>
       <div className="club-header-bar">
-        <Link href="/club" className="club-wordmark" onClick={close}>
-          College Club Seattle
+        <Link href="/club" className="club-brand" onClick={close}>
+          {/* The words beside the mark are the link's name, so the picture itself says nothing extra. */}
+          <Image src="/club-logo-mark.png" alt="" width={40} height={40} className="club-brand-mark" priority />
+          <span className="club-wordmark">College Club Seattle</span>
         </Link>
         <nav id="club-member-nav" className="club-nav" aria-label="Member area">
           {GROUP_ORDER.map((group) => {
@@ -102,7 +110,7 @@ export function MemberNav({
                 <ul>
                   {items.map((item) => (
                     <li key={`${item.href}:${item.label}`}>
-                      <Link href={item.href} onClick={close}>
+                      <Link href={item.href} onClick={close} aria-current={isHere(item.href) ? "page" : undefined}>
                         {item.label}
                       </Link>
                     </li>
@@ -119,6 +127,9 @@ export function MemberNav({
             );
           })}
         </nav>
+        <p className="club-acting" data-testid="acting-as">
+          {acting}
+        </p>
         <div className="club-header-actions">
           <button
             ref={menuButton}

@@ -20,6 +20,7 @@ import {
   type BookBrowse,
 } from "@/club/web-book";
 import { blockedReason, viewerOf } from "@/club/web-actor";
+import { PageBand } from "../PageBand";
 import { PlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
 import { DaySelect } from "./DaySelect";
@@ -301,11 +302,8 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
   return (
     <section className="club-book">
-      <header className="club-launch-head">
-        <p className="club-kicker">Book</p>
-        <h1>Reservations</h1>
-        <p className="club-lead">{lead}</p>
-      </header>
+      <PageBand eyebrow="Equipment & boats" title="Reservations" />
+      <p className="club-lead club-band-facts">{lead}</p>
       <PlaceholderNote />
       {blocked && (
         <p className="club-alert" role="alert" data-testid="blocked-note">
