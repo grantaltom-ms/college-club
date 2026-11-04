@@ -358,6 +358,18 @@ function earnedLines(s: ClubState, rules: BillingRules, month: string): Map<stri
 
 const KIND_ORDER = new Map(BILLING_KINDS.map((k, i) => [k, i]));
 
+const sortLines = (lines: PlannedLine[]): PlannedLine[] =>
+  [...lines].sort((a, b) => KIND_ORDER.get(a.kind)! - KIND_ORDER.get(b.kind)! || Number(a.adjustment) - Number(b.adjustment) || a.description.localeCompare(b.description));
+
+/**
+ * What one household's invoice lines would be for a month, without closing anything. Same categories and wording as
+ * planBilling. Used by My bill for the open month (and any earlier month that has not been billed yet).
+ */
+export function householdEarnedLines(s: ClubState, rules: BillingRules, householdId: string, month: string): PlannedLine[] {
+  if (!isMonth(month)) return [];
+  return sortLines(earnedLines(s, rules, month).get(householdId) ?? []);
+}
+
 /**
  * What closing a month would do, without doing it: each household's invoice, and everything that stops it (a month that
  * has not ended, one already closed, out of order, a household with charges but no QuickBooks ID). Changes nothing.
@@ -386,7 +398,7 @@ export function planBilling(s: ClubState, rules: BillingRules, month: string, no
     .sort((a, b) => a.displayName.localeCompare(b.displayName, "en", { sensitivity: "base" }) || a.id.localeCompare(b.id));
   const prefix = month.slice(2, 4) + month.slice(5, 7);
   const invoices: PlannedInvoice[] = households.map((h, i) => {
-    const mine = [...lines.get(h.id)!].sort((a, b) => KIND_ORDER.get(a.kind)! - KIND_ORDER.get(b.kind)! || Number(a.adjustment) - Number(b.adjustment) || a.description.localeCompare(b.description));
+    const mine = sortLines(lines.get(h.id)!);
     return { householdId: h.id, householdName: h.displayName, quickbooksId: h.quickbooksId, invoiceNo: `${prefix}-${String(i + 1).padStart(4, "0")}`, lines: mine, totalCents: mine.reduce((n, l) => n + l.amountCents, 0) };
   });
   for (const inv of invoices) {

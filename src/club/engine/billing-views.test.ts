@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BILLING_RULES } from "../settings/billing-rules";
-import { recordCharge, recordVisitors, runBilling, voidCharge, voidVisitors } from "./billing";
-import { chargeRows, closedInvoices, closedMonths, householdChoices, linesComplete, memberChoices, visitorRows } from "./billing-views";
+import { householdEarnedLines, planBilling, recordCharge, recordVisitors, runBilling, voidCharge, voidVisitors } from "./billing";
+import { chargeRows, closedInvoices, closedMonths, householdBill, householdBillMonth, householdChoices, linesComplete, memberChoices, visitorRows } from "./billing-views";
 import { createHousehold, endHousehold, setQuickbooksId } from "./households";
 import { clubLedger } from "./ledger";
 import { NOW, STORE_KINDS, fixtureFor, staffCtx, type Fixture } from "./testkit";
@@ -171,5 +171,86 @@ describe.each(STORE_KINDS)("the billing list views (%s store)", (kind) => {
     const same = memberChoices(await read(f)).filter((c) => c.name.startsWith("Ada Quill"));
     expect(same.map((c) => c.name).sort()).toEqual(["Ada Quill (The Other household)", "Ada Quill (The Quill household)"]);
     expect(memberChoices(await read(f)).map((c) => c.name)).toContain("Ben Quill");
+  });
+});
+
+describe.each(STORE_KINDS)("a household's My bill view (%s store)", (kind) => {
+  const setup = async (): Promise<Fixture> => {
+    const f = await fixtureFor(kind)();
+    await setQuickbooksId(f.store, staffCtx(), f.h.Quill, "QB-100");
+    await setQuickbooksId(f.store, staffCtx(), f.h.Reed, "QB-200");
+    return f;
+  };
+  const read = (f: Fixture) => f.store.read();
+
+  it("shows this month's running lines for one household only, including dues and charges", async () => {
+    const f = await setup();
+    await recordCharge(f.store, staffCtx(), { householdId: f.h.Quill, memberId: f.m.Ada, day: "2026-10-20", category: "bar", adjustment: false, amountCents: 1250, description: "Two beers" });
+    await recordCharge(f.store, staffCtx(), { householdId: f.h.Reed, day: "2026-10-20", category: "bar", adjustment: false, amountCents: 9900, description: "Someone else's tab" });
+    await recordVisitors(f.store, staffCtx(), RULES, { memberId: f.m.Ada, visitors: 5, via: "staff", day: "2026-10-15" });
+    const view = householdBill(await read(f), RULES, f.h.Quill, NOW)!;
+    expect(view.householdName).toBe("The Quill household");
+    expect(view.current.month).toBe("2026-10");
+    expect(view.current.status).toBe("open");
+    expect(view.current.lines.map((l) => [l.kind, l.amountCents])).toEqual([
+      ["dues", 15450],
+      ["visitor_fees", 5000],
+      ["bar", 1250],
+    ]);
+    expect(view.current.totalCents).toBe(15450 + 5000 + 1250);
+    expect(view.current.lines.some((l) => l.description.includes("Someone else's"))).toBe(false);
+    expect(view.placeholder).toBe(true);
+    // September is the next month staff would close; it shows as awaiting with dues until then.
+    expect(view.awaiting.map((m) => m.month)).toEqual(["2026-09"]);
+    expect(view.awaiting[0].lines.map((l) => l.kind)).toEqual(["dues"]);
+    expect(view.closed).toEqual([]);
+  });
+
+  it("lists earlier unbilled months separately, and moves them into closed once staff freeze the month", async () => {
+    const f = await setup();
+    await recordCharge(f.store, staffCtx(), { householdId: f.h.Quill, day: "2026-09-12", category: "bar", adjustment: false, amountCents: 2000, description: "September drinks" });
+    await recordCharge(f.store, staffCtx(), { householdId: f.h.Quill, day: "2026-10-05", category: "snack_bar", adjustment: false, amountCents: 300, description: "Chips" });
+    const before = householdBill(await read(f), RULES, f.h.Quill, NOW)!;
+    expect(before.awaiting.map((m) => m.month)).toEqual(["2026-09"]);
+    expect(before.awaiting[0].lines.map((l) => l.kind)).toEqual(["dues", "bar"]);
+    expect(before.current.lines.map((l) => l.kind)).toEqual(["dues", "snack_bar"]);
+
+    await runBilling(f.store, staffCtx(), RULES, "2026-09");
+    const after = householdBill(await read(f), RULES, f.h.Quill, NOW)!;
+    expect(after.awaiting).toEqual([]);
+    expect(after.closed).toHaveLength(1);
+    expect(after.closed[0]).toMatchObject({ month: "2026-09", status: "closed", closedBy: "Test staff" });
+    expect(after.closed[0].invoiceNo).toMatch(/^2609-/);
+    expect(after.closed[0].lines.map((l) => l.kind)).toEqual(["dues", "bar"]);
+    expect(after.closed[0].totalCents).toBe(after.closed[0].lines.reduce((n, l) => n + l.amountCents, 0));
+    // Reed's closed invoice is not on Quill's bill.
+    const reed = householdBill(await read(f), RULES, f.h.Reed, NOW)!;
+    expect(reed.closed[0].invoiceNo).not.toBe(after.closed[0].invoiceNo);
+    expect(reed.closed[0].lines.some((l) => l.kind === "bar")).toBe(false);
+  });
+
+  it("finds one month by its code, and returns null for a stranger household or a blank month", async () => {
+    const f = await setup();
+    await recordCharge(f.store, staffCtx(), { householdId: f.h.Quill, day: "2026-09-12", category: "bar", adjustment: false, amountCents: 500 });
+    await runBilling(f.store, staffCtx(), RULES, "2026-09");
+    const view = householdBill(await read(f), RULES, f.h.Quill, NOW)!;
+    expect(householdBillMonth(view, "2026-10")?.status).toBe("open");
+    expect(householdBillMonth(view, "2026-09")?.status).toBe("closed");
+    // August is before the billing sequence now that September is closed, so it is not on the bill.
+    expect(householdBillMonth(view, "2026-08")).toBeNull();
+    expect(householdBillMonth(view, "not-a-month")).toBeNull();
+    expect(householdBill(await read(f), RULES, "no-such-household", NOW)).toBeNull();
+  });
+
+  it("matches planBilling's lines for a finished month (same engine, no second ledger)", async () => {
+    const f = await setup();
+    await recordCharge(f.store, staffCtx(), { householdId: f.h.Quill, day: "2026-09-18", category: "bar", adjustment: false, amountCents: 1750 });
+    await recordVisitors(f.store, staffCtx(), RULES, { memberId: f.m.Ada, visitors: 6, via: "staff", day: "2026-09-20" });
+    const state = await read(f);
+    const mine = householdEarnedLines(state, RULES, f.h.Quill, "2026-09");
+    // planBilling for September works because October 28 is after September ended.
+    const planned = planBilling(state, RULES, "2026-09", NOW).invoices.find((i) => i.householdId === f.h.Quill)!;
+    expect(mine).toEqual(planned.lines);
+    expect(mine.reduce((n, l) => n + l.amountCents, 0)).toBe(planned.totalCents);
   });
 });
