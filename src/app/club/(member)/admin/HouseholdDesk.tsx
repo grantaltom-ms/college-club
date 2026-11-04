@@ -24,6 +24,15 @@ export function HouseholdDesk({ state, household, typed, problem }: { state: Clu
           <p className="club-meta">The ID this household has in QuickBooks. Monthly billing needs it, and it can only be changed here, with the change written in the household&apos;s file.</p>
           <QuickbooksForm householdId={household.id} current={household.quickbooksId} />
         </div>
+        <div className="club-card" id="household-bill">
+          <h3>Household bill</h3>
+          <p className="club-meta">The last months&apos; invoices still matter after a membership ends.</p>
+          <p>
+            <Link href={`/club/my-bill?household=${household.id}`} className="club-button club-button-link" data-testid="household-bill-link">
+              View bill
+            </Link>
+          </p>
+        </div>
         </div>
       </section>
     );
@@ -58,6 +67,16 @@ export function HouseholdDesk({ state, household, typed, problem }: { state: Clu
           <h3>QuickBooks ID</h3>
           <p className="club-meta">The ID this household has in QuickBooks. Monthly billing needs it, and it can only be changed here, with the change written in the household&apos;s file.</p>
           <QuickbooksForm householdId={household.id} current={household.quickbooksId} />
+        </div>
+
+        <div className="club-card" id="household-bill">
+          <h3>Household bill</h3>
+          <p className="club-meta">What this household will see on My bill: this month so far, any earlier months not yet closed, and past invoices.</p>
+          <p>
+            <Link href={`/club/my-bill?household=${household.id}`} className="club-button club-button-link" data-testid="household-bill-link">
+              View bill
+            </Link>
+          </p>
         </div>
 
         <div className="club-card" id="add-adult">

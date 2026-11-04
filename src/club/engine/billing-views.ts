@@ -1,7 +1,8 @@
+import { pacificDate } from "../time";
 import type { BillingRules, BillingRun, ClubState, VisitVia } from "../types";
-import type { PlannedInvoice } from "./billing";
-import { KIND_LABEL, isBilledDay, visitorsOnDay } from "./billing";
-import { monthLabel, monthOf, visitorFeeCents } from "./billing-words";
+import type { PlannedInvoice, PlannedLine } from "./billing";
+import { KIND_LABEL, householdEarnedLines, isBilledDay, suggestedMonth, visitorsOnDay } from "./billing";
+import { isMonth, monthLabel, monthOf, nextMonth, visitorFeeCents } from "./billing-words";
 import { fullName, householdOf, memberById } from "./queries";
 
 /** What the staff billing screens list: charges, visitor entries and closed months, newest first. Read only; nothing here changes anything. */
@@ -151,4 +152,108 @@ export function closedInvoices(s: ClubState, run: BillingRun): PlannedInvoice[] 
 export function linesComplete(s: ClubState, run: BillingRun): boolean {
   const invoices = new Set(s.billingLines.filter((l) => l.runId === run.id).map((l) => l.invoiceNo));
   return invoices.size === run.invoiceCount;
+}
+
+/** One month on a household's My bill screen: either the open running total or a frozen closed invoice. */
+export interface HouseholdBillMonth {
+  month: string;
+  label: string;
+  /** "open" is still accruing (or finished but not yet closed); "closed" is frozen. */
+  status: "open" | "closed";
+  lines: PlannedLine[];
+  totalCents: number;
+  invoiceNo: string | null;
+  closedAt: string | null;
+  closedBy: string | null;
+}
+
+/** What one household sees on My bill. Read only; built from the same lines staff close into QuickBooks. */
+export interface HouseholdBillView {
+  householdId: string;
+  householdName: string;
+  /** This Pacific calendar month, even when there is nothing on it yet. */
+  current: HouseholdBillMonth;
+  /** Earlier months that have not been closed yet and have something for this household, newest first. */
+  awaiting: HouseholdBillMonth[];
+  /** Closed months that had an invoice for this household, newest first. */
+  closed: HouseholdBillMonth[];
+  placeholder: boolean;
+}
+
+const openMonthView = (s: ClubState, rules: BillingRules, householdId: string, month: string): HouseholdBillMonth => {
+  const lines = householdEarnedLines(s, rules, householdId, month);
+  return {
+    month,
+    label: monthLabel(month),
+    status: "open",
+    lines,
+    totalCents: lines.reduce((n, l) => n + l.amountCents, 0),
+    invoiceNo: null,
+    closedAt: null,
+    closedBy: null,
+  };
+};
+
+/** Every YYYY-MM from `from` up to but not including `until`, oldest first. */
+function monthsUntil(from: string, until: string): string[] {
+  if (!isMonth(from) || !isMonth(until) || from >= until) return [];
+  const out: string[] = [];
+  for (let m = from; m < until; m = nextMonth(m)) out.push(m);
+  return out;
+}
+
+/**
+ * One household's bill: this month so far, any earlier months not yet closed, and every closed invoice. Changes nothing.
+ * Staff and members both read through this so the words and totals match the staff billing screen.
+ */
+export function householdBill(s: ClubState, rules: BillingRules, householdId: string, now: Date): HouseholdBillView | null {
+  const household = householdOf(s, householdId);
+  if (!household) return null;
+  const currentMonth = monthOf(pacificDate(now));
+  // Only months staff can still close in order: after the last closed month, or the month the staff
+  // screen would offer first. Older finished months are left out on purpose (staff pick the starting
+  // month; anything before that is never billed).
+  const latestClosed = s.billingRuns.reduce<string | null>((m, r) => (m === null || r.month > m ? r.month : m), null);
+  const firstOpen = latestClosed !== null ? nextMonth(latestClosed) : suggestedMonth(s, now);
+  const awaiting = monthsUntil(firstOpen, currentMonth)
+    .map((m) => openMonthView(s, rules, householdId, m))
+    .filter((m) => m.lines.length > 0)
+    .reverse();
+
+  // Only months that have this household's frozen invoice among the lines loaded on this screen. An older closed month
+  // whose lines were not loaded simply does not appear (same limit the staff billing files already have).
+  const closed: HouseholdBillMonth[] = [...s.billingRuns]
+    .sort((a, b) => b.month.localeCompare(a.month))
+    .flatMap((run) => {
+      const invoice = closedInvoices(s, run).find((i) => i.householdId === householdId);
+      if (!invoice) return [];
+      return [
+        {
+          month: run.month,
+          label: monthLabel(run.month),
+          status: "closed" as const,
+          lines: invoice.lines,
+          totalCents: invoice.totalCents,
+          invoiceNo: invoice.invoiceNo,
+          closedAt: run.createdAt,
+          closedBy: run.createdBy.label,
+        },
+      ];
+    });
+
+  return {
+    householdId: household.id,
+    householdName: household.displayName,
+    current: openMonthView(s, rules, householdId, currentMonth),
+    awaiting,
+    closed,
+    placeholder: rules.placeholder,
+  };
+}
+
+/** One month from a household's bill, or null when that month has nothing for them (and is not the open current month). */
+export function householdBillMonth(view: HouseholdBillView, month: string): HouseholdBillMonth | null {
+  if (!isMonth(month)) return null;
+  if (view.current.month === month) return view.current;
+  return view.awaiting.find((m) => m.month === month) ?? view.closed.find((m) => m.month === month) ?? null;
 }

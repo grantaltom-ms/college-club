@@ -27,6 +27,7 @@ export default async function MemberLayout({ children }: { children: React.React
     links.push({ href: "/club/classes", label: "Classes", group: "go" });
     links.push({ href: "/club/events", label: "Events", group: "go" });
     if (actor.kind === "member") links.push({ href: "/club/my-classes", label: "My classes", group: "mine" });
+    if (actor.kind === "member") links.push({ href: "/club/my-bill", label: "My bill", group: "mine" });
     if (hasBoats) links.push({ href: "/club/my-boats", label: "My boats", group: "mine" });
     if (actor.kind === "staff" || (actor.kind === "member" && actor.member.isCoach === true)) {
       links.push({ href: "/club/practices", label: "Practices", group: "go" });

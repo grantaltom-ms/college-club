@@ -100,6 +100,7 @@ export function HouseholdView({ state, household, viewerIsStaff }: { state: Club
                 <Link href="/club/classes">Classes</Link>
                 <Link href="/club/events">Events</Link>
                 <Link href="/club/my-bookings">My bookings</Link>
+                <Link href="/club/my-bill">My bill</Link>
                 <Link href="/club/damage">Report damage</Link>
               </nav>
             </>
