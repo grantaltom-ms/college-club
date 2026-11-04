@@ -1,0 +1,960 @@
+/*
+ * The members' and staff look: design package "Waterloo Blocks" (Direction 1a), Nov 4 2026.
+ *
+ * What it is: a white page, a solid Oyster top bar, a blue-grey (Waterloo) title band on every screen, white cards on cool hairlines,
+ * square-ish corners, Cinzel for buttons, labels and the menu, and EB Garamond for reading.
+ *
+ * Where it applies: ONLY inside `.club-app`, which the (member) layout puts around every member and staff page. The dashboard, the
+ * public site, the sign-in screen and the front-desk and snack-bar iPads do not sit inside it, so nothing here can change them.
+ *
+ * The rules of the package, kept here so the next person does not have to guess:
+ *  - The only colours are the ones in the table below. No gradients, no emoji. Oyster is for the top bar (and its pale cousin for zebra rows).
+ *  - All text on Waterloo is white. Debonair is never text. Small text on Oyster is #435661 or darker.
+ *  - One error red (the app's existing --error) for refusals and the danger button. Everything else that used to be green, amber, purple or
+ *    teal is now the palette plus words ("Yours", "Class", "Out of service"), so no meaning depends on colour alone.
+ *  - Square-ish: buttons 2px, form boxes 4px, cards 6px. Every tap target is at least 44px.
+ *  - Form box outlines are Waterloo, not the package's Debonair: Debonair is only 2.7 to 1 on white and a box edge needs 3 to 1.
+ *
+ * tests/e2e/club-app-look.spec.ts holds this: it reads the colours the browser really draws on the converted screens and fails on any
+ * that is not in this palette.
+ */
+
+.club-app {
+  /* The palette (package values). */
+  --app-canvas: #ffffff;
+  --app-line: #c3cbce; /* cool line: card borders, rows, dividers on white */
+  --app-line-warm: #d3ccbc; /* the bottom edge of the Oyster top bar, nowhere else */
+  --app-row-alt: #f5f3ec; /* zebra rows only */
+  --app-selected: #e6ebed; /* selected cell, status chip, quiet hover */
+  --app-focus: #7f96a0;
+  --app-waterloo: #536872;
+  --app-waterloo-hover: #435661;
+  --app-cyberspace: #44484d;
+  --app-ink: #33363a;
+  --app-slate: #6c7176;
+  --app-oyster: #e2ddd0;
+
+  /* Remap the older tokens inside this area only, so pages not yet converted drop their beige, warm lines and round corners too. */
+  --paper: var(--app-canvas);
+  --card: var(--app-canvas);
+  --hairline: var(--app-line);
+  --grid: var(--app-line);
+  --oyster-50: var(--app-selected);
+  --waterloo-dark: var(--app-waterloo-hover);
+  --focus: var(--app-focus);
+  --radius-card: 6px;
+  --radius-card-lg: 6px;
+  --radius-input: 4px;
+  --shadow-xs: 0 1px 2px rgba(51, 54, 58, 0.06);
+  --shadow-md: 0 8px 24px rgba(51, 54, 58, 0.1);
+
+  /* The page frame: 1240px wide with a 32px gutter (16px on a phone). */
+  --container: 1240px;
+  --gutter: 32px;
+
+  min-height: 100vh;
+  background: var(--app-canvas);
+  color: var(--app-cyberspace);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+@media (max-width: 599px) {
+  .club-app {
+    --gutter: 16px;
+  }
+}
+
+.club-app :focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Test-build strip, top bar, menu ---------- */
+
+.club-app .club-banner {
+  margin: 0;
+  padding: 8px var(--gutter);
+  background: var(--app-selected);
+  border: 0;
+  border-bottom: 1px solid var(--app-line);
+  border-radius: 0;
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--app-ink);
+}
+
+.club-app .club-header {
+  background: var(--app-oyster);
+  border-bottom: 1px solid var(--app-line-warm);
+  backdrop-filter: none;
+}
+
+.club-app .club-header-bar {
+  box-sizing: border-box;
+  max-width: var(--container);
+  min-height: 72px;
+  padding: 0 var(--gutter);
+  gap: 4px 32px;
+}
+
+.club-app .club-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--tap-min);
+  color: var(--app-ink);
+  text-decoration: none;
+}
+
+.club-app .club-brand-mark {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.club-app .club-wordmark {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--app-ink);
+}
+
+@media (max-width: 599px) {
+  .club-app .club-header-bar {
+    gap: 0 8px;
+  }
+
+  .club-app .club-brand {
+    gap: 8px;
+  }
+
+  .club-app .club-wordmark {
+    font-size: 13px;
+    letter-spacing: 0.08em;
+  }
+}
+
+/* Who is signed in. At the right of the bar on a wide screen; its own thin row under the bar on a phone. */
+.club-app .club-acting {
+  order: 3;
+  flex: 1 0 100%;
+  margin: 0;
+  padding: 0 0 8px;
+  font-family: var(--body);
+  font-size: 16px;
+  color: var(--app-cyberspace);
+}
+
+.club-app .club-header-actions {
+  order: 2;
+}
+
+.club-app .club-menu-button {
+  border-radius: 2px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--app-cyberspace);
+}
+
+.club-app .club-menu-button:hover {
+  background: var(--app-selected);
+}
+
+/* The phone menu: a panel under the bar. */
+.club-app .club-nav {
+  background: var(--app-oyster);
+  border-bottom: 1px solid var(--app-line-warm);
+}
+
+.club-app .club-nav-group-label {
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--app-waterloo-hover);
+}
+
+.club-app .club-nav li + li a,
+.club-app .club-nav li + li form {
+  border-top-color: var(--app-line-warm);
+}
+
+.club-app .club-nav a,
+.club-app .club-nav button {
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--app-cyberspace);
+  transition: color 220ms var(--ease);
+}
+
+.club-app .club-nav a:hover,
+.club-app .club-nav button:hover {
+  color: var(--app-waterloo-hover);
+  text-decoration: none;
+}
+
+.club-app .club-nav a[aria-current="page"] {
+  color: var(--app-ink);
+}
+
+.club-app .club-scrim {
+  background: rgba(51, 54, 58, 0.45);
+}
+
+/* The phone panel may be no taller than what is left of the screen under the bar (MemberNav measures where the bar ends). */
+@media (max-width: 899px) {
+  .club-app .club-nav {
+    max-height: calc(100vh - var(--club-menu-top, 120px));
+    max-height: calc(100dvh - var(--club-menu-top, 120px));
+  }
+}
+
+@media (min-width: 900px) {
+  .club-app .club-acting {
+    order: 2;
+    flex: 0 0 auto;
+    padding: 0;
+    white-space: nowrap;
+  }
+
+  .club-app .club-nav {
+    order: 1;
+    gap: 0 4px;
+    justify-content: flex-start;
+    background: none;
+    border: 0;
+  }
+
+  /* A row of text items: 44px tall, a 2px line under the page you are on. */
+  .club-app .club-nav a,
+  .club-app .club-nav button {
+    min-height: var(--tap-min);
+    padding: 0 14px;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--app-cyberspace);
+  }
+
+  .club-app .club-nav a:hover,
+  .club-app .club-nav button:hover {
+    background: none;
+    color: var(--app-waterloo-hover);
+  }
+
+  .club-app .club-nav a[aria-current="page"] {
+    color: var(--app-ink);
+    border-bottom-color: var(--app-waterloo);
+  }
+}
+
+/* ---------- Frame, title band, headings ---------- */
+
+.club-app .club-frame {
+  box-sizing: border-box;
+  max-width: var(--container);
+  padding: 0 var(--gutter);
+}
+
+.club-app main {
+  padding-bottom: 64px;
+}
+
+/* A screen that has not been given a title band yet still gets room under the bar. */
+.club-app main:not(:has(.club-band)) {
+  padding-top: 32px;
+}
+
+/*
+ * The band is as wide as the page frame, and paints itself out to both edges of the window with a very wide shadow that
+ * clip-path trims to the band's own height. That way it is full-bleed without making the page scroll sideways.
+ */
+.club-app .club-band {
+  margin: 0 0 28px;
+  background: var(--app-waterloo);
+  color: #ffffff;
+  box-shadow: 0 0 0 100vmax var(--app-waterloo);
+  clip-path: inset(0 -100vmax);
+}
+
+.club-app .club-band-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 36px 0;
+}
+
+.club-app .club-band-text {
+  min-width: 0;
+}
+
+.club-app .club-band-eyebrow {
+  margin: 0 0 10px;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.club-app .club-band h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+@media (max-width: 599px) {
+  .club-app .club-band h1 {
+    font-size: 28px;
+  }
+
+  .club-app .club-band-inner {
+    padding: 28px 0;
+  }
+}
+
+.club-app .club-band-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Inside the band, buttons are the package's "light" (main) and "ghostLight" (secondary). */
+.club-app .club-band .club-button {
+  margin: 0;
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--app-ink);
+}
+
+.club-app .club-band a.club-button-link {
+  color: var(--app-ink);
+}
+
+.club-app .club-band .club-button:hover {
+  background: var(--app-oyster);
+  border-color: var(--app-oyster);
+}
+
+.club-app .club-band .club-button-quiet,
+.club-app .club-band a.club-button-quiet {
+  background: transparent;
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.club-app .club-band .club-button-quiet:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--app-ink);
+}
+
+/* The line of facts or the question that sits just under a title band. */
+.club-app .club-band-facts {
+  margin: 0 0 20px;
+}
+
+.club-app h1,
+.club-app h2,
+.club-app h3 {
+  font-family: var(--display);
+  color: var(--app-ink);
+}
+
+.club-app h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.club-app h3 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.club-app .club-meta {
+  font-size: 16px;
+  color: var(--app-slate);
+}
+
+.club-app .club-lead {
+  font-size: 18px;
+  color: var(--app-cyberspace);
+}
+
+.club-app main a:not([class]) {
+  color: var(--app-waterloo);
+  transition: color 220ms var(--ease);
+}
+
+.club-app main a:not([class]):hover {
+  color: var(--app-ink);
+}
+
+/* The small label above a heading (Cinzel, spaced, uppercase). */
+.club-app .club-kicker {
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--app-slate);
+}
+
+/* ---------- Buttons: primary, outline, light, ghostLight, dark, link ---------- */
+
+.club-app .club-button {
+  box-sizing: border-box;
+  min-height: var(--tap-min);
+  padding: 0 24px;
+  border-radius: 2px;
+  border: 1px solid var(--app-waterloo);
+  background: var(--app-waterloo);
+  color: #ffffff;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  transition: background-color 220ms var(--ease), border-color 220ms var(--ease), color 220ms var(--ease);
+}
+
+.club-app .club-button:hover {
+  background: var(--app-waterloo-hover);
+  border-color: var(--app-waterloo-hover);
+  color: #ffffff;
+}
+
+.club-app a.club-button-link {
+  color: #ffffff;
+}
+
+/* The page's main action is the same blue-grey as any button; the package has one primary. */
+.club-app .club-button-primary {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+}
+
+.club-app .club-button-primary:hover {
+  background: var(--app-waterloo-hover);
+  border-color: var(--app-waterloo-hover);
+}
+
+.club-app .club-button-xl {
+  min-height: 52px;
+  padding: 0 34px;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+}
+
+/* Outline: the quiet choice next to a main one. */
+.club-app .club-button-quiet,
+.club-app a.club-button-quiet {
+  background: transparent;
+  border-color: var(--app-waterloo);
+  color: var(--app-waterloo);
+}
+
+.club-app .club-button-quiet:hover {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+}
+
+/* Danger: the one error red. */
+.club-app .club-button-danger {
+  background: var(--error);
+  border-color: var(--error);
+}
+
+.club-app .club-button-danger:hover {
+  background: var(--app-ink);
+  border-color: var(--app-ink);
+}
+
+/* Switched off: the same button at 42% strength, with a "not allowed" cursor. */
+.club-app .club-button:disabled,
+.club-app .club-button:disabled:hover {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+/* ---------- Cards ---------- */
+
+.club-app .club-card,
+.club-app .club-shortcut,
+.club-app .club-today a,
+.club-app .club-book-choose-card,
+.club-app .club-hero-action {
+  background: #ffffff;
+  border: 1px solid var(--app-line);
+  border-radius: 6px;
+  box-shadow: var(--shadow-xs);
+}
+
+.club-app .club-card {
+  padding: 20px 24px;
+}
+
+.club-app .club-shortcut:hover,
+.club-app .club-today a:hover,
+.club-app .club-book-choose-card:hover,
+.club-app .club-book-choose-card:focus-visible {
+  border-color: var(--app-line);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.club-app .club-shortcut,
+.club-app .club-book-choose-card {
+  transition: box-shadow 220ms var(--ease), transform 220ms var(--ease);
+}
+
+.club-app .club-shortcut-quiet {
+  background: #ffffff;
+}
+
+.club-app .club-hero-action {
+  padding: 32px 24px;
+  box-shadow: var(--shadow-xs);
+}
+
+/* The one highlight card on a screen: solid Waterloo, all text white. Its buttons are the "light" ones. */
+.club-app .club-card-highlight {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+}
+
+.club-app .club-card-highlight .club-lead,
+.club-app .club-card-highlight p {
+  color: #ffffff;
+}
+
+.club-app .club-card-highlight .club-button {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--app-ink);
+}
+
+.club-app .club-card-highlight .club-button:hover {
+  background: var(--app-oyster);
+  border-color: var(--app-oyster);
+  color: var(--app-ink);
+}
+
+.club-app .club-card-highlight .club-quiet-links a {
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.club-app .club-quiet-links {
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.club-app .club-quiet-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  color: var(--app-waterloo);
+}
+
+.club-app .club-empty-inline {
+  border-color: var(--app-line);
+}
+
+.club-app .club-history li {
+  border-bottom-color: var(--app-line);
+}
+
+/* ---------- Status chips: square, Cinzel, spaced. Words carry the meaning, not colour. ---------- */
+
+.club-app .club-chip {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 0;
+  background: var(--app-selected);
+  color: var(--app-waterloo-hover);
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.club-app .club-chip-active {
+  background: var(--app-waterloo);
+  color: #ffffff;
+}
+
+.club-app .club-chip-removed,
+.club-app .club-chip-household_ended {
+  background: #ffffff;
+  border: 1px solid var(--app-waterloo-hover);
+  color: var(--app-ink);
+}
+
+.club-app .club-chips a {
+  border-radius: 2px;
+  background: #ffffff;
+  border-color: var(--app-line);
+  color: var(--app-ink);
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.club-app .club-chips a[aria-current="page"] {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+}
+
+/* ---------- Form boxes ---------- */
+
+.club-app .club-form label {
+  margin-bottom: 6px;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--app-ink);
+}
+
+.club-app .club-form .club-check,
+.club-app .club-form .club-check label {
+  font-family: var(--body);
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.club-app .club-form select,
+.club-app .club-form input[type="text"],
+.club-app .club-form input[type="email"],
+.club-app .club-form input[type="tel"],
+.club-app .club-form input[type="date"],
+.club-app .club-form textarea {
+  background: #ffffff;
+  border: 1px solid var(--app-waterloo);
+  border-radius: 4px;
+  color: var(--app-cyberspace);
+  font-family: var(--body);
+  font-size: 17px;
+}
+
+.club-app .club-form select:focus,
+.club-app .club-form input:focus,
+.club-app .club-form textarea:focus {
+  border-color: var(--app-waterloo);
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+}
+
+.club-app .club-form fieldset {
+  border-color: var(--app-line);
+  border-radius: 6px;
+}
+
+/* ---------- Notes: refusals in the one error red; everything else in the palette ---------- */
+
+.club-app .club-alert,
+.club-app .club-success,
+.club-app .club-placeholder {
+  border-radius: 4px;
+  font-family: var(--body);
+  font-size: 17px;
+  color: var(--app-ink);
+}
+
+.club-app .club-alert {
+  background: #ffffff;
+  border-color: var(--error);
+  border-left-width: 4px;
+}
+
+.club-app .club-success {
+  background: var(--app-selected);
+  border-color: var(--app-waterloo);
+}
+
+.club-app .club-placeholder {
+  background: var(--app-selected);
+  border-color: var(--app-waterloo-hover);
+  border-style: dashed;
+  font-size: 16px;
+}
+
+.club-app .club-done,
+.club-app .club-done-wait {
+  background: var(--app-selected);
+  border-color: var(--app-waterloo);
+}
+
+/* ---------- Booking slots and the Reservations screen ---------- */
+
+.club-app .slot {
+  border-radius: 2px;
+  font-family: var(--body);
+  font-size: 15px;
+}
+
+/* Free: a Waterloo outline, to tap. Booked by someone else: solid Waterloo. Yours: solid Cyberspace, and it says so. */
+.club-app .slot-free {
+  background: #ffffff;
+  border-color: var(--app-waterloo);
+  color: var(--app-waterloo);
+}
+
+.club-app a.slot-free:hover,
+.club-app a.slot-free:focus-visible {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+}
+
+.club-app .slot-booked,
+.club-app .slot-taken {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.club-app .slot-yours {
+  background: var(--app-cyberspace);
+  border-color: var(--app-cyberspace);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Class, practice, out of service: a pale tint with a dashed edge and the word in the slot. */
+.club-app .slot-class,
+.club-app .slot-practice,
+.club-app .slot-out_of_service {
+  background: var(--app-selected);
+  border: 1px dashed var(--app-waterloo-hover);
+  color: var(--app-ink);
+}
+
+.club-app .slot-past,
+.club-app .slot-not_open {
+  background: transparent;
+  border: 1px dashed var(--app-line);
+  color: var(--app-slate);
+}
+
+/* The Reservations screen's own variables, folded into the palette (it had a cool lake blue and a green of its own). */
+.club-app .club-book {
+  --book-ink: var(--app-ink);
+  --book-muted: var(--app-slate);
+  --book-line: var(--app-line);
+  --book-card: #ffffff;
+  --book-wash: var(--app-selected);
+  --book-lake: var(--app-waterloo);
+  --book-lake-deep: var(--app-waterloo-hover);
+  --book-yours: var(--app-cyberspace);
+  --book-yours-wash: var(--app-cyberspace);
+  --book-taken: var(--app-waterloo);
+  --book-taken-ink: #ffffff;
+}
+
+.club-app .club-book .club-lead {
+  color: var(--app-cyberspace);
+}
+
+.club-app .club-book-choose-label {
+  letter-spacing: 0.03em;
+  color: var(--app-ink);
+}
+
+.club-app .club-book-choose-hint {
+  font-family: var(--body);
+  font-size: 16px;
+  color: var(--app-slate);
+}
+
+.club-app .club-book .slot-free {
+  background: #ffffff;
+  border-color: var(--app-waterloo);
+  color: var(--app-waterloo);
+}
+
+.club-app .club-book a.slot-free:hover,
+.club-app .club-book a.slot-free:focus-visible {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+}
+
+.club-app .club-book .slot-yours {
+  background: var(--app-cyberspace);
+  border-color: var(--app-cyberspace);
+  color: #ffffff;
+}
+
+.club-app .club-book .slot-booked,
+.club-app .club-book .slot-taken {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+}
+
+/* The dense shell picker: free time chips are outlined to tap, yours are Cyberspace, taken ones are solid Waterloo. */
+.club-app .club-shell-chip {
+  border-radius: 2px;
+  font-family: var(--body);
+  font-size: 15px;
+}
+
+.club-app .club-shell-chip-free {
+  background: #ffffff;
+  border: 1px solid var(--app-waterloo);
+  color: var(--app-waterloo);
+}
+
+.club-app .club-shell-chip-free:hover {
+  background: var(--app-waterloo);
+  color: #ffffff;
+}
+
+.club-app .club-shell-chip-yours {
+  background: var(--app-cyberspace);
+  border: 1px solid var(--app-cyberspace);
+  color: #ffffff;
+}
+
+.club-app .club-shell-chip-taken {
+  background: var(--app-waterloo);
+  border: 1px solid var(--app-waterloo);
+  color: #ffffff;
+}
+
+.club-app .club-shell-chip-muted {
+  background: transparent;
+  border: 1px dashed var(--app-line);
+  color: var(--app-slate);
+}
+
+/* Small text on the Reservations screens: reading type is EB Garamond, labels are Cinzel. */
+.club-app .club-book-choose-hint,
+.club-app .club-book-shell-size-hint,
+.club-app .club-book-context-label,
+.club-app .club-book-legend,
+.club-app .club-shell-dense-count,
+.club-app .club-shell-row-meta,
+.club-app .club-shell-row-weight,
+.club-app .club-shell-row-foot,
+.club-app .club-book-item-foot,
+.club-app .club-shell-window-change,
+.club-app .club-shell-pick-hour,
+.club-app .club-rules-quiet,
+.club-app .club-confirm-primary [data-testid="check-ok"],
+.club-app .club-length-label {
+  font-family: var(--body);
+  font-size: 16px;
+}
+
+.club-app .club-book-day-label,
+.club-app .club-shell-window-label {
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--app-slate);
+}
+
+.club-app .club-book .club-slots-compact .slot small,
+.club-app .club-shell-chip small {
+  font-size: 13px;
+}
+
+.club-app .club-back {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.club-app .club-back a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  color: var(--app-waterloo);
+}
+
+.club-app .club-book-day-select select,
+.club-app .club-book-hour select {
+  border: 1px solid var(--app-waterloo);
+  border-radius: 4px;
+  background: #ffffff;
+  font-family: var(--body);
+  font-size: 17px;
+  color: var(--app-cyberspace);
+}
+
+/* The booking form: how long, and the big confirm box. */
+.club-app .club-length-chip {
+  border-radius: 2px;
+  border-color: var(--app-line);
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  min-height: var(--tap-min);
+}
+
+.club-app .club-length-chip[aria-current="page"] {
+  background: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+  color: #ffffff;
+}
+
+.club-app .club-confirm-primary {
+  border: 1px solid var(--app-line);
+  border-radius: 6px;
+  box-shadow: var(--shadow-xs);
+}
+
+.club-app .club-book-item {
+  border-radius: 6px;
+}
+
+.club-app .club-book-shell-size {
+  border-radius: 6px;
+}
+
+.club-app .club-book-shell-size-hint {
+  color: var(--app-slate);
+}

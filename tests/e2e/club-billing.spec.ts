@@ -117,8 +117,10 @@ test.describe("charges", () => {
     await expect(bar.getByRole("button", { name: /^Void/ })).toBeVisible();
     // The form was cleared for the next one, and the newest charge is above the older one.
     await expect(page.getByTestId("charge-form").getByLabel(/^Amount/)).toHaveValue("");
-    const rows = await page.getByTestId("charge-row").filter({ hasText: t }).allTextContents();
-    expect(rows).toHaveLength(2);
+    // The new charge shows when the page refreshes, a moment after the "added" message and the cleared form: wait for both rows.
+    const mine = page.getByTestId("charge-row").filter({ hasText: t });
+    await expect(mine).toHaveCount(2);
+    const rows = await mine.allTextContents();
     expect(rows[0]).toContain(`Chips ${t}`);
     expect(rows[1]).toContain(`Round for the crew ${t}`);
   });

@@ -94,24 +94,28 @@ test.describe("the staff office board", () => {
     await actAs(page, "Test staff");
     await page.goto("/club/admin");
     const look = await page.evaluate(() => {
+      // The probes go inside the members' and staff area (.club-app), because that is where the new look, and so the 42% rule, applies.
+      const host = document.querySelector(".club-app") ?? document.body;
       const b = document.createElement("button");
       b.className = "club-button";
       b.disabled = true;
       b.textContent = "Probe";
-      document.body.appendChild(b);
+      host.appendChild(b);
       const on = document.createElement("button");
       on.className = "club-button";
       on.textContent = "Probe on";
-      document.body.appendChild(on);
+      host.appendChild(on);
       const s = getComputedStyle(b);
       const a = getComputedStyle(on);
-      const out = { off: { bg: s.backgroundColor, cursor: s.cursor }, on: { bg: a.backgroundColor } };
+      // The design package draws a switched-off button as the same button at 42% strength.
+      const out = { off: { opacity: s.opacity, cursor: s.cursor }, on: { opacity: a.opacity } };
       b.remove();
       on.remove();
       return out;
     });
     expect(look.off.cursor).toBe("not-allowed");
-    expect(look.off.bg).not.toBe(look.on.bg);
+    expect(look.off.opacity).toBe("0.42");
+    expect(look.on.opacity).toBe("1");
   });
 
   test("a booking over with nobody checked in is a no-show on its own, and staff can put it right from Reservation attendance", async ({ page }) => {

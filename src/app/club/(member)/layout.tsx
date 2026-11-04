@@ -5,13 +5,15 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { memberAppMetadata, memberAppViewport } from "@/club/pwa";
 import { readClubOnce } from "@/club/store/read-once";
+import "../club-app.css";
 import { MemberNav, type MemberNavLink } from "./MemberNav";
 
 export const generateMetadata = (): Promise<Metadata> => memberAppMetadata();
 export const generateViewport = (): Promise<Viewport> => memberAppViewport();
 
 /**
- * The menu bar, the test-build banner and the "acting as" line, around every member and staff page. The front-desk iPad
+ * The test-build banner, the menu bar (with the "acting as" line at its right) and the page frame, around every member and staff page.
+ * `.club-app` is what scopes the Nov 2026 look (club-app.css) to this folder: nothing outside it changes. The front-desk iPad
  * (app/club/ipad) sits outside this folder on purpose: a shared screen should not show anyone's menu.
  */
 export default async function MemberLayout({ children }: { children: React.ReactNode }) {
@@ -43,29 +45,30 @@ export default async function MemberLayout({ children }: { children: React.React
   if (actor === null) links.push({ href: "/club/sign-in", label: "Sign in", group: "account" });
   if (pickerEnabled()) links.push({ href: "/club/act-as", label: "Switch test member", group: "account" });
 
+  const acting =
+    actor === null
+      ? "Not acting as anyone."
+      : actor.source === "login"
+        ? `Signed in as ${actor.kind === "staff" ? actor.label : fullName(actor.member)}.`
+        : actor.kind === "staff"
+          ? `Acting as ${actor.label}.`
+          : `Acting as ${fullName(actor.member)}.`;
+
   return (
-    <>
+    <div className="club-app">
+      <p className="club-banner" role="note">
+        Test build. Every household, member and booking here is invented. Nothing is connected to real club data.
+      </p>
       <MemberNav
         homeHref="/club"
         homeLabel={actor?.kind === "staff" ? "Households" : "My household"}
         links={links}
         showSignOut={actor?.source === "login"}
+        acting={acting}
       />
       <div className="club-frame">
-        <p className="club-banner" role="note">
-          Test build. Every household, member and booking here is invented. Nothing is connected to real club data.
-        </p>
-        <p className="club-acting" data-testid="acting-as">
-          {actor === null
-            ? "Not acting as anyone."
-            : actor.source === "login"
-              ? `Signed in as ${actor.kind === "staff" ? actor.label : fullName(actor.member)}.`
-              : actor.kind === "staff"
-                ? `Acting as ${actor.label}.`
-                : `Acting as ${fullName(actor.member)}.`}
-        </p>
         <main>{children}</main>
       </div>
-    </>
+    </div>
   );
 }

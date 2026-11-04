@@ -3,6 +3,7 @@ import { bookingBlockReason } from "@/club/engine/eligibility";
 import { fullName, historyOf, membersOf, qualificationsOf } from "@/club/engine/queries";
 import { formatDay, formatMoment } from "@/club/time";
 import type { ClubState, Household, Member } from "@/club/types";
+import { PageBand } from "./PageBand";
 
 const ROLE = { primary: "Primary adult", additional: "Additional adult" } as const;
 const STATUS = { active: "Active", removed: "Left the household", household_ended: "Membership ended" } as const;
@@ -65,18 +66,15 @@ export function HouseholdView({ state, household, viewerIsStaff }: { state: Club
 
   return (
     <article className={viewerIsStaff ? undefined : "club-launch"}>
-      <header className="club-launch-head">
-        <p className="club-kicker">{viewerIsStaff ? "Household" : "Your household"}</p>
-        <h1 data-testid="household-name">{household.displayName}</h1>
-        <p className="club-meta" data-testid="household-facts">
-          {household.membershipType} · joined {formatDay(household.joinedOn)} ·{" "}
-          {household.status === "ended" ? (
-            <strong>membership ended {formatDay(household.endedOn!)}</strong>
-          ) : (
-            <span className="club-chip club-chip-active">Active</span>
-          )}
-        </p>
-      </header>
+      <PageBand eyebrow={viewerIsStaff ? "Household" : "Your household"} title={household.displayName} titleTestId="household-name" />
+      <p className="club-meta club-band-facts" data-testid="household-facts">
+        {household.membershipType} · joined {formatDay(household.joinedOn)} ·{" "}
+        {household.status === "ended" ? (
+          <strong>membership ended {formatDay(household.endedOn!)}</strong>
+        ) : (
+          <span className="club-chip club-chip-active">Active</span>
+        )}
+      </p>
 
       {viewerIsStaff && (
         <dl className="club-slots" aria-label="Household records">
@@ -87,7 +85,7 @@ export function HouseholdView({ state, household, viewerIsStaff }: { state: Club
       )}
 
       {!viewerIsStaff && household.status === "active" && (
-        <div className="club-hero-action">
+        <div className={canBook ? "club-hero-action club-card-highlight" : "club-hero-action"}>
           {canBook ? (
             <>
               <p className="club-lead">Ready when you are.</p>
