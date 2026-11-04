@@ -15,6 +15,12 @@ Grant Carlson is a board member and House Committee chair at College Club Seattl
 
 Other people: Caitlin Sogn and Julia (staff) will edit this system with Claude Code themselves. Write code and settings so they can.
 
+## Look and feel (club + public site)
+
+CCS screens share one brand (warm paper, ink, lake greys, Sun accent; Cinzel / EB Garamond / Figtree). The member app feels like a **front desk**, not a SaaS dashboard: one job per screen, plain-English refusals, phone-sized taps. The public site uses the same tokens with the `ds-` pieces (Sun CTA, hero budget). Tokens live in `src/app/globals.css` — do not invent new colours or fonts.
+
+**When building or restyling `/club` or `/site` UI, read the project skill** `.cursor/skills/ccs-design/SKILL.md` (or invoke `/ccs-design`). Do not apply that skill to the usage dashboard unless Grant asked.
+
 ## Decisions made on Oct 22, 2026
 
 - **Build path: full replacement.** This app, on Vercel, will become both the CCS public website and its reservation and events system, replacing Wix and iCrew. (Open question 2: answered.)
