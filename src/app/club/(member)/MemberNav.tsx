@@ -52,6 +52,13 @@ export function MemberNav({
     page.style.overflow = "hidden";
     header.current?.querySelector<HTMLElement>(".club-nav a")?.focus();
 
+    // The panel opens under the bar, which is taller than it looks (the "acting as" row, and the test-build strip above it), so measure
+    // where the bar ends instead of guessing: otherwise the last links fall below a short phone screen and the page behind cannot scroll.
+    const bar = header.current;
+    const placePanel = () => bar?.style.setProperty("--club-menu-top", `${Math.round(bar.getBoundingClientRect().bottom)}px`);
+    placePanel();
+    window.addEventListener("resize", placePanel);
+
     const wide = window.matchMedia("(min-width: 900px)");
     const closeWhenWide = () => {
       if (wide.matches) setOpenAt(null);
@@ -82,6 +89,8 @@ export function MemberNav({
 
     return () => {
       page.style.overflow = scrollBefore;
+      window.removeEventListener("resize", placePanel);
+      bar?.style.removeProperty("--club-menu-top");
       wide.removeEventListener("change", closeWhenWide);
       document.removeEventListener("keydown", onKey);
     };

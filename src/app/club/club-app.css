@@ -211,6 +211,14 @@
   background: rgba(51, 54, 58, 0.45);
 }
 
+/* The phone panel may be no taller than what is left of the screen under the bar (MemberNav measures where the bar ends). */
+@media (max-width: 899px) {
+  .club-app .club-nav {
+    max-height: calc(100vh - var(--club-menu-top, 120px));
+    max-height: calc(100dvh - var(--club-menu-top, 120px));
+  }
+}
+
 @media (min-width: 900px) {
   .club-app .club-acting {
     order: 2;
