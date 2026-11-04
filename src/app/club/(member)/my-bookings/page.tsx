@@ -119,6 +119,12 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
       <header className="club-launch-head">
         <p className="club-kicker">{staff ? "Desk" : "Yours"}</p>
         <h1>{staff ? "All bookings" : "My bookings"}</h1>
+        {staff && (
+          <p className="club-meta">
+            Correct an automatic no-show on <Link href="/club/admin/reservations">Reservation attendance</Link> — the front desk does not
+            chase missed boat check-ins.
+          </p>
+        )}
       </header>
       <PlaceholderNote />
       {booked && (

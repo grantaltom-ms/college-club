@@ -8,7 +8,8 @@ import { officeDamage, type OfficeDamage } from "./damage";
 import { officeIncidents, type OfficeIncidents } from "./incidents";
 
 /**
- * What staff see first thing: what needs a look, what is on today, what is out of service and what has people waiting.
+ * What staff see on the Attention board: today, damage, incidents, out of service, waitlists.
+ * Automatic no-shows (`needsLook`) are still computed for Reservation attendance; the front desk does not chase them.
  * The building comparison: the manager's board by the front desk. Everything here is worked out from the club's records;
  * nothing is stored for it.
  */

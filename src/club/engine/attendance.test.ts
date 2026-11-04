@@ -354,7 +354,7 @@ describe("the automatic no-show as a plain rule", () => {
       "Room Space and Work Space reservations do not need a check-in: they are never marked a no-show.",
       "Members can check themselves in on the front-desk iPad or on their own phone while check-in is open; the record shows which. Events are not checked in by members.",
       "Events are not marked automatically; staff mark who came.",
-      "Staff can correct any of these afterwards. The correction is added to the record; nothing is erased.",
+      "Staff can correct any of these afterwards on Reservation attendance or All bookings. A missed check-in does not need a staff chase; the correction is added to the record and nothing is erased.",
     ]);
     // With nothing exempt, the line is left out; with three kinds it reads as a list.
     expect(describeAttendanceRules(rulesWith({ checkInNotNeededFor: [] })).join(" ")).not.toContain("do not need a check-in");

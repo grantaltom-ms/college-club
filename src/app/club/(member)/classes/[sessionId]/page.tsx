@@ -11,7 +11,7 @@ import { CLASS_RULES, classRulesFor } from "@/club/settings/class-rules";
 import { RULE_BOOK } from "@/club/settings/rulebook";
 import { getClubStore } from "@/club/store/instance";
 import { formatDayLong, formatRange, pacificDate } from "@/club/time";
-import { idParam, NOTICES } from "@/club/web";
+import { idParam, intParam, NOTICES } from "@/club/web";
 import { ClassPlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
 import { howCheckedIn, rowFor } from "@/club/engine/attendance";
@@ -61,10 +61,22 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
   const joinedPlace = joined ? state.signups.filter((g) => g.sessionId === session.id && g.status === "waitlisted").findIndex((g) => g.id === joined.id) + 1 : 0;
   const notice = CLASS_NOTICES[one(query.notice) ?? ""];
   const cancelledNames = session.status === "cancelled" && staff ? state.signups.filter((g) => g.sessionId === session.id && g.cancelReason?.startsWith("The class was cancelled")) : [];
+  const emailed = intParam(one(query.emailed), 0, 500, -1);
+  const emailedOf = intParam(one(query.of), 0, 500, 0);
+  const mailFail = intParam(one(query.mailfail), 0, 500, 0);
+  const justCancelled = session.status === "cancelled" && one(query.changed) === "1";
   const explained = describeClassRules(CLASS_RULES, template);
   const yours = yoursText(view.yours);
 
   const whenWords = `${formatDayLong(pacificDate(new Date(session.startsAt)))}, ${formatRange(session.startsAt, session.endsAt)}`;
+  const cancelMailNote =
+    justCancelled && emailedOf > 0
+      ? emailed === emailedOf
+        ? `We emailed all ${emailedOf} ${emailedOf === 1 ? "person" : "people"} who were signed up or waiting.`
+        : emailed > 0
+          ? `We emailed ${emailed} of ${emailedOf}. ${mailFail > 0 ? `${mailFail} could not be reached by email; ` : ""}please contact anyone still listed below.`
+          : "Email could not be sent right now. Please contact everyone listed below."
+      : null;
 
   return (
     <section>
@@ -108,8 +120,8 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
         </div>
       )}
       {one(query.changed) && (
-        <p className="club-success" role="status">
-          Saved.
+        <p className="club-success" role="status" data-testid="class-changed">
+          {justCancelled ? (cancelMailNote ?? "Class cancelled.") : "Saved."}
         </p>
       )}
       {notice && (
@@ -215,7 +227,14 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
           )}
           {cancelledNames.length > 0 && (
             <div className="club-card" data-testid="affected">
-              <h3>Please contact these people</h3>
+              <h3>{emailed > 0 && emailed === emailedOf ? "People who were emailed" : "Please contact these people"}</h3>
+              <p className="club-meta">
+                {emailed > 0 && emailed === emailedOf
+                  ? "Each person below was emailed that the class was cancelled. Phone numbers are here if you want to follow up."
+                  : emailed > 0
+                    ? "Some of these people were emailed. Reach the others by phone or email."
+                    : "Each person below was signed up or waiting when the class was cancelled. Email them or call if they may not have been reached yet."}
+              </p>
               <ul>
                 {cancelledNames.map((g) => {
                   const m = state.members.find((x) => x.id === g.memberId)!;
@@ -243,11 +262,11 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
                 </p>
                 <p className="club-meta">Adding places moves people up from the waiting list at once. Places cannot go below the people who already have one.</p>
               </form>
-              <form method="post" action="/api/club/classes/cancel-session" className="club-form">
+              <form method="post" action="/api/club/classes/cancel-session" className="club-form" data-testid="cancel-class-form">
                 <input type="hidden" name="session" value={session.id} />
                 <p>
-                  <label htmlFor="why">Cancel this class (members will see the reason)</label>
-                  <input id="why" name="reason" type="text" maxLength={300} required />{" "}
+                  <label htmlFor="why">Cancel this class (members see the reason, and anyone signed up or waiting is emailed)</label>
+                  <input id="why" name="reason" type="text" maxLength={300} required placeholder="Instructor is ill" />{" "}
                   <button type="submit" className="club-button" aria-label={`Cancel ${sessionTitle(state, session)}`}>
                     Cancel class
                   </button>
