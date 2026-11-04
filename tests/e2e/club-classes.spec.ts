@@ -49,6 +49,8 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
   await expect(page.getByRole("heading", { level: 1, name: "Fitness classes" })).toBeVisible();
   await expect(page.getByTestId("placeholder-note")).toBeVisible();
   await expect(page.getByTestId("classes-view-toggle").getByRole("link", { name: "Classes" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("class-calendar-subscribe")).toBeVisible();
+  await expect(page.getByTestId("calendar-ics")).toBeVisible();
   await expect(card(page, "Stretch & Mobility").getByTestId("class-schedule")).toContainText(/Fridays/);
   await expect(card(page, "Stretch & Mobility").getByTestId("class-schedule")).toContainText(/Clubhouse room/);
   await expect(card(page, "Stretch & Mobility").getByTestId("class-schedule")).toContainText(/10 places/);
@@ -85,6 +87,26 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
   await expect(page.getByTestId("class-session").filter({ hasText: /Friday, Oct 30/ }).getByTestId("class-chairs")).toHaveText("10 places left");
 });
 
+test("the calendar feed lists upcoming classes with no member names, and works without signing in", async ({ page, request }) => {
+  await actAs(page, "Nora Abernathy");
+  await page.goto("/club/classes");
+  const href = await page.getByTestId("calendar-ics").getAttribute("href");
+  expect(href).toMatch(/\/api\/club\/classes\/calendar$/);
+
+  // Signed out: calendar apps have no cookie.
+  const fresh = await request.get("/api/club/classes/calendar");
+  expect(fresh.status()).toBe(200);
+  expect(fresh.headers()["content-type"]).toMatch(/text\/calendar/);
+  const body = await fresh.text();
+  expect(body).toContain("BEGIN:VCALENDAR");
+  expect(body).toContain("SUMMARY:Erg Conditioning");
+  expect(body).toContain("SUMMARY:Stretch & Mobility");
+  expect(body).toContain("LOCATION:Boathouse gym");
+  expect(body).not.toContain("Vandermeer");
+  expect(body).not.toContain("Abernathy");
+  expect(body).not.toContain("Lindqvist");
+});
+
 test("By day still shows the day board for members who think in dates", async ({ page }) => {
   await actAs(page, "Nora Abernathy");
   await page.goto("/club/classes");
@@ -94,7 +116,8 @@ test("By day still shows the day board for members who think in dates", async ({
   await expect(page.getByRole("navigation", { name: "Pick a day" })).toBeVisible();
   await page.getByRole("navigation", { name: "Pick a day" }).getByRole("link", { name: /Fri Oct 30/ }).click();
   await expect(page.getByTestId("day-heading")).toContainText("Friday, Oct 30");
-  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toHaveText("10 places left");
+  // Places left can move if another test signed up for Stretch on the shared server; just open the session.
+  await expect(card(page, "Stretch & Mobility").getByTestId("class-chairs")).toContainText(/places left|Full/);
   await card(page, "Stretch & Mobility").getByRole("link", { name: "Stretch & Mobility" }).click();
   await expect(page).toHaveURL(/\/club\/classes\/[0-9a-f-]{36}/);
   await expect(page.getByTestId("class-when")).toContainText("Friday, Oct 30");

@@ -2105,3 +2105,27 @@ details summary {
 .club-class-of-date .club-meta {
   margin: 0;
 }
+
+.club-class-calendar {
+  margin: 12px 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+
+.club-class-calendar-title {
+  margin: 0 0 4px;
+  font-family: var(--ui);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.club-class-calendar .club-meta {
+  margin: 0 0 8px;
+}
+
+.club-class-calendar .club-quiet-links {
+  margin: 0;
+}

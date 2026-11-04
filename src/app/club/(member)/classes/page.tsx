@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { clubNow } from "@/club/clock";
+import { classCalendarSubscribeUrls } from "@/club/engine/class-calendar";
 import { classCatalog } from "@/club/engine/class-catalog";
 import { sessionView } from "@/club/engine/classes";
 import { chairsText, yoursText } from "@/club/engine/class-words";
@@ -34,6 +36,7 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
   const viewer = viewerOf(actor);
   // ?view=day (or a leftover ?day= bookmark) opens the day board; otherwise the bulletin.
   const byDay = one(params.view) === "day" || one(params.day) != null;
+  const calendar = await calendarLinks();
 
   return (
     <section className={byDay ? "club-classes-day" : "club-classes-catalog"}>
@@ -63,8 +66,56 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
         </Link>
       </nav>
 
+      {!byDay && <CalendarSubscribe calendar={calendar} />}
+
       {byDay ? <DayBoard state={state} now={now} viewer={viewer} params={params} /> : <ClassBulletin state={state} now={now} viewer={viewer} />}
     </section>
+  );
+}
+
+/** Absolute feed addresses when we know this site's origin; otherwise a same-site path. */
+async function calendarLinks(): Promise<{ https: string; webcal: string | null }> {
+  const configured = process.env.CLUB_SITE_URL?.trim();
+  if (configured) {
+    try {
+      const origin = new URL(configured).origin;
+      if (origin.startsWith("http")) {
+        const urls = classCalendarSubscribeUrls(origin);
+        return { https: urls.https, webcal: urls.webcal };
+      }
+    } catch {
+      // fall through
+    }
+  }
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  if (host) {
+    const urls = classCalendarSubscribeUrls(`${proto}://${host}`);
+    return { https: urls.https, webcal: urls.webcal };
+  }
+  return { https: "/api/club/classes/calendar", webcal: null };
+}
+
+function CalendarSubscribe({ calendar }: { calendar: { https: string; webcal: string | null } }) {
+  return (
+    <aside className="club-class-calendar" data-testid="class-calendar-subscribe">
+      <h2 className="club-class-calendar-title">Add to your calendar</h2>
+      <p className="club-meta">
+        Subscribe once in Google Calendar, Apple Calendar or Outlook. Class dates update when the club changes the schedule. Signing up for a place still happens here.
+      </p>
+      <p className="club-quiet-links">
+        {calendar.webcal ? (
+          <a href={calendar.webcal} data-testid="calendar-webcal">
+            Subscribe on this device
+          </a>
+        ) : null}
+        {calendar.webcal ? " · " : null}
+        <a href={calendar.https} data-testid="calendar-ics">
+          Calendar feed (.ics)
+        </a>
+      </p>
+    </aside>
   );
 }
 
