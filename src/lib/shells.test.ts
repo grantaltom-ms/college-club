@@ -6,8 +6,10 @@ import {
   byWeekday,
   monthCompare,
   monthTimeline,
+  normalizeShellOwnership,
   sameDateCutoff,
   sampleShells,
+  shellOwnershipQuery,
   yearToDate,
   type Outing,
 } from "./shells";
@@ -159,6 +161,48 @@ describe("preparing the iCrew export", () => {
 
   it("says plainly when the file is not the shell export", () => {
     expect(() => convert("Name,Date\nx,2026-01-01")).toThrow(/no "Seats" column/);
+  });
+});
+
+describe("shell ownership", () => {
+  it("treats a blank or unknown choice as club boats", () => {
+    expect(normalizeShellOwnership(null)).toEqual(["club"]);
+    expect(normalizeShellOwnership("")).toEqual(["club"]);
+    expect(normalizeShellOwnership("nope")).toEqual(["club"]);
+    expect(normalizeShellOwnership("club")).toEqual(["club"]);
+    expect(normalizeShellOwnership(" MEMBER ")).toEqual(["member"]);
+    expect(normalizeShellOwnership("member,club")).toEqual(["club", "member"]);
+    expect(normalizeShellOwnership(["member", "club", "club"])).toEqual(["club", "member"]);
+    expect(shellOwnershipQuery(["member", "club"])).toBe("club,member");
+  });
+
+  it("keeps the default sample on the club fleet", () => {
+    expect(sampleShells(["club"])).toEqual(sampleShells());
+    expect(sampleShells("club")).toEqual(sampleShells());
+    expect(sampleShells("nope")).toEqual(sampleShells());
+    expect(sampleShells().ownership).toBeUndefined();
+    expect(sampleShells().memberFrom).toBeUndefined();
+  });
+
+  it("adds member-owned outings only in 2026 and leaves the 2025 club count untouched", () => {
+    const club = sampleShells();
+    const member = sampleShells("member");
+    const both = sampleShells("club,member");
+    const clubBoats = new Set(club.outings.map((o) => o.boat));
+    expect(member.ownership).toEqual(["member"]);
+    expect(member.memberFrom).toBe("2026-01-01");
+    expect(member.outings.length).toBeGreaterThan(0);
+    expect(member.outings.every((o) => o.day >= "2026-01-01" && !clubBoats.has(o.boat))).toBe(true);
+    expect(member.outings.some((o) => o.day.startsWith("2025"))).toBe(false);
+    expect(monthCompare(member.outings, member.through).years).toEqual([2026]);
+    const in2025 = (rows: Outing[]) => rows.filter((o) => o.day.startsWith("2025")).length;
+    expect(in2025(both.outings)).toBe(in2025(club.outings));
+    expect(both.outings.filter((o) => o.day.startsWith("2026")).length).toBe(
+      club.outings.filter((o) => o.day.startsWith("2026")).length + member.outings.length,
+    );
+    expect(both.through).toBe(club.through);
+    expect(both.rowers.find((r) => r.year === 2025)).toEqual(club.rowers.find((r) => r.year === 2025));
+    expect(both.ownership).toEqual(["club", "member"]);
   });
 });
 

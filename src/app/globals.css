@@ -837,6 +837,26 @@ main.frame {
   color: var(--slate);
 }
 
+.shells-ownership {
+  margin-top: 20px;
+}
+
+.filter-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.filter-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--cyberspace);
+}
+
 .chip-dot {
   display: inline-block;
   width: 10px;
