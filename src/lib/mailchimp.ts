@@ -1,11 +1,11 @@
-import { formatDay } from "./dates";
+import { formatDay, pacificCalendarDate } from "./dates";
 
 /** One sent email campaign, with counts only. No subscriber names or addresses ever pass through here. */
 export interface Campaign {
   id: string;
   title: string;
   subject: string;
-  /** YYYY-MM-DD, Pacific time is not applied: this is the date Mailchimp reports. */
+  /** YYYY-MM-DD in America/Los_Angeles. Mailchimp's send_time is an instant; Tuesday 5:30 pm Pacific stays on Tuesday. */
   sentOn: string;
   sent: number;
   bounces: number;
@@ -54,7 +54,7 @@ export function toCampaign(r: Report): Campaign | null {
     id: r.id,
     title,
     subject,
-    sentOn: r.send_time.slice(0, 10),
+    sentOn: pacificCalendarDate(r.send_time),
     sent,
     bounces,
     delivered: Math.max(sent - bounces, 0),

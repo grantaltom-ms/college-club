@@ -185,7 +185,7 @@ function Email({ data }: { data: EmailData }) {
     <>
       <p className="page-sub">
         {fmtInt(campaigns.length)} emails to the member list, {fmtDate(campaigns[0].sentOn)} to {fmtDate(data.through)}.
-        Counts come from Mailchimp. People are never shown here, only totals.
+        Dates are the Pacific day each email went out. Counts come from Mailchimp. People are never shown here, only totals.
       </p>
       {data.source === "sample" && (
         <p className="sample-banner" role="note">
@@ -293,7 +293,7 @@ function Email({ data }: { data: EmailData }) {
             {season
               ? `Watercooler clicks ${season.high.clickRate - season.low.clickRate < 1.5 ? "barely change" : "change"} with the season: from ${fmtPct(season.low.clickRate)} in ${season.low.label} to ${fmtPct(season.high.clickRate)} in ${season.high.label}, all years pooled. `
               : ""}
-            Best send time cannot be judged because almost every Watercooler goes out Tuesday at about 5:30 pm. Rates are
+            Best send time cannot be judged because almost every Watercooler goes out Tuesday at about 5:30 pm Pacific. Rates are
             totals divided by delivered emails, so they can differ slightly from the figures Mailchimp shows per email.
           </p>
         </aside>

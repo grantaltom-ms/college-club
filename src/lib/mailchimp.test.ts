@@ -50,9 +50,28 @@ describe("toCampaign", () => {
       clicks: { unique_subscriber_clicks: 40 },
     })!;
     expect(c.delivered).toBe(1690);
-    expect(c.sentOn).toBe("2026-10-06");
+    // 00:30 UTC on Oct 6 is 5:30 pm Pacific on Oct 5.
+    expect(c.sentOn).toBe("2026-10-05");
     expect(c.filteredOpens).toBe(550);
     expect(c.weekly).toBe(true);
+  });
+
+  it("dates a Tuesday 5:30 pm Pacific Watercooler on Tuesday", () => {
+    const pdt = toCampaign({
+      id: "tue-pdt",
+      campaign_title: "Weekly Watercooler",
+      send_time: "2026-10-07T00:30:00+00:00",
+      emails_sent: 1700,
+    })!;
+    const pst = toCampaign({
+      id: "tue-pst",
+      campaign_title: "Weekly Watercooler",
+      send_time: "2026-11-04T01:30:00+00:00",
+      emails_sent: 1700,
+    })!;
+    expect(pdt.sentOn).toBe("2026-10-06");
+    expect(pdt.weekly).toBe(true);
+    expect(pst.sentOn).toBe("2026-11-03");
   });
 
   it("treats a zero filtered count as not available, and skips empty reports", () => {

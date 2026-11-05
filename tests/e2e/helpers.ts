@@ -3,6 +3,7 @@ import { sampleData } from "../../src/lib/sample";
 import { sampleShells } from "../../src/lib/shells";
 import { sampleEmail } from "../../src/lib/mailchimp";
 import { sampleMembership } from "../../src/lib/membership";
+import { sampleReservations } from "../../src/lib/reservations";
 
 /** Serve the invented sample club from the data endpoint, so no test touches the real database. */
 export async function mockDashboard(page: Page) {
@@ -12,15 +13,17 @@ export async function mockDashboard(page: Page) {
   );
 }
 
-/** Serve invented shell outings, emails and membership counts too, for the summary page that reads every source. */
+/** Serve invented shell outings, reservations, emails and membership counts too, for the summary page that reads every source. */
 export async function mockAll(page: Page) {
   await mockDashboard(page);
   const shells = JSON.stringify(sampleShells());
   const email = JSON.stringify(sampleEmail());
   const membership = JSON.stringify(sampleMembership());
+  const reservations = JSON.stringify(sampleReservations());
   await page.route("**/api/shells", (route) => route.fulfill({ status: 200, contentType: "application/json", body: shells }));
   await page.route("**/api/email", (route) => route.fulfill({ status: 200, contentType: "application/json", body: email }));
   await page.route("**/api/membership", (route) => route.fulfill({ status: 200, contentType: "application/json", body: membership }));
+  await page.route("**/api/reservations", (route) => route.fulfill({ status: 200, contentType: "application/json", body: reservations }));
 }
 
 /** The dashboard's menu bar. */

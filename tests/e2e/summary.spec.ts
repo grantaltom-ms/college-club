@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { formatDay } from "../../src/lib/dates";
+import { sampleReservations } from "../../src/lib/reservations";
+import { sampleData } from "../../src/lib/sample";
+import { headline } from "../../src/lib/stats";
 import { sampleShells, changePct, yearToDate } from "../../src/lib/shells";
 import { mockAll } from "./helpers";
 
@@ -14,6 +18,7 @@ test("the summary leads with one sentence and seven headline cards, each linking
   await expect(page.locator(".stat-card")).toHaveCount(7);
   await expect(page.getByTestId("card-quiet").locator(".stat-value")).toHaveText("133");
   await expect(page.getByTestId("card-quiet")).toContainText("of 497 members came in less than once a month this year (27%).");
+  await expect(page.getByTestId("card-quiet")).toContainText(headline(sampleData().members).noVisitsDetail);
   await expect(page.getByTestId("card-quiet-note")).toHaveText("11 new members haven't started yet (off the waitlist).");
   await expect(page.getByTestId("card-quiet-roster-change")).toHaveText(
     "Down from 185 because the count now uses the QuickBooks list of paying members (497) instead of the iCrew list. Club usage didn’t improve; the list of who counts as a member changed.",
@@ -27,6 +32,7 @@ test("the summary leads with one sentence and seven headline cards, each linking
   await expect(page.getByTestId("card-membership-note")).toHaveCount(0);
   await expect(page.locator(".stat-target").first()).toHaveText("Board target: not set yet");
   await expect(page.getByTestId("data-dates")).toContainText("Data through: member visits Sep 27, 2026");
+  await expect(page.getByTestId("data-dates")).toContainText(`reservations ${formatDay(sampleReservations().through, true)}`);
   await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Summary" })).toHaveAttribute("aria-current", "page");
 });
 

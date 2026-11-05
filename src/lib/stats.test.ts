@@ -12,6 +12,7 @@ import {
   heatColor,
   heatmap,
   headline,
+  noVisitsDetail,
   hourSeries,
   quietByJoined,
   visitsByType,
@@ -63,6 +64,9 @@ describe("band summary and headline", () => {
     expect(h.quiet).toBe(133);
     expect(h.quietShare).toBe(27);
     expect(h.noVisits).toBe(31);
+    expect(h.noVisitsDetail).toBe(
+      "31 are in the 0-visits band: no matched visit day (a day with a door entry or a booking). Door taps count only when they match a visit day.",
+    );
     expect(h.regulars).toBe(198);
   });
 
@@ -75,6 +79,9 @@ describe("band summary and headline", () => {
     const h = headline(members);
     // The share is of the whole roster, so the not-started member is in the total but not the count.
     expect(h).toMatchObject({ total: 3, started: 2, notStarted: 1, quiet: 1, noVisits: 1, quietShare: 33 });
+    expect(h.noVisitsDetail).toBe(
+      "1 is in the 0-visits band: no matched visit day (a day with a door entry or a booking). Door taps count only when they match a visit day.",
+    );
     expect(bandSummary(members).reduce((s, r) => s + r.members, 0)).toBe(2);
     expect(bandSummary(members).map((r) => r.memberShare)).toEqual([33, 0, 0, 0, 33]);
   });
@@ -88,6 +95,15 @@ describe("band summary and headline", () => {
   it("handles an empty list", () => {
     expect(headline([]).total).toBe(0);
     expect(percent(1, 0)).toBe(0);
+  });
+
+  it("keeps unmatched door taps out of the 0-visits sentence", () => {
+    const h = headline([member({ band: "0 visits", visitDays: 0, doorEntries: 22 })]);
+    expect(h.noVisits).toBe(1);
+    expect(h.noVisitsDetail).toBe(
+      "1 is in the 0-visits band: no matched visit day (a day with a door entry or a booking). The band still has 22 door entries that did not count as a visit day.",
+    );
+    expect(noVisitsDetail(1, 1)).toContain("1 door entry that did not count");
   });
 });
 
