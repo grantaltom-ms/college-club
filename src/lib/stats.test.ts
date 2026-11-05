@@ -259,11 +259,11 @@ describe("multiBooking", () => {
     // The weekend-daytime member is often, and is in none of the named groups.
     expect(r.earlyBirds + r.workFromClub + r.households + r.unknown).toBe(r.often - 1);
   });
-  it("keeps the habit bar at 35 extra rows, one short of it is not often", () => {
-    // Five extras was "often" on the boat-and-class export. Counting every non-gym reservation
-    // ID multiplies those extras by about seven, so the same habit is 35.
-    expect(OFTEN_EXTRA_BOOKINGS).toBe(35);
-    expect(OFTEN_EXTRA_BOOKINGS).toBe(5 * 7);
+  it("keeps the habit bar at 40 extra rows, one short of it is not often", () => {
+    // Five extras was "often" on the boat-and-class export. Counting every reservation ID
+    // multiplies those extras by about eight, so the same habit is 40.
+    expect(OFTEN_EXTRA_BOOKINGS).toBe(40);
+    expect(OFTEN_EXTRA_BOOKINGS).toBe(5 * 8);
     const shares = { earlyShare: 0.1, weekendShare: 0.1 };
     const once = member({ bookingDays: 20, bookings: 21, ...shares });
     const shy = member({ bookingDays: 20, bookings: 20 + OFTEN_EXTRA_BOOKINGS - 1, ...shares });

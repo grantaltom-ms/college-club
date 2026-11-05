@@ -180,8 +180,8 @@ function Visits({ data }: { data: DashboardData }) {
             <summary>How we tell</summary>
             <p>
               The reservation export has no start times, so a member counts as booking more than once in a day
-              when they have more reservation rows than booking days. Each row is one reservation other than the gym
-              (a shell, a dock space, a room, a work space, and so on). {fmtInt(mb.often)} do it often ({OFTEN_EXTRA_BOOKINGS}{" "}
+              when they have more reservation rows than booking days. Each row is one reservation of any kind
+              (a shell, the gym, a dock space, a room, a work space, and so on). {fmtInt(mb.often)} do it often ({OFTEN_EXTRA_BOOKINGS}{" "}
               or more extra rows from July to September). We set aside{" "}
               {fmtInt(mb.earlyBirds)} who mostly arrive 4 to 8 am (rowers booking two boats), {fmtInt(mb.households)}{" "}
               shared accounts for two people, and {fmtInt(mb.unknown)} with no door data. Extra rows can also be two

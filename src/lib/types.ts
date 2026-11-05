@@ -15,10 +15,10 @@ export interface Member {
   /** Days with a door entry or a boat/class booking, Jan 1 to data end. */
   visitDays: number;
   doorEntries: number;
-  /** Days with at least one non-gym iCrew reservation, Jul 1 to Sep 30. Gym Space is left out. */
+  /** Days with at least one iCrew reservation, Jul 1 to Sep 30. Every item type counts, including the gym. */
   bookingDays: number;
   /**
-   * Non-gym iCrew reservation rows, Jul 1 to Sep 30. Gym Space is left out.
+   * iCrew reservation rows, Jul 1 to Sep 30, one per reservation ID, every item type, including the gym.
    * More than bookingDays means some day had two or more rows (a second booking, or two amenities).
    */
   bookings: number;
