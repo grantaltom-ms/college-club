@@ -23,7 +23,7 @@ describe("the shipped booking rules", () => {
       slotMinutes: 30,
       minMinutes: 30,
       defaultMinutes: 90,
-      maxMinutes: 240,
+      maxMinutes: 180,
       maxFuturePerType: 0,
       maxPerDayPerType: 0,
       cancelCutoffMinutes: 120,
@@ -31,6 +31,16 @@ describe("the shipped booking rules", () => {
     });
     expect(raw.about).toContain("PLACEHOLDER");
     expect(raw.about).toContain("iCrew");
+  });
+
+  it("let a booking run up to 3 hours, except work space, which keeps 4 hours (Grant, Nov 5, 2026)", () => {
+    const longest = Object.fromEntries(RULE_BOOK.classes.map((c) => [c.code, rulesFor(RULE_BOOK, { id: "i", name: "Test", classCode: c.code, ruleOverrides: {} }).rules.maxMinutes]));
+    expect(longest["work-space"]).toBe(240);
+    const others = Object.entries(longest).filter(([code]) => code !== "work-space");
+    expect(others.length).toBeGreaterThan(5);
+    for (const [code, minutes] of others) expect([code, minutes]).toEqual([code, 180]);
+    // The default length still sits inside both limits.
+    expect(RULE_BOOK.defaults.defaultMinutes).toBe(90);
   });
 
   it("describe singles, doubles and quads by seat count, with a qualification per boat class", () => {
@@ -86,8 +96,8 @@ describe("a mistake in the rules file is caught in words someone can act on", ()
     expect(parse((c) => (c.defaults!.maxMinutes = 100))).toThrow("maxMinutes (100) must be a whole number of 30-minute slots");
     expect(parse((c) => (c.defaults!.dayEnd = "20:10"))).toThrow("must be a whole number of 30-minute slots");
     expect(parse((c) => Object.assign(c.defaults!, { maxFuturePerType: 2, maxPerDayPerType: 3 }))).toThrow("day limit could never be reached");
-    expect(parse((c) => (c.defaults!.defaultMinutes = 15))).toThrow("defaultMinutes (15) must be between minMinutes (30) and maxMinutes (240)");
-    expect(parse((c) => (c.defaults!.defaultMinutes = 300))).toThrow("defaultMinutes (300) must be between minMinutes (30) and maxMinutes (240)");
+    expect(parse((c) => (c.defaults!.defaultMinutes = 15))).toThrow("defaultMinutes (15) must be between minMinutes (30) and maxMinutes (180)");
+    expect(parse((c) => (c.defaults!.defaultMinutes = 300))).toThrow("defaultMinutes (300) must be between minMinutes (30) and maxMinutes (180)");
     expect(parse((c) => (c.defaults!.defaultMinutes = 100))).toThrow("defaultMinutes (100) must be a whole number of 30-minute slots");
   });
 
@@ -120,8 +130,8 @@ describe("a mistake in the rules file is caught in words someone can act on", ()
 
   it("refuses a class override that breaks the rules once combined with the defaults", () => {
     expect(parse((c) => (c.classes[0].rules = { maxMinutes: 45, defaultMinutes: 30 }))).toThrow("maxMinutes (45) must be a whole number of 30-minute slots");
-    expect(parse((c) => (c.classes[0].rules = { minMinutes: 300 }))).toThrow("maxMinutes (240) cannot be shorter than minMinutes (300)");
-    expect(parse((c) => (c.classes[0].rules = { defaultMinutes: 300 }))).toThrow("defaultMinutes (300) must be between minMinutes (30) and maxMinutes (240)");
+    expect(parse((c) => (c.classes[0].rules = { minMinutes: 300 }))).toThrow("maxMinutes (180) cannot be shorter than minMinutes (300)");
+    expect(parse((c) => (c.classes[0].rules = { defaultMinutes: 300 }))).toThrow("defaultMinutes (300) must be between minMinutes (30) and maxMinutes (180)");
   });
 
   it("throws a RuleBookError, so the app can tell a rules mistake from a bug", () => {
@@ -135,7 +145,7 @@ describe("which rules apply to an item", () => {
   it("take the defaults, then the class, then the item, in that order", () => {
     const book = parse((c) => (c.classes[0].rules = { maxMinutes: 90 }))();
     expect(rulesFor(book, item()).rules.maxMinutes).toBe(90);
-    expect(rulesFor(book, item({ classCode: "shell-double" })).rules.maxMinutes).toBe(240);
+    expect(rulesFor(book, item({ classCode: "shell-double" })).rules.maxMinutes).toBe(180);
     expect(rulesFor(book, item({ ruleOverrides: { maxMinutes: 60 } })).rules.maxMinutes).toBe(60);
     expect(rulesFor(book, item({ ruleOverrides: { maxMinutes: 60 } })).rules.slotMinutes).toBe(30);
   });

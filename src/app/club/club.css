@@ -1917,61 +1917,6 @@ details summary {
   padding-top: 8px;
 }
 
-.club-length {
-  margin: 0 0 16px;
-}
-
-.club-length-label {
-  margin: 0 0 8px;
-  font-family: var(--ui);
-  font-weight: 600;
-}
-
-.club-length-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.club-length-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-pill);
-  background: var(--card);
-  color: var(--ink);
-  font-family: var(--ui);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.club-length-chip[aria-current="page"] {
-  background: var(--cyberspace);
-  border-color: var(--cyberspace);
-  color: var(--white);
-}
-
-/* Beat .club-form select (width/min-height) so this stays off-screen and does not widen the page. */
-.club-form select.club-length-select,
-.club-length-select {
-  /* Kept for Playwright and no-JS; chips are the visible control. */
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  min-height: 0;
-  max-width: none;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .club-rules-quiet {
   margin: 36px 0 0;
   padding-top: 20px;

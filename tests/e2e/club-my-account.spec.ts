@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * My account (Grant, Nov 5, 2026): a member's own pages (My household, My bookings, My classes, My bill, My boats) are one dropdown in
+ * My account (Grant, Nov 5, 2026): a member's own pages (My household, My bookings, My bill, My boats) are one dropdown in
  * the top bar, so the bar is less busy. On a phone the same links are listed under a "My account" label in the Menu panel. Staff, whose
  * bar is a desk and not an account, are unchanged. The sample club's Nora Abernathy owns a private boat (so she has My boats), Dev Rao
  * has none, and Kenji Tanaka is a coach (so he has Report an incident).
@@ -16,7 +16,7 @@ const actAs = async (page: Page, who: string) => {
 const nav = (page: Page) => page.getByRole("navigation", { name: "Member area" });
 const accountButton = (page: Page) => nav(page).getByRole("button", { name: "My account" });
 const accountList = (page: Page) => page.locator("#club-account-menu");
-const OWN_PAGES = ["My household", "My bookings", "My classes", "My bill"];
+const OWN_PAGES = ["My household", "My bookings", "My bill"];
 
 test.describe("My account, on a wide screen", () => {
   test.use({ viewport: { width: 1180, height: 800 } });
@@ -34,10 +34,42 @@ test.describe("My account, on a wide screen", () => {
     await expect(accountButton(page)).toHaveAttribute("aria-expanded", "true");
     await expect(accountList(page).getByRole("link")).toHaveText([...OWN_PAGES, "My boats"]);
     const hrefs = await accountList(page).getByRole("link").evaluateAll((els) => els.map((el) => el.getAttribute("href")));
-    expect(hrefs).toEqual(["/club", "/club/my-bookings", "/club/my-classes", "/club/my-bill", "/club/my-boats"]);
+    expect(hrefs).toEqual(["/club", "/club/my-bookings", "/club/my-bill", "/club/my-boats"]);
   });
 
-  test("a member with no private boat gets four pages, and a coach keeps Report an incident in the bar", async ({ page }) => {
+  test("the My account button sits on the same line as the links beside it, and its list opens flush under it", async ({ page }) => {
+    await actAs(page, "Nora Abernathy");
+    for (const width of [1180, 1366, 1920]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/club");
+      const centre = async (name: string | RegExp, role: "link" | "button") => {
+        const box = await nav(page).getByRole(role, { name, exact: typeof name === "string" }).boundingBox();
+        expect(box, `${String(name)} is drawn at ${width}px`).not.toBeNull();
+        return { y: box!.y + box!.height / 2, height: box!.height };
+      };
+      const account = await centre("My account", "button");
+      const events = await centre("Events", "link");
+      const book = await centre("Book", "link");
+      // The same vertical centre and the same height as the links beside it, to the pixel.
+      expect(Math.abs(account.y - events.y), `My account against Events at ${width}px`).toBeLessThanOrEqual(1);
+      expect(Math.abs(account.y - book.y), `My account against Book at ${width}px`).toBeLessThanOrEqual(1);
+      expect(Math.abs(account.height - events.height)).toBeLessThanOrEqual(1);
+      // Wide enough for the whole bar on one row: every item, the test build's extra link too, sits on one line.
+      if (width >= 1366) {
+        const centres = await nav(page).locator("a:visible, button:visible").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2));
+        expect(Math.max(...centres) - Math.min(...centres), `every bar item on one line at ${width}px`).toBeLessThanOrEqual(1);
+      }
+      // The list opens under the button, left edges level, with no gap.
+      await accountButton(page).click();
+      const button = (await accountButton(page).boundingBox())!;
+      const list = (await accountList(page).boundingBox())!;
+      expect(Math.abs(list.x - button.x), `list left edge against the button at ${width}px`).toBeLessThanOrEqual(1);
+      expect(Math.abs(list.y - (button.y + button.height)), `list top against the button's bottom at ${width}px`).toBeLessThanOrEqual(1);
+      await page.keyboard.press("Escape");
+    }
+  });
+
+  test("a member with no private boat gets three pages, and a coach keeps Report an incident in the bar", async ({ page }) => {
     await actAs(page, "Dev Rao");
     await page.goto("/club");
     await accountButton(page).click();
@@ -96,7 +128,9 @@ test.describe("My account, on a wide screen", () => {
     await expect(accountList(page)).toBeVisible();
     await page.keyboard.press("Tab");
     await expect(accountList(page).getByRole("link", { name: "My household", exact: true })).toBeFocused();
-    for (let n = 0; n < 3; n++) await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(accountList(page).getByRole("link", { name: "My bookings", exact: true })).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(accountList(page).getByRole("link", { name: "My bill", exact: true })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(accountList(page)).toBeHidden();

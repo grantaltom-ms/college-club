@@ -89,6 +89,41 @@ const pastRows = (page: Page) => page.getByRole("list", { name: "Past bookings" 
 const row = (page: Page, text: string) => upcomingRows(page).filter({ hasText: text });
 const pastRow = (page: Page, text: string) => pastRows(page).filter({ hasText: text });
 
+test("the length is one dropdown of 30-minute steps up to 3 hours, starting at 1 hour 30 minutes, and choosing one checks it at once", async ({ page }) => {
+  // Look only: nothing is booked, and no other test uses this boat at this hour.
+  await actAs(page, "Nora Abernathy");
+  await openShellHour(page, "2026-11-06", "5:00 to 5:30 am", "single");
+  await slot(page, "Kingfisher", "5:00 to 5:30 am", "free").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Book Kingfisher" })).toBeVisible();
+
+  const length = page.getByLabel("Length");
+  await expect(length).toBeVisible();
+  await expect(length.locator("option")).toHaveText(["30 minutes", "1 hour", "1 hour 30 minutes", "2 hours", "2 hours 30 minutes", "3 hours"]);
+  await expect(length).toHaveValue("90");
+  await expect(page.getByTestId("booking-when")).toContainText("5:00 to 6:30 am");
+  // The row of bubbles is gone: no link for a length anywhere on the form.
+  for (const name of ["1 hour", "2 hours", "3 hours"]) await expect(page.getByRole("link", { name, exact: true })).toHaveCount(0);
+
+  // Choosing a length checks it at once, with no button to press, and the choice stays selected.
+  await length.selectOption("180");
+  await expect(page).toHaveURL(/minutes=180/);
+  await expect(page.getByTestId("booking-when")).toContainText("5:00 to 8:00 am");
+  await expect(page.getByTestId("check-ok")).toBeVisible();
+  await expect(page.getByLabel("Length")).toHaveValue("180");
+  await page.getByLabel("Length").selectOption("30");
+  await expect(page.getByTestId("booking-when")).toContainText("5:00 to 5:30 am");
+});
+
+test("a length longer than 3 hours cannot be chosen: asking for 4 hours in the address falls back to the 90-minute start", async ({ page }) => {
+  await actAs(page, "Nora Abernathy");
+  await openShellHour(page, "2026-11-06", "5:00 to 5:30 am", "single");
+  const href = await slot(page, "Kingfisher", "5:00 to 5:30 am", "free").getAttribute("href");
+  await page.goto(`${href}&minutes=240`);
+  await expect(page.getByLabel("Length")).toHaveValue("90");
+  await expect(page.getByTestId("booking-when")).toContainText("5:00 to 6:30 am");
+  await expect(page.getByLabel("Length").locator("option[value='240']")).toHaveCount(0);
+});
+
 test("core flow: pick a member, find a free single, book it, see it in My bookings, cancel it, and see the slot free again", async ({ page }) => {
   await actAs(page, "Nora Abernathy");
   await cancelAll(page);
@@ -105,7 +140,7 @@ test("core flow: pick a member, find a free single, book it, see it in My bookin
   // The rules that apply are shown, with the placeholder warning.
   await expect(page.getByRole("region", { name: "Rules" })).toContainText("Rules for Kingfisher (single)");
   await expect(page.getByRole("region", { name: "Rules" })).toContainText("These numbers are placeholders");
-  await expect(page.getByRole("region", { name: "Rules" })).toContainText("The shortest booking is 30 minutes and the longest is 4 hours.");
+  await expect(page.getByRole("region", { name: "Rules" })).toContainText("The shortest booking is 30 minutes and the longest is 3 hours.");
   await expect(page.getByRole("region", { name: "Rules" })).toContainText("Book up to 14 days ahead.");
   await expect(page.getByRole("region", { name: "Rules" })).toContainText("There is no limit on how many shell bookings you can hold or make in a day.");
   await page.getByRole("button", { name: "Book Kingfisher", exact: true }).click();
@@ -133,7 +168,8 @@ test("core flow: pick a member, find a free single, book it, see it in My bookin
   await page.goto("/club/my-bookings");
   await row(page, "Kingfisher").getByRole("button", { name: /^Cancel Kingfisher/ }).click();
   await expect(page.getByTestId("cancelled-note")).toHaveText("Cancelled Kingfisher. The time is free for others again.");
-  await expect(page.getByTestId("no-upcoming")).toBeVisible();
+  // The list also holds a member's class sign-ups, so "nothing booked" is not the test any more: the booking has left Upcoming.
+  await expect(row(page, "Kingfisher")).toHaveCount(0);
   await expect(pastRow(page, "Kingfisher").first().getByTestId("booking-status")).toHaveText("Cancelled");
   await openShellHour(page, "2026-10-31", "9:00 to 9:30 am", "single");
   await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "free")).toBeVisible();
@@ -269,7 +305,7 @@ test("book, cancel and rebook again and again: nothing limits how many a member 
     await cancelAll(page);
   }
   await page.goto("/club/my-bookings");
-  await expect(page.getByTestId("no-upcoming")).toBeVisible();
+  await expect(upcomingRows(page)).toHaveCount(0);
 });
 
 test("the clocks go back on Sunday Nov 1: bookable hours still run 5 am to 7 pm with no lost or doubled half hour", async ({ page }) => {

@@ -10,7 +10,7 @@ export type MemberNavLink = {
   label: string;
   /**
    * Groups links in the phone menu so it reads like a desk, not a laundry list. "me" is a member's own account (My household, My
-   * bookings, My classes, My bill, My boats): one dropdown called My account on a wide screen, one labelled group on a phone.
+   * bookings with their class sign-ups, My bill, My boats): one dropdown called My account on a wide screen, one labelled group on a phone.
    */
   group: "go" | "me" | "coach" | "mine" | "desk" | "account";
 };

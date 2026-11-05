@@ -259,7 +259,7 @@
 }
 
 /*
- * My account: a member's own pages (My household, My bookings, My classes, My bill, My boats) in one dropdown on a wide screen, so the
+ * My account: a member's own pages (My household, My bookings with their classes, My bill, My boats) in one dropdown on a wide screen, so the
  * bar is less busy. On a phone the button is hidden and the same links are listed under the "My account" label in the menu panel.
  */
 .club-app .club-account-button {
@@ -267,9 +267,14 @@
 }
 
 @media (min-width: 900px) {
-  .club-app .club-nav-account {
+  /*
+   * On a wide screen the other groups are display: contents, so the phone panel's space above each group does not apply to them.
+   * This group is a real box (it holds the dropdown), so it would take that 14px and sit lower than the links beside it.
+   */
+  .club-app .club-nav .club-nav-account {
     display: block;
     position: relative;
+    margin: 0;
   }
 
   .club-app .club-nav .club-account-button {
@@ -968,8 +973,7 @@
 .club-app .club-shell-window-change,
 .club-app .club-shell-pick-hour,
 .club-app .club-rules-quiet,
-.club-app .club-confirm-primary [data-testid="check-ok"],
-.club-app .club-length-label {
+.club-app .club-confirm-primary [data-testid="check-ok"] {
   font-family: var(--body);
   font-size: 16px;
 }
@@ -1013,23 +1017,18 @@
   color: var(--app-cyberspace);
 }
 
-/* The booking form: how long, and the big confirm box. */
-.club-app .club-length-chip {
-  border-radius: 2px;
-  border-color: var(--app-line);
+/* The small tag at the top of a row of My bookings: what kind of thing it is (Shell, Kayak, Dock Space, Class). */
+.club-app .club-row-kind {
+  margin: 0 0 4px;
   font-family: var(--display);
-  font-size: 12px;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  min-height: var(--tap-min);
+  color: var(--app-slate);
 }
 
-.club-app .club-length-chip[aria-current="page"] {
-  background: var(--app-waterloo);
-  border-color: var(--app-waterloo);
-  color: #ffffff;
-}
-
+/* The booking form: the big confirm box. (How long is a dropdown, styled like every other form box.) */
 .club-app .club-confirm-primary {
   border: 1px solid var(--app-line);
   border-radius: 6px;

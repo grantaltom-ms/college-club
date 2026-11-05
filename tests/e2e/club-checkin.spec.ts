@@ -91,9 +91,9 @@ test.describe("on a member's own phone", () => {
     await expect(room.getByTestId("check-in-opens")).toHaveCount(0);
   });
 
-  test("a class chair can be checked in the same way, from My classes", async ({ page }) => {
+  test("a class chair can be checked in the same way, from My bookings", async ({ page }) => {
     await actAs(page, "Camille Moreau");
-    await page.goto("/club/my-classes");
+    await page.goto("/club/my-bookings");
     const row = classRow(page, "Lunchtime Mobility");
     await expect(row.getByTestId("class-status")).toHaveText("You have a place");
     await row.getByRole("button", { name: "Check in for Lunchtime Mobility" }).click();
