@@ -77,10 +77,30 @@ export interface Headline {
   notStarted: number;
   quiet: number;
   quietShare: number;
+  /**
+   * Members in the "0 visits" band. The band is a visit-day rate: a visit day is a matched door entry
+   * or a booking. Members in the band can still have door taps that were not matched into a visit day.
+   */
   noVisits: number;
+  /** Sentence for the rarely-visit card. Names the band and the visit-day rule. */
+  noVisitsDetail: string;
   regulars: number;
   regularEntryShare: number;
   withoutFob: number;
+}
+
+/**
+ * What the 0-visits count means. A visit day is a day with a matched door entry or a booking.
+ * Door taps that were not matched into a visit day are outside the count.
+ */
+export function noVisitsDetail(count: number, doorEntries: number): string {
+  const verb = count === 1 ? "is" : "are";
+  const band = `${fmtInt(count)} ${verb} in the 0-visits band: no matched visit day (a day with a door entry or a booking).`;
+  if (doorEntries > 0) {
+    const noun = doorEntries === 1 ? "entry" : "entries";
+    return `${band} The band still has ${fmtInt(doorEntries)} door ${noun} that did not count as a visit day.`;
+  }
+  return `${band} Door taps count only when they match a visit day.`;
 }
 
 export function headline(members: Member[]): Headline {
@@ -88,13 +108,15 @@ export function headline(members: Member[]): Headline {
   const byBand = (b: Band) => rows.find((r) => r.band === b)!;
   const quiet = byBand("0 visits").members + byBand("Under 1/month").members;
   const active = started(members).length;
+  const zero = byBand("0 visits");
   return {
     total: members.length,
     started: active,
     notStarted: members.length - active,
     quiet,
     quietShare: percent(quiet, members.length),
-    noVisits: byBand("0 visits").members,
+    noVisits: zero.members,
+    noVisitsDetail: noVisitsDetail(zero.members, zero.doorEntries),
     regulars: byBand("4+/month").members,
     regularEntryShare: byBand("4+/month").entryShare,
     withoutFob: members.filter((m) => !m.ownFob).length,

@@ -12,7 +12,9 @@ test("the email page leads with list size and the jump, then the comparisons", a
   await expect(page.getByRole("heading", { name: "Best five by click rate" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Most recent twelve" })).toBeVisible();
   // The open-rate warning moved to the notes at the end; the flat charts and the lowest five are gone.
+  await expect(page.getByText("Dates are the Pacific day each email went out.")).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Limits of this data" })).toContainText("Open rates run too high");
+  await expect(page.getByRole("complementary", { name: "Limits of this data" })).toContainText("Tuesday at about 5:30 pm Pacific");
   await expect(page.getByRole("group", { name: "Click rate by year", exact: true })).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Watercooler click rate by month of the year" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Lowest five by click rate" })).toHaveCount(0);

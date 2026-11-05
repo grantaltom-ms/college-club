@@ -8,6 +8,7 @@ import { formatDay } from "@/lib/dates";
 import { listJump, listSize, quarterVsYearAgo, weeklyByQuarter, fmtPct, type EmailData } from "@/lib/mailchimp";
 import { latestMonth, monthLabel, reconciliationFlags } from "@/lib/membership";
 import { changePct, yearToDate, type ShellData } from "@/lib/shells";
+import type { ReservationData } from "@/lib/reservations";
 import { bookingYearOverYear, fmtInt, headline, multiBooking, yearOverYear } from "@/lib/stats";
 import { fmtChange, storyLines } from "@/lib/summary";
 import type { DashboardData, MembershipData } from "@/lib/types";
@@ -19,10 +20,21 @@ export default function SummaryPage() {
   const shells = useJson<ShellData>("/api/shells", "The shell figures could not be loaded.");
   const email = useJson<EmailData>("/api/email", "The email figures could not be loaded.");
   const membership = useJson<MembershipData>("/api/membership", "The membership figures could not be loaded.");
+  const reservations = useJson<ReservationData>("/api/reservations", "The reservation figures could not be loaded.");
   return (
     <>
       <h1 className="page-title">How the club is doing.</h1>
-      <WithData>{(data) => <Summary data={data} shells={shells.state} email={email.state} membership={membership.state} />}</WithData>
+      <WithData>
+        {(data) => (
+          <Summary
+            data={data}
+            shells={shells.state}
+            email={email.state}
+            membership={membership.state}
+            reservations={reservations.state}
+          />
+        )}
+      </WithData>
     </>
   );
 }
@@ -78,7 +90,19 @@ function Pending({ area, state }: { area: string; state: JsonState<unknown> }) {
   );
 }
 
-function Summary({ data, shells, email, membership }: { data: DashboardData; shells: JsonState<ShellData>; email: JsonState<EmailData>; membership: JsonState<MembershipData> }) {
+function Summary({
+  data,
+  shells,
+  email,
+  membership,
+  reservations,
+}: {
+  data: DashboardData;
+  shells: JsonState<ShellData>;
+  email: JsonState<EmailData>;
+  membership: JsonState<MembershipData>;
+  reservations: JsonState<ReservationData>;
+}) {
   const h = headline(data.members);
   const mb = multiBooking(data.members);
   const door = yearOverYear(data.door);
@@ -103,6 +127,7 @@ function Summary({ data, shells, email, membership }: { data: DashboardData; she
   const dates: string[] = [`member visits ${formatDay(data.dataThrough, true)}`];
   const lastDoor = data.door.periods[data.door.periods.length - 1]?.lastDay;
   if (lastDoor) dates.push(`front door ${formatDay(lastDoor, true)}`);
+  if (reservations.status === "ready" && reservations.data.through) dates.push(`reservations ${formatDay(reservations.data.through, true)}`);
   if (shells.status === "ready") dates.push(`shells ${formatDay(shells.data.through, true)}`);
   if (email.status === "ready" && email.data.through) dates.push(`email ${formatDay(email.data.through, true)}`);
   if (membership.status === "ready") {
@@ -136,7 +161,7 @@ function Summary({ data, shells, email, membership }: { data: DashboardData; she
             area="Members who rarely visit"
             value={fmtInt(h.quiet)}
             lead={`of ${fmtInt(h.total)} members came in less than once a month this year (${h.quietShare}%).`}
-            detail={`${fmtInt(h.noVisits)} have not come in at all.`}
+            detail={h.noVisitsDetail}
             note={h.notStarted > 0 ? `${fmtInt(h.notStarted)} new members haven't started yet (off the waitlist).` : undefined}
             rosterChange={`Down from ${fmtInt(ICREW_QUIET_BEFORE)} because the count now uses the QuickBooks list of paying members (${fmtInt(h.total)}) instead of the iCrew list. Club usage didn’t improve; the list of who counts as a member changed.`}
             href="/visits"

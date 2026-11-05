@@ -1,5 +1,32 @@
 const DAY_MS = 86_400_000;
 
+const PACIFIC = "America/Los_Angeles";
+
+/** Parts, not a formatted string, so the calendar date does not depend on a locale's separators. */
+const pacificDayParts = new Intl.DateTimeFormat("en-US", {
+  timeZone: PACIFIC,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * The America/Los_Angeles calendar date of an instant, as YYYY-MM-DD.
+ * A Tuesday 5:30 pm Pacific send is already Wednesday in UTC; this keeps Tuesday.
+ * An unreadable instant falls back to the first ten characters.
+ */
+export function pacificCalendarDate(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso.slice(0, 10);
+  const parts = pacificDayParts.formatToParts(at);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  const year = value("year");
+  const month = value("month");
+  const day = value("day");
+  if (year.length !== 4 || month.length !== 2 || day.length !== 2) return iso.slice(0, 10);
+  return `${year}-${month}-${day}`;
+}
+
 /** Parse YYYY-MM-DD as a UTC timestamp so results never shift with time zones. */
 export function parseDay(day: string): number {
   const [y, m, d] = day.split("-").map(Number);

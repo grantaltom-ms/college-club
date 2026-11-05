@@ -58,7 +58,7 @@ function Visits({ data }: { data: DashboardData }) {
               of {fmtInt(h.total)} members visited less than once a month.
             </p>
             <p className="hero-support">
-              {fmtInt(h.noVisits)} had no visit at all. The other {fmtInt(h.quiet - h.noVisits)} came in, but rarely.
+              {h.noVisitsDetail} The other {fmtInt(h.quiet - h.noVisits)} came in, but rarely.
               {h.notStarted > 0 && <> {fmtInt(h.notStarted)} new members haven&rsquo;t started yet, so they are not in the {fmtInt(h.quiet)}.</>}
             </p>
           </div>
