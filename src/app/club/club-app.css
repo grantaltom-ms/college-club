@@ -968,6 +968,22 @@
   border-color: var(--app-waterloo);
 }
 
+/* The other kinds of text box (the time of a practice or an incident, a search box, a number): the same white box with a Waterloo edge as the rest. */
+.club-app input[type="time"],
+.club-app input[type="search"],
+.club-app input[type="number"],
+.club-app input[type="datetime-local"],
+.club-app input[type="month"],
+.club-app input[type="url"],
+.club-app input[type="password"] {
+  background: #ffffff;
+  border: 1px solid var(--app-waterloo);
+  border-radius: 4px;
+  color: var(--app-cyberspace);
+  font-family: var(--body);
+  font-size: 17px;
+}
+
 /* My bill's receipt header: white on its dark block, and the small rule under the month in Oyster (it was the Sun yellow, which is not in this palette). */
 .club-app .club-bill-month {
   color: #ffffff;

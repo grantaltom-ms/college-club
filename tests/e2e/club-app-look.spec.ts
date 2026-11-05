@@ -30,9 +30,11 @@ const visit = async (page: Page, screen: Screen) => {
  */
 type Screen = { name: string; who: string | null; path: string; h1: string | RegExp; go?: (page: Page) => Promise<void> };
 
-const follow = (from: string, link: string) => async (page: Page) => {
+/** Go to a page, press the first link that matches, and wait until the address has really changed to the one it leads to. */
+const follow = (from: string, link: string, arrives: RegExp) => async (page: Page) => {
   await page.goto(from);
   await page.locator(link).first().click();
+  await page.waitForURL(arrives);
 };
 
 const SCREENS: Screen[] = [
@@ -47,26 +49,27 @@ const SCREENS: Screen[] = [
   // Part 2: every other member screen
   { name: "My bookings", who: "Nora Abernathy", path: "/club/my-bookings", h1: "My bookings" },
   { name: "All bookings (staff)", who: "Test staff", path: "/club/my-bookings", h1: "All bookings" },
-  { name: "the booking form", who: "Nora Abernathy", path: "", h1: /^Book \S/, go: follow("/club/book?what=gym", 'main a[href^="/club/book/new"]') },
+  { name: "the booking form", who: "Nora Abernathy", path: "", h1: /^Book \S/, go: follow("/club/book?what=gym", 'main a[href^="/club/book/new"]', /\/club\/book\/new\?/) },
   { name: "My classes", who: "Nora Abernathy", path: "/club/my-classes", h1: "My classes" },
   { name: "My classes (staff)", who: "Test staff", path: "/club/my-classes", h1: "My classes" },
   { name: "Fitness classes", who: "Nora Abernathy", path: "/club/classes", h1: "Fitness classes" },
   { name: "Fitness classes by day", who: "Nora Abernathy", path: "/club/classes?view=day", h1: "Fitness classes" },
   { name: "Fitness classes (staff)", who: "Test staff", path: "/club/classes", h1: "Fitness classes" },
-  { name: "one class and its dates", who: "Nora Abernathy", path: "", h1: /\S/, go: follow("/club/classes", 'main a[href^="/club/classes/of/"]') },
+  { name: "one class and its dates", who: "Nora Abernathy", path: "", h1: /\S/, go: follow("/club/classes", 'main a[href^="/club/classes/of/"]', /\/club\/classes\/of\//) },
   {
     name: "one class session",
     who: "Nora Abernathy",
     path: "",
     h1: /\S/,
     go: async (page) => {
-      await follow("/club/classes", 'main a[href^="/club/classes/of/"]')(page);
+      await follow("/club/classes", 'main a[href^="/club/classes/of/"]', /\/club\/classes\/of\//)(page);
       await page.locator('main a[href^="/club/classes/"]:not([href^="/club/classes/of/"]):not([href="/club/classes/manage"])').first().click();
+      await page.waitForURL(/\/club\/classes\/(?!of\/|manage)[^/?]+$/);
     },
   },
   { name: "Events", who: "Nora Abernathy", path: "/club/events", h1: "Events" },
   { name: "Events (staff)", who: "Test staff", path: "/club/events", h1: "Events" },
-  { name: "one event", who: "Nora Abernathy", path: "", h1: /\S/, go: follow("/club/events", 'main a[href^="/club/events/"]:not([href="/club/events/manage"])') },
+  { name: "one event", who: "Nora Abernathy", path: "", h1: /\S/, go: follow("/club/events", 'main a[href^="/club/events/"]:not([href="/club/events/manage"])', /\/club\/events\/(?!manage)[^/?]+$/) },
   { name: "My bill", who: "Nora Abernathy", path: "/club/my-bill", h1: "My bill" },
   { name: "My bill (staff, no household chosen)", who: "Test staff", path: "/club/my-bill", h1: "My bill" },
   { name: "My boats", who: "Nora Abernathy", path: "/club/my-boats", h1: "My boats" },
@@ -74,7 +77,7 @@ const SCREENS: Screen[] = [
   { name: "My practices", who: "Nora Abernathy", path: "/club/my-practices", h1: "My practices" },
   { name: "Practices (a coach)", who: "Kenji Tanaka", path: "/club/practices", h1: "Practices" },
   { name: "Set up a practice", who: "Kenji Tanaka", path: "/club/practices/new", h1: "Set up a practice" },
-  { name: "one practice", who: "Kenji Tanaka", path: "", h1: /\S/, go: follow("/club/practices", 'main a[href^="/club/practices/"]:not([href="/club/practices/new"])') },
+  { name: "one practice", who: "Kenji Tanaka", path: "", h1: /\S/, go: follow("/club/practices", 'main a[href^="/club/practices/"]:not([href="/club/practices/new"])', /\/club\/practices\/(?!new)[^/?]+$/) },
   { name: "Report damage", who: "Nora Abernathy", path: "/club/damage", h1: "Report damage" },
   { name: "Report an incident (a coach)", who: "Kenji Tanaka", path: "/club/incidents", h1: "Report an incident" },
   { name: "the sign-in prompt", who: null, path: "/club/my-bookings", h1: "Choose a test member" },
