@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isHouseholdName, loadLiveData, toCell, toDoorMonth, toFinanceMonth, toMember, toMembershipMonth, toPeriod, toTotal } from "./supabase";
+import { isHouseholdName, loadLiveData, loadShells, toCell, toDoorMonth, toFinanceMonth, toMember, toMembershipMonth, toPeriod, toShellData, toTotal, type ShellRow } from "./supabase";
 
 describe("database rows to dashboard data", () => {
   it("maps a members row, turning blanks into zeros and keeping dates", () => {
@@ -204,6 +204,105 @@ describe("finance_monthly rows", () => {
       sourceFile: "Sample Board Reporting Package.xlsx",
       note: "Sample note.",
     });
+  });
+});
+
+describe("shell ownership load", () => {
+  const cfg = { url: "https://example.supabase.co", key: "k" };
+  const row = (day: string, boat: string, ownership: string, rower: string): ShellRow => ({
+    boat,
+    seats: 1,
+    day,
+    kind: "member",
+    minutes: 60,
+    start_time: "07:00:00",
+    rower_key: rower,
+    ownership,
+  });
+  const clubTable = [
+    row("2025-06-01", "Heron", "club", "rower-2025"),
+    row("2026-06-01", "Heron", "club", "rower-club-2026"),
+    row("2026-07-01", "OnlyInClubTable", "club", "rower-only-club"),
+  ];
+  const allTable = [
+    row("2025-08-01", "ShouldNotAppear", "member", "rower-invented-2025"),
+    row("2026-06-01", "Heron", "club", "rower-club-2026"),
+    row("2026-06-02", "Puffin", "member", "rower-member-2026"),
+  ];
+
+  function serve() {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        const parsed = new URL(url);
+        const table = parsed.pathname.split("/").pop() as string;
+        let rows = table === "shell_outings" ? clubTable : table === "shell_outings_all" ? allTable : [];
+        const day = parsed.searchParams.get("day");
+        const ownership = parsed.searchParams.get("ownership");
+        if (day?.startsWith("lt.")) rows = rows.filter((r) => r.day < day.slice(3));
+        if (day?.startsWith("gte.")) rows = rows.filter((r) => r.day >= day.slice(4));
+        if (ownership?.startsWith("eq.")) rows = rows.filter((r) => r.ownership === ownership.slice(3));
+        if (ownership?.startsWith("in.")) {
+          const list = ownership.slice(3).replace(/[()]/g, "").split(",");
+          rows = rows.filter((r) => list.includes(r.ownership ?? ""));
+        }
+        return new Response(JSON.stringify(rows), { status: 200 });
+      }),
+    );
+    return urls;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("club only reads shell_outings, including 2025 and 2026, and never the full table", async () => {
+    const urls = serve();
+    const data = await loadShells(cfg, "2026-11-04");
+    expect(urls).toEqual(["https://example.supabase.co/rest/v1/shell_outings?select=*&order=day.asc,id.asc&limit=1000&offset=0"]);
+    expect(data.ownership).toEqual(["club"]);
+    expect(data.memberFrom).toBeUndefined();
+    expect(data.outings.map((o) => `${o.day} ${o.boat}`)).toEqual(["2025-06-01 Heron", "2026-06-01 Heron", "2026-07-01 OnlyInClubTable"]);
+    expect(JSON.stringify(data)).not.toMatch(/rower-/);
+  });
+
+  it("member reads 2026 rows from shell_outings_all and does not invent a 2025 member year", async () => {
+    const urls = serve();
+    const data = await loadShells(cfg, "2026-11-04", "member");
+    expect(urls).toEqual([
+      "https://example.supabase.co/rest/v1/shell_outings_all?select=*&order=day.asc,id.asc&limit=1000&offset=0&ownership=eq.member&day=gte.2026-01-01",
+    ]);
+    expect(data.ownership).toEqual(["member"]);
+    expect(data.memberFrom).toBe("2026-01-01");
+    expect(data.outings.map((o) => o.boat)).toEqual(["Puffin"]);
+    expect(data.outings.every((o) => o.day >= "2026-01-01")).toBe(true);
+    expect(JSON.stringify(data)).not.toContain("rower-member-2026");
+    expect(JSON.stringify(data)).not.toContain("ShouldNotAppear");
+  });
+
+  it("club plus member keeps 2025 from the club table and 2026 from the full table, without double counting", async () => {
+    const urls = serve();
+    const data = await loadShells(cfg, "2026-11-04", ["club", "member"]);
+    expect(urls).toEqual([
+      "https://example.supabase.co/rest/v1/shell_outings?select=*&order=day.asc,id.asc&limit=1000&offset=0&day=lt.2026-01-01",
+      "https://example.supabase.co/rest/v1/shell_outings_all?select=*&order=day.asc,id.asc&limit=1000&offset=0&ownership=in.(club,member)&day=gte.2026-01-01",
+    ]);
+    expect(data.outings.map((o) => `${o.day} ${o.boat}`)).toEqual(["2025-06-01 Heron", "2026-06-01 Heron", "2026-06-02 Puffin"]);
+    expect(data.ownership).toEqual(["club", "member"]);
+    expect(data.memberFrom).toBe("2026-01-01");
+    expect(JSON.stringify(data)).not.toContain("OnlyInClubTable");
+    expect(JSON.stringify(data)).not.toContain("ShouldNotAppear");
+  });
+
+  it("an unknown fleet falls back to the club series", async () => {
+    const urls = serve();
+    const data = await loadShells(cfg, "2026-11-04", "all");
+    expect(urls[0]).toContain("/shell_outings?");
+    expect(urls.some((url) => url.includes("shell_outings_all"))).toBe(false);
+    expect(data.ownership).toEqual(["club"]);
+    expect(toShellData([row("2026-03-02", "Puffin", "member", "secret")], "2026-11-04", ["member"]).outings).toEqual([
+      { boat: "Puffin", seats: 1, day: "2026-03-02", team: false, minutes: 60, startHour: 7 },
+    ]);
   });
 });
 

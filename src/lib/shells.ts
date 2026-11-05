@@ -23,6 +23,33 @@ export interface RowerCount {
   sameDates: number;
 }
 
+export type ShellOwnership = "club" | "member";
+
+/** First day member-owned outings exist. The log has none before this, and the page must not invent them. */
+export const SHELL_MEMBER_FROM = "2026-01-01";
+
+const SHELL_FLEETS: ShellOwnership[] = ["club", "member"];
+
+/**
+ * `club`, `member`, or `club,member`. A blank or unknown value falls back to club,
+ * so the year-over-year figures stay on the club fleet unless someone asks otherwise.
+ */
+export function normalizeShellOwnership(raw: readonly string[] | string | null | undefined): ShellOwnership[] {
+  const parts = typeof raw === "string" ? raw.split(",") : (raw ?? []);
+  const wanted = new Set<ShellOwnership>();
+  for (const part of parts) {
+    const value = part.trim().toLowerCase();
+    if (value === "club" || value === "member") wanted.add(value);
+  }
+  const selected = SHELL_FLEETS.filter((fleet) => wanted.has(fleet));
+  return selected.length > 0 ? selected : ["club"];
+}
+
+/** Query value for `?ownership=`, in a stable order. */
+export function shellOwnershipQuery(raw: readonly string[] | string | null | undefined): string {
+  return normalizeShellOwnership(raw).join(",");
+}
+
 export interface ShellData {
   /** "live" comes from Supabase; "sample" is made-up data for development and tests. */
   source: "live" | "sample";
@@ -30,6 +57,13 @@ export interface ShellData {
   through: string;
   outings: Outing[];
   rowers: RowerCount[];
+  /** Fleets included in `outings`. Absent means club only, the historical series. */
+  ownership?: ShellOwnership[];
+  /**
+   * Set when member-owned boats are included. Those rows start on this day (2026).
+   * A prior year in the same response, if any, is club boats only.
+   */
+  memberFrom?: string;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -266,8 +300,8 @@ const SAMPLE_PER_MONTH: Record<string, number[]> = {
 };
 const SAMPLE_HOURS = [5, 5, 5, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 9, 10, 12, 16, 17, 18];
 
-/** Made-up outings for development and tests. Boats are invented; nothing here is real club data. */
-export function sampleShells(): ShellData {
+/** Made-up club outings for development and tests. Boats are invented; nothing here is real club data. */
+function clubSample(): ShellData {
   const rand = rng(77);
   const weights = SAMPLE_BOATS.map((b) => b[2]);
   const weightSum = weights.reduce((s, w) => s + w, 0);
@@ -314,4 +348,87 @@ export function sampleShells(): ShellData {
     };
   });
   return { source: "sample", through, outings, rowers };
+}
+
+const MEMBER_BOATS: [string, number][] = [
+  ["Puffin", 1],
+  ["Murre", 1],
+  ["Auk", 2],
+];
+/** January through October, and only in 2026. October stops on the club sample's last day. */
+const MEMBER_PER_MONTH = [8, 6, 8, 7, 8, 6, 10, 6, 5, 3];
+
+/** Invented member-owned outings for demos. 2026 only: there is no 2025 member series to copy. */
+function memberSample(): ShellData {
+  const rand = rng(91);
+  const through = "2026-10-12";
+  const outings: Outing[] = [];
+  const rowerDays: { day: string; rower: number }[] = [];
+  MEMBER_PER_MONTH.forEach((count, i) => {
+    const month = i + 1;
+    const last = Number(monthEnd(2026, month).slice(8));
+    const days = `${2026}-${pad2(month)}` === through.slice(0, 7) ? Number(through.slice(8)) : last;
+    for (let n = 0; n < count; n++) {
+      const [boat, seats] = MEMBER_BOATS[Math.floor(rand() * MEMBER_BOATS.length)];
+      const day = `2026-${pad2(month)}-${pad2(1 + Math.floor(rand() * days))}`;
+      outings.push({
+        boat,
+        seats,
+        day,
+        team: false,
+        minutes: [60, 90, 90, 120][Math.floor(rand() * 4)],
+        startHour: SAMPLE_HOURS[Math.floor(rand() * SAMPLE_HOURS.length)],
+      });
+      rowerDays.push({ day, rower: 200 + Math.floor(rand() * 12) });
+    }
+  });
+  outings.sort((a, b) => a.day.localeCompare(b.day) || a.boat.localeCompare(b.boat));
+  return {
+    source: "sample",
+    through,
+    outings,
+    rowers: [
+      {
+        year: 2026,
+        rowers: new Set(rowerDays.map((r) => r.rower)).size,
+        sameDates: new Set(rowerDays.filter((r) => r.day <= through).map((r) => r.rower)).size,
+      },
+    ],
+    ownership: ["member"],
+    memberFrom: SHELL_MEMBER_FROM,
+  };
+}
+
+function mergeSamples(club: ShellData, member: ShellData): ShellData {
+  const outings = [...club.outings, ...member.outings].sort((a, b) => a.day.localeCompare(b.day) || a.boat.localeCompare(b.boat));
+  const years = [...new Set([...club.rowers, ...member.rowers].map((r) => r.year))].sort((a, b) => a - b);
+  return {
+    source: "sample",
+    through: club.through >= member.through ? club.through : member.through,
+    outings,
+    rowers: years.map((year) => {
+      const clubYear = club.rowers.find((r) => r.year === year);
+      const memberYear = member.rowers.find((r) => r.year === year);
+      return {
+        year,
+        rowers: (clubYear?.rowers ?? 0) + (memberYear?.rowers ?? 0),
+        sameDates: (clubYear?.sameDates ?? 0) + (memberYear?.sameDates ?? 0),
+      };
+    }),
+    ownership: ["club", "member"],
+    memberFrom: SHELL_MEMBER_FROM,
+  };
+}
+
+/**
+ * Made-up outings for development and tests. Defaults to the club fleet, matching the live page.
+ * Member-owned boats are added only when asked, and only in 2026.
+ */
+export function sampleShells(ownership: readonly string[] | string | null = ["club"]): ShellData {
+  const selected = normalizeShellOwnership(ownership);
+  const club = clubSample();
+  if (!selected.includes("member")) return club;
+  const member = memberSample();
+  if (!selected.includes("club")) return member;
+  return mergeSamples(club, member);
 }

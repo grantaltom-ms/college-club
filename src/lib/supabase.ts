@@ -1,5 +1,5 @@
 import { buildRoster, ROSTER_SOURCE, type QbRow } from "./roster";
-import { sameDateCutoff, type Outing, type RowerCount, type ShellData } from "./shells";
+import { normalizeShellOwnership, sameDateCutoff, SHELL_MEMBER_FROM, type Outing, type RowerCount, type ShellData } from "./shells";
 import {
   BAND_ORDER,
   type Band,
@@ -79,10 +79,11 @@ export function liveConfig(): { url: string; key: string } | null {
   return url && key ? { url: url.replace(/\/$/, ""), key } : null;
 }
 
-export async function fetchAll<T>(cfg: { url: string; key: string }, table: string, order: string): Promise<T[]> {
+export async function fetchAll<T>(cfg: { url: string; key: string }, table: string, order: string, filter = ""): Promise<T[]> {
   const rows: T[] = [];
+  const extra = filter ? `&${filter}` : "";
   for (let offset = 0; ; offset += PAGE) {
-    const res = await fetch(`${cfg.url}/rest/v1/${table}?select=*&order=${order}&limit=${PAGE}&offset=${offset}`, {
+    const res = await fetch(`${cfg.url}/rest/v1/${table}?select=*&order=${order}&limit=${PAGE}&offset=${offset}${extra}`, {
       headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` },
       cache: "no-store",
     });
@@ -296,6 +297,8 @@ export interface ShellRow {
   start_time: string | null;
   /** Scrambled code for the rower (never their name). Only used here, on the server, to count people. */
   rower_key: string | null;
+  /** "club" or "member" on shell_outings_all. The live club table is club boats. */
+  ownership?: string | null;
 }
 
 /** The browser gets the boat, day and time only: no rower code, so no way back to a person. */
@@ -326,7 +329,8 @@ export function countRowers(rows: ShellRow[], through: string): RowerCount[] {
 }
 
 /** Outings up to today (later bookings are left out until they happen). */
-export function toShellData(rows: ShellRow[], today: string): ShellData {
+export function toShellData(rows: ShellRow[], today: string, ownership: readonly string[] | string = ["club"]): ShellData {
+  const selected = normalizeShellOwnership(ownership);
   const kept = rows.filter((r) => r.day <= today);
   const through = kept.reduce((max, r) => (r.day > max ? r.day : max), "");
   return {
@@ -334,10 +338,36 @@ export function toShellData(rows: ShellRow[], today: string): ShellData {
     through,
     outings: kept.map(toOuting),
     rowers: countRowers(kept, through),
+    ownership: selected,
+    ...(selected.includes("member") ? { memberFrom: SHELL_MEMBER_FROM } : {}),
   };
 }
 
-export async function loadShells(cfg: { url: string; key: string }, today = new Date().toISOString().slice(0, 10)): Promise<ShellData> {
-  const rows = await fetchAll<ShellRow>(cfg, "shell_outings", "day.asc,id.asc");
-  return toShellData(rows, today);
+const SHELL_ORDER = "day.asc,id.asc";
+
+/**
+ * Club only reads `shell_outings`, the live club series (2025 and 2026).
+ * Member, or club plus member, keeps years before 2026 from that club series
+ * and reads 2026 onward from `shell_outings_all`. That table has no 2025 rows.
+ */
+export async function loadShells(
+  cfg: { url: string; key: string },
+  today = new Date().toISOString().slice(0, 10),
+  ownership: readonly string[] | string = ["club"],
+): Promise<ShellData> {
+  const selected = normalizeShellOwnership(ownership);
+  const clubOnly = selected.length === 1 && selected[0] === "club";
+  if (clubOnly) {
+    const rows = await fetchAll<ShellRow>(cfg, "shell_outings", SHELL_ORDER);
+    return toShellData(rows, today, selected);
+  }
+  const rows: ShellRow[] = [];
+  if (selected.includes("club")) {
+    const prior = await fetchAll<ShellRow>(cfg, "shell_outings", SHELL_ORDER, `day=lt.${SHELL_MEMBER_FROM}`);
+    rows.push(...prior);
+  }
+  const ownFilter = selected.length === 1 ? `ownership=eq.${selected[0]}` : `ownership=in.(${selected.join(",")})`;
+  const recent = await fetchAll<ShellRow>(cfg, "shell_outings_all", SHELL_ORDER, `${ownFilter}&day=gte.${SHELL_MEMBER_FROM}`);
+  rows.push(...recent);
+  return toShellData(rows, today, selected);
 }
