@@ -19,14 +19,20 @@ export function describeRules(state: ClubState, book: RuleBook, item: Item): { h
   const clock = (c: string) => formatClock(pacificWall("2026-01-15", clockToMinutes(c) === 1440 ? 1439 : clockToMinutes(c))).replace("11:59 pm", "midnight");
   const opens = rules.opensAt === "00:00" ? "midnight" : formatClock(pacificWall("2026-01-15", clockToMinutes(rules.opensAt)));
   const priv = item.isPrivate === true;
-  const need = requiredQualification && !priv ? state.qualifications.find((q) => q.code === requiredQualification)?.name : null;
+  const need = requiredQualification && !priv && !cls.coachesOnly ? state.qualifications.find((q) => q.code === requiredQualification)?.name : null;
   const lines = [
     `Book up to ${rules.windowDays} day${rules.windowDays === 1 ? "" : "s"} ahead. A new day opens at ${opens} Pacific time.`,
     `Bookings run from ${clock(rules.dayStart)} to ${clock(rules.dayEnd)}, in ${rules.slotMinutes}-minute steps.`,
     `The shortest booking is ${formatMinutes(rules.minMinutes)} and the longest is ${formatMinutes(rules.maxMinutes)}.`,
     limitWords(rules, type),
     `Cancel at least ${formatMinutes(rules.cancelCutoffMinutes)} before the start, or it counts as a late cancellation.`,
-    priv ? "This is a private boat. Its owners and the people an owner has invited can use it, and its skill level is not checked: the owner vouches for who uses it." : need ? `You need ${need}.` : "No qualification is needed.",
+    priv
+      ? "This is a private boat. Its owners and the people an owner has invited can use it, and its skill level is not checked: the owner vouches for who uses it."
+      : cls.coachesOnly
+        ? "Only coaches and club staff can book this boat. No skill level is checked: the coach decides who rows."
+        : need
+          ? `You need ${need}.`
+          : "No qualification is needed.",
   ];
   if (rules.gapMinutes > 0) lines.splice(3, 0, `Leave ${formatMinutes(rules.gapMinutes)} free between bookings of the same ${cls.name.toLowerCase()}.`);
   const places = item.places ?? 1;
@@ -39,7 +45,7 @@ export function describeRules(state: ClubState, book: RuleBook, item: Item): { h
   }
   if (cls.seats > 1) {
     lines.push(
-      `${item.name} has ${cls.seats} seats. You can add up to ${cls.seats - 1} other member${cls.seats - 1 === 1 ? "" : "s"} as crew; ${priv ? "each must be an owner or someone an owner has invited" : "each needs the same qualification"}. Crew do not count toward their own limits, but nobody can be in two boats at once.`,
+      `${item.name} has ${cls.seats} seats. You can add up to ${cls.seats - 1} other member${cls.seats - 1 === 1 ? "" : "s"} as crew; ${priv ? "each must be an owner or someone an owner has invited" : cls.coachesOnly ? "any active member can be crew" : "each needs the same qualification"}. Crew do not count toward their own limits, but nobody can be in two boats at once.`,
     );
   }
   return { heading: `Rules for ${item.name} (${cls.name.toLowerCase()})`, lines, placeholder: book.placeholder };

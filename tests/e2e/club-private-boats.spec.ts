@@ -73,10 +73,12 @@ test.describe("what members see", () => {
     await expect(shellRow(page, boat)).toBeVisible();
     await expect(shellRow(page, boat)).not.toContainText("needs ");
     await expect(page.getByTestId("my-boats-link")).toContainText("You can use private boats");
-    // The menu offers "My boats" to an owner, on every page, and the link goes to the right place.
+    // The My account menu offers "My boats" to an owner, on every page, and the link goes to the right place.
     const menu = page.getByRole("navigation", { name: "Member area" });
+    await menu.getByRole("button", { name: "My account" }).click();
     await expect(menu.getByRole("link", { name: "My boats" })).toHaveAttribute("href", "/club/my-boats");
     await page.goto("/club/my-bookings");
+    await menu.getByRole("button", { name: "My account" }).click();
     await expect(menu.getByRole("link", { name: "My boats" })).toBeVisible();
 
     // Someone who is not on the list never sees the boat, and cannot open its booking form by its address.
@@ -86,7 +88,9 @@ test.describe("what members see", () => {
     await expect(shellRow(page, boat)).toHaveCount(0);
     await expect(page.getByText(boat)).toHaveCount(0);
     await expect(page.getByTestId("my-boats-link")).toHaveCount(0);
-    // ...and the menu does not offer "My boats" to someone with no private boat.
+    // ...and the My account menu does not offer "My boats" to someone with no private boat (opened, so the test would see it).
+    await page.getByRole("navigation", { name: "Member area" }).getByRole("button", { name: "My account" }).click();
+    await expect(page.getByRole("navigation", { name: "Member area" }).getByRole("link", { name: "My bookings" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Member area" }).getByRole("link", { name: "My boats" })).toHaveCount(0);
     expect((await page.goto(href))?.status()).toBe(404);
     await page.goto("/club/my-boats");

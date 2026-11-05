@@ -93,7 +93,19 @@ export function parseRuleBook(input: unknown, qualifications: Pick<Qualification
     const need = cls.requiredQualification ?? null;
     if (need !== null && !qualifications.some((q) => q.code === need)) throw new RuleBookError(`${where}: the qualification "${need}" does not exist.`);
     checkOverrides(defaults, cls.rules ?? {}, `${where} rules`);
-    return { code: cls.code, type: cls.type as BookingType, name: cls.name, seats: cls.seats!, requiredQualification: need, rules: cls.rules ?? {} };
+    if (cls.coachesOnly !== undefined && typeof cls.coachesOnly !== "boolean") throw new RuleBookError(`${where}: coachesOnly must be true or false.`);
+    if (cls.coachesOnly === true && need !== null) {
+      throw new RuleBookError(`${where}: a coachesOnly class cannot also need a qualification (no skill level is checked for it: the coach decides who rows).`);
+    }
+    return {
+      code: cls.code,
+      type: cls.type as BookingType,
+      name: cls.name,
+      seats: cls.seats!,
+      requiredQualification: need,
+      ...(cls.coachesOnly === true ? { coachesOnly: true } : {}),
+      rules: cls.rules ?? {},
+    };
   });
   return { placeholder: data.placeholder !== false, defaults, classes };
 }

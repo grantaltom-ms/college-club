@@ -25,17 +25,18 @@ export default async function MemberLayout({ children }: { children: React.React
   const links: MemberNavLink[] = [];
   if (actor) {
     links.push({ href: "/club/book", label: "Book", group: "go" });
-    links.push({ href: "/club/my-bookings", label: actor.kind === "staff" ? "All bookings" : "My bookings", group: actor.kind === "staff" ? "desk" : "mine" });
+    links.push({ href: "/club/my-bookings", label: actor.kind === "staff" ? "All bookings" : "My bookings", group: actor.kind === "staff" ? "desk" : "me" });
     links.push({ href: "/club/classes", label: "Classes", group: "go" });
     links.push({ href: "/club/events", label: "Events", group: "go" });
-    if (actor.kind === "member") links.push({ href: "/club/my-classes", label: "My classes", group: "mine" });
-    if (actor.kind === "member") links.push({ href: "/club/my-bill", label: "My bill", group: "mine" });
-    if (hasBoats) links.push({ href: "/club/my-boats", label: "My boats", group: "mine" });
+    // A member's own pages are one dropdown, My account: My household (the home link, below), My bookings, My classes, My bill, My boats.
+    if (actor.kind === "member") links.push({ href: "/club/my-classes", label: "My classes", group: "me" });
+    if (actor.kind === "member") links.push({ href: "/club/my-bill", label: "My bill", group: "me" });
+    if (hasBoats) links.push({ href: "/club/my-boats", label: "My boats", group: "me" });
     if (actor.kind === "staff" || (actor.kind === "member" && actor.member.isCoach === true)) {
       links.push({ href: "/club/practices", label: "Practices", group: "go" });
     }
     if (actor.kind === "member" && actor.member.isCoach === true) {
-      links.push({ href: "/club/incidents", label: "Report an incident", group: "mine" });
+      links.push({ href: "/club/incidents", label: "Report an incident", group: "coach" });
     }
     if (actor.kind === "staff") {
       links.push({ href: "/club/admin", label: "Staff office", group: "desk" });
@@ -62,6 +63,7 @@ export default async function MemberLayout({ children }: { children: React.React
       <MemberNav
         homeHref="/club"
         homeLabel={actor?.kind === "staff" ? "Households" : "My household"}
+        homeGroup={actor?.kind === "member" ? "me" : "mine"}
         links={links}
         showSignOut={actor?.source === "login"}
         acting={acting}

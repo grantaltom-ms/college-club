@@ -90,7 +90,7 @@ function ShellDenseList({
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
-  const freeCount = rows.filter((r) => r.free.length > 0 && !r.item.locked).length;
+  const freeCount = rows.filter((r) => r.free.length > 0 && !r.item.locked && !r.item.coachBlocked).length;
 
   return (
     <div className="club-shell-dense" data-testid="shell-dense">
@@ -105,7 +105,7 @@ function ShellDenseList({
           const meta = [skill, maker].filter(Boolean).join(" · ");
           const notices = openDamageNotices(state, item.item.id);
           // Still offer free-slot links when unqualified — the booking form explains the refusal in words.
-          const bookable = free.length > 0 && !item.locked;
+          const bookable = free.length > 0 && !item.locked && !item.coachBlocked;
 
           return (
             <li
@@ -119,6 +119,7 @@ function ShellDenseList({
                   <span className="club-shell-row-name">
                     {item.item.name}
                     {item.isPrivate && <span className="club-tag">Private</span>}
+                    {item.coachesOnly && <span className="club-tag">Coaches only</span>}
                   </span>
                   {(meta || kindLabel) && (
                     <span className="club-shell-row-meta">
@@ -137,6 +138,11 @@ function ShellDenseList({
               {item.locked && (
                 <p className="club-meta" data-testid="boat-locked-note">
                   Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
+                </p>
+              )}
+              {item.coachBlocked && (
+                <p className="club-meta" data-testid="coaches-only-note">
+                  Coaches only: this boat can only be booked by coaches and club staff. Ask a coach or club staff to book it.
                 </p>
               )}
               {notices.length > 0 && (
@@ -442,6 +448,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                         <h3>
                           {item.item.name}
                           {item.isPrivate && <span className="club-tag">Private</span>}
+                          {item.coachesOnly && <span className="club-tag">Coaches only</span>}
                         </h3>
                         <p className="club-meta">
                           {kind ? kind.label : item.className}
@@ -469,34 +476,43 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                           Locked: this private boat has no owner right now, so it cannot be booked until club staff add one.
                         </p>
                       )}
+                      {item.coachBlocked && (
+                        <p className="club-meta" data-testid="coaches-only-note">
+                          Coaches only: this boat can only be booked by coaches and club staff. Ask a coach or club staff to book it.
+                        </p>
+                      )}
                       <ol className="slots club-slots-compact">
                         {openSlots.map((slot) => {
                           const counted = slot.placesLeft !== null && !slot.heldFor && (slot.state === "free" || slot.state === "booked" || slot.state === "yours");
+                          // A free slot on a coaches-only boat is not offered to a member who is not a coach: it says so instead.
+                          const coachesOnlySlot = slot.state === "free" && item.coachBlocked;
                           const words = slot.heldFor
                             ? `${slot.heldFor} class`
-                            : counted && slot.state !== "yours"
-                              ? `${slot.placesLeft} of ${item.places} places left`
-                              : SLOT_WORDS[slot.state].toLowerCase();
+                            : coachesOnlySlot
+                              ? "coaches only"
+                              : counted && slot.state !== "yours"
+                                ? `${slot.placesLeft} of ${item.places} places left`
+                                : SLOT_WORDS[slot.state].toLowerCase();
                           const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${words}`;
                           const taken = slot.state === "booked" || slot.state === "class" || slot.state === "practice" || slot.state === "out_of_service" || slot.state === "not_open";
                           const shortTaken =
                             slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state]);
                           return (
                             <li key={slot.startsAt}>
-                              {slot.state === "free" && !item.locked ? (
+                              {slot.state === "free" && !item.locked && !item.coachBlocked ? (
                                 <Link className="slot slot-free" href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })} aria-label={label}>
                                   {formatClock(slot.startsAt)}
                                   {slot.placesLeft !== null && <small>{slot.placesLeft} left</small>}
                                 </Link>
                               ) : (
                                 <span
-                                  className={`slot slot-${slot.state}${taken ? " slot-taken" : ""}`}
+                                  className={`slot slot-${coachesOnlySlot ? "coaches" : slot.state}${taken ? " slot-taken" : ""}`}
                                   aria-label={label}
-                                  data-state={slot.state}
+                                  data-state={coachesOnlySlot ? "coaches_only" : slot.state}
                                   title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}
                                 >
                                   {formatClock(slot.startsAt)}
-                                  <small>{shortTaken}</small>
+                                  <small>{coachesOnlySlot ? "Coaches only" : shortTaken}</small>
                                 </span>
                               )}
                             </li>

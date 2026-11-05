@@ -37,8 +37,13 @@ describe("the shipped booking rules", () => {
     const seats = Object.fromEntries(RULE_BOOK.classes.map((c) => [c.code, c.seats]));
     expect(seats).toMatchObject({ "shell-single": 1, "shell-double": 2, "shell-quad": 4, "shell-eight": 8 });
     expect(classOf(RULE_BOOK, { classCode: "shell-quad" }).requiredQualification).toBe("scull-3");
-    expect(classOf(RULE_BOOK, { classCode: "shell-eight" }).requiredQualification).toBe("scull-3");
+    // The eight is for coaches and staff only, and its skill level is not checked: the coach decides who rows (Grant, Nov 5, 2026).
+    expect(classOf(RULE_BOOK, { classCode: "shell-eight" })).toMatchObject({ requiredQualification: null, coachesOnly: true });
     expect(classOf(RULE_BOOK, { classCode: "kayak" }).requiredQualification).toBeNull();
+  });
+
+  it("mark only the eight as coaches only", () => {
+    expect(RULE_BOOK.classes.filter((c) => c.coachesOnly === true).map((c) => c.code)).toEqual(["shell-eight"]);
   });
 
   it("cover shells, kayaks, paddle boards and the spaces, using only booking types the engine knows", () => {
@@ -102,6 +107,15 @@ describe("a mistake in the rules file is caught in words someone can act on", ()
     expect(parse((c) => (c.classes[0].seats = 0))).toThrow("seats must be a whole number from 1 to 12");
     expect(parse((c) => (c.classes[0].requiredQualification = "scull-9"))).toThrow('the qualification "scull-9" does not exist');
     expect(parse((c) => (c.classes = []))).toThrow('needs a "classes" list');
+  });
+
+  it("refuses a coachesOnly that is not true or false, and a coaches-only class that also names a skill level", () => {
+    expect(parse((c) => (c.classes[3].coachesOnly = "yes"))).toThrow("coachesOnly must be true or false");
+    expect(parse((c) => (c.classes[3].requiredQualification = "scull-3"))).toThrow("a coachesOnly class cannot also need a qualification");
+    // False is the same as leaving it out, and a skill level on an ordinary class is fine.
+    expect(parse((c) => (c.classes[3].coachesOnly = false))).not.toThrow();
+    expect(parse((c) => Object.assign(c.classes[0], { coachesOnly: false, requiredQualification: "scull-1" }))).not.toThrow();
+    expect(parse((c) => (c.classes[3].coachesOnly = false))().classes[3].coachesOnly).toBeUndefined();
   });
 
   it("refuses a class override that breaks the rules once combined with the defaults", () => {

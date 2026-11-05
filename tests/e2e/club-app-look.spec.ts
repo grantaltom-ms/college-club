@@ -292,11 +292,21 @@ test.describe("the members' and staff look", () => {
       return { color: s.color, line: s.borderBottomColor, width: s.borderBottomWidth };
     });
     expect(look).toEqual({ color: rgb("#33363a"), line: rgb("#536872"), width: "2px" });
-    // The others are not marked, and the home link is only marked on the home address.
-    const home = page.getByRole("navigation", { name: "Member area" }).getByRole("link", { name: "My household", exact: true });
-    await expect(home).not.toHaveAttribute("aria-current", "page");
+    // The others are not marked. A member's own pages sit under My account: its button carries the same line while one of them is open,
+    // and inside the opened list the household link is only marked on the home address.
+    const nav = page.getByRole("navigation", { name: "Member area" });
+    const account = nav.getByRole("button", { name: "My account" });
+    await expect(account).not.toHaveAttribute("data-active", "");
     await page.goto("/club");
-    await expect(home).toHaveAttribute("aria-current", "page");
+    await expect(account).toHaveAttribute("data-active", "");
+    const accountLook = await account.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { color: s.color, line: s.borderBottomColor, width: s.borderBottomWidth };
+    });
+    expect(accountLook).toEqual({ color: rgb("#33363a"), line: rgb("#536872"), width: "2px" });
+    await account.click();
+    await expect(nav.getByRole("link", { name: "My household", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "My bookings", exact: true })).not.toHaveAttribute("aria-current", "page");
   });
 
   test("on a phone the bar keeps the name and Menu on one row, and shows who is acting under it", async ({ page }) => {

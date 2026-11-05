@@ -20,6 +20,9 @@ test.describe("My bill", () => {
   test("a member opens it from the menu and sees this month's running lines for their household only", async ({ page }) => {
     await actAs(page, "Erik Lindqvist");
     const menu = page.getByRole("navigation", { name: "Member area" });
+    // My bill is one of the pages under the My account dropdown.
+    await expect(menu.getByRole("link", { name: "My bill", exact: true })).toBeHidden();
+    await menu.getByRole("button", { name: "My account" }).click();
     await expect(menu.getByRole("link", { name: "My bill", exact: true })).toBeVisible();
     await menu.getByRole("link", { name: "My bill", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "My bill" })).toBeVisible();

@@ -258,6 +258,94 @@
   }
 }
 
+/*
+ * My account: a member's own pages (My household, My bookings, My classes, My bill, My boats) in one dropdown on a wide screen, so the
+ * bar is less busy. On a phone the button is hidden and the same links are listed under the "My account" label in the menu panel.
+ */
+.club-app .club-account-button {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .club-app .club-nav-account {
+    display: block;
+    position: relative;
+  }
+
+  .club-app .club-nav .club-account-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  /* A small chevron drawn with borders, so it needs no font. It turns over while the menu is open. */
+  .club-app .club-account-button::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    margin-top: -4px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 220ms var(--ease), margin 220ms var(--ease);
+  }
+
+  .club-app .club-account-button[aria-expanded="true"]::after {
+    margin-top: 3px;
+    transform: rotate(-135deg);
+  }
+
+  /* Like the other items, the button carries the 2px line while the page you are on is one of its pages. */
+  .club-app .club-nav .club-account-button[data-active] {
+    color: var(--app-ink);
+    border-bottom-color: var(--app-waterloo);
+  }
+
+  .club-app .club-nav-account ul {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 45;
+    min-width: 220px;
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+    background: #ffffff;
+    border: 1px solid var(--app-line);
+    border-radius: 4px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .club-app .club-nav-account ul[data-open] {
+    display: block;
+  }
+
+  .club-app .club-nav-account li {
+    display: block;
+  }
+
+  .club-app .club-nav .club-nav-account li a {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: flex-start;
+    padding: 0 16px;
+    border-bottom: 0;
+    white-space: nowrap;
+  }
+
+  .club-app .club-nav .club-nav-account li a:hover {
+    background: var(--app-selected);
+  }
+
+  .club-app .club-nav .club-nav-account li a[aria-current="page"] {
+    border-bottom: 0;
+    background: var(--app-selected);
+  }
+}
+
 /* ---------- Frame, title band, headings ---------- */
 
 .club-app .club-frame {
@@ -758,9 +846,10 @@
   font-weight: 700;
 }
 
-/* Class, practice, out of service: a pale tint with a dashed edge and the word in the slot. */
+/* Class, practice, out of service, coaches only: a pale tint with a dashed edge and the word in the slot. */
 .club-app .slot-class,
 .club-app .slot-practice,
+.club-app .slot-coaches,
 .club-app .slot-out_of_service {
   background: var(--app-selected);
   border: 1px dashed var(--app-waterloo-hover);
