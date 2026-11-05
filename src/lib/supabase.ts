@@ -304,6 +304,7 @@ export interface ShellRow {
 /** The browser gets the boat, day and time only: no rower code, so no way back to a person. */
 export function toOuting(r: ShellRow): Outing {
   const hour = r.start_time ? Number(r.start_time.slice(0, 2)) : NaN;
+  const ownership = r.ownership === "member" ? "member" : r.ownership === "club" ? "club" : undefined;
   return {
     boat: r.boat,
     seats: r.seats ?? 1,
@@ -311,6 +312,7 @@ export function toOuting(r: ShellRow): Outing {
     team: r.kind === "team",
     minutes: r.minutes ?? 0,
     startHour: Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null,
+    ...(ownership ? { ownership } : {}),
   };
 }
 
@@ -347,8 +349,10 @@ const SHELL_ORDER = "day.asc,id.asc";
 
 /**
  * Club only reads `shell_outings`, the live club series (2025 and 2026).
- * Member, or club plus member, keeps years before 2026 from that club series
- * and reads 2026 onward from `shell_outings_all`. That table has no 2025 rows.
+ * Member reads every `shell_outings_all` row tagged member, including an earlier year when one exists.
+ * Club plus member keeps years before 2026 on the club series, adds any earlier member rows from the
+ * full table, and reads 2026 onward from `shell_outings_all` split by ownership.
+ * Club rows are never taken from both tables, and the full table is never read without an ownership filter.
  */
 export async function loadShells(
   cfg: { url: string; key: string },
@@ -361,13 +365,13 @@ export async function loadShells(
     const rows = await fetchAll<ShellRow>(cfg, "shell_outings", SHELL_ORDER);
     return toShellData(rows, today, selected);
   }
-  const rows: ShellRow[] = [];
-  if (selected.includes("club")) {
-    const prior = await fetchAll<ShellRow>(cfg, "shell_outings", SHELL_ORDER, `day=lt.${SHELL_MEMBER_FROM}`);
-    rows.push(...prior);
+  if (!selected.includes("club")) {
+    const rows = await fetchAll<ShellRow>(cfg, "shell_outings_all", SHELL_ORDER, "ownership=eq.member");
+    return toShellData(rows, today, selected);
   }
-  const ownFilter = selected.length === 1 ? `ownership=eq.${selected[0]}` : `ownership=in.(${selected.join(",")})`;
-  const recent = await fetchAll<ShellRow>(cfg, "shell_outings_all", SHELL_ORDER, `${ownFilter}&day=gte.${SHELL_MEMBER_FROM}`);
-  rows.push(...recent);
+  const priorClub = await fetchAll<ShellRow>(cfg, "shell_outings", SHELL_ORDER, `day=lt.${SHELL_MEMBER_FROM}`);
+  const priorMember = await fetchAll<ShellRow>(cfg, "shell_outings_all", SHELL_ORDER, `ownership=eq.member&day=lt.${SHELL_MEMBER_FROM}`);
+  const recent = await fetchAll<ShellRow>(cfg, "shell_outings_all", SHELL_ORDER, `ownership=in.(club,member)&day=gte.${SHELL_MEMBER_FROM}`);
+  const rows = [...priorClub, ...priorMember, ...recent].sort((a, b) => a.day.localeCompare(b.day) || a.boat.localeCompare(b.boat));
   return toShellData(rows, today, selected);
 }

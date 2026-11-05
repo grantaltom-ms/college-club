@@ -10,6 +10,11 @@ export interface ColumnGroup {
   xLabel: string | null;
   /** One bar per series, in the same order as `colors`. Zero leaves a gap. */
   values: number[];
+  /**
+   * Parts of each side-by-side bar, bottom to top. `segments[s]` splits `values[s]`.
+   * Leave it off for a solid bar. A 0 value still leaves that column blank.
+   */
+  segments?: number[][];
   /** First line is shown large; the rest are details. */
   tooltip: [string, ...string[]];
 }
@@ -22,6 +27,8 @@ interface Props {
   tick?: (n: number) => string;
   /** Stack the series in one column (parts of a whole) instead of side by side. */
   stacked?: boolean;
+  /** Colors for `segments`, one list per bar, bottom to top. */
+  segmentColors?: string[][];
 }
 
 const MARGIN = { top: 10, right: 8, bottom: 30, left: 44 };
@@ -30,7 +37,7 @@ const MARGIN = { top: 10, right: 8, bottom: 30, left: 44 };
  * Columns in groups (one group per month, one bar per year), so each month compares side by side.
  * With `stacked`, the series sit on top of each other in one column instead.
  */
-export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, tick = compact, stacked = false }: Props) {
+export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, tick = compact, stacked = false, segmentColors }: Props) {
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
 
@@ -52,7 +59,7 @@ export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, ti
   const tipY = activeGroup ? yOf(heightOf(activeGroup)) - 8 : 0;
 
   return (
-    <div className="chart-wrap" ref={ref}>
+    <div className="chart-wrap" ref={ref} data-stacked={groups.some((g) => g.segments) ? "true" : undefined}>
       {width > 0 && (
         <svg
           className="chart-svg"
@@ -76,16 +83,26 @@ export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, ti
             return (
               <g key={g.key}>
                 {stacked && <Stack values={g.values} colors={colors} x={left} width={barW} yOf={yOf} dim={active !== null && active !== i} />}
-                {!stacked && g.values.map((v, s) =>
-                  v > 0 ? (
+                {!stacked && g.values.map((v, s) => {
+                  const x = left + s * (barW + 2);
+                  const parts = g.segments?.[s];
+                  if (parts && v > 0) {
+                    const partColors = segmentColors?.[s] ?? parts.map(() => colors[s] ?? colors[0]);
+                    return (
+                      <g key={s}>
+                        <Stack values={parts} colors={partColors} x={x} width={barW} yOf={yOf} dim={active !== null && active !== i} />
+                      </g>
+                    );
+                  }
+                  return v > 0 ? (
                     <path
                       key={s}
-                      d={barPath(left + s * (barW + 2), yOf(v), barW, innerH - (yOf(v) - MARGIN.top))}
+                      d={barPath(x, yOf(v), barW, innerH - (yOf(v) - MARGIN.top))}
                       fill={colors[s]}
                       opacity={active === null || active === i ? 1 : 0.55}
                     />
-                  ) : null,
-                )}
+                  ) : null;
+                })}
                 {label && (
                   <text x={MARGIN.left + slot * i + slot / 2} y={height - 8} textAnchor="middle">
                     {label}

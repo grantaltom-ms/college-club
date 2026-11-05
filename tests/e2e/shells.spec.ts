@@ -120,13 +120,29 @@ test("ownership checkboxes default to club boats and can add member-owned boats 
   await expect(memberBox).not.toBeChecked();
   await expect(page.getByTestId("shells-ytd")).toHaveText(clubYtd.toLocaleString("en-US"));
   await expect(page.getByTestId("shells-ownership-note")).toHaveCount(0);
+  await expect(page.locator("[data-stacked='true']")).toHaveCount(0);
   await expect(group(page, "Shell outings by month, 2025 and 2026")).toBeVisible();
   expect(new URL(requested.at(-1)!).searchParams.get("ownership")).toBe("club");
 
   await memberBox.check();
-  await expect(page.getByTestId("shells-ownership-note")).toContainText("does not fill in a 2025 member-owned year");
+  await expect(page.getByTestId("shells-ownership-note")).toContainText("club boats on the bottom, member-owned boats on top");
+  await expect(page.getByTestId("shells-ownership-note")).toContainText("does not invent a member-owned year");
   await expect(page.getByTestId("shells-ytd")).toHaveText(bothYtd.toLocaleString("en-US"));
   await expect(group(page, "Shell outings by month, 2025 and 2026")).toBeVisible();
+  await expect(page.locator("[data-stacked='true']")).toHaveCount(1);
+  const stacked = page.locator(".card", { hasText: "member-owned boats on top" });
+  await expect(stacked.getByRole("list", { name: "Legend" })).toContainText("Member-owned");
+  await expect(stacked.getByRole("list", { name: "Legend" })).toContainText("2025 club");
+  await stacked.getByRole("button", { name: "View as table" }).click();
+  await expect(stacked.getByRole("columnheader")).toHaveText([
+    "Month",
+    "2025 club",
+    "2025 member-owned",
+    "2026 club",
+    "2026 member-owned",
+    "Club change, 2025 to 2026",
+  ]);
+  await stacked.getByRole("button", { name: "View as chart" }).click();
   expect(new URL(requested.at(-1)!).searchParams.get("ownership")).toBe("club,member");
 
   await clubBox.uncheck();
@@ -142,6 +158,7 @@ test("ownership checkboxes default to club boats and can add member-owned boats 
   await expect(clubBox).toBeChecked();
   await expect(memberBox).not.toBeChecked();
   await expect(page.getByTestId("shells-ytd")).toHaveText(clubYtd.toLocaleString("en-US"));
+  await expect(page.locator("[data-stacked='true']")).toHaveCount(0);
   await expect(group(page, "Shell outings by month, 2025 and 2026")).toBeVisible();
 });
 
