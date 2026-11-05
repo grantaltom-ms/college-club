@@ -20,11 +20,12 @@ export function PageBand({
   title: string;
   /** Some tests find the heading by this id. */
   titleTestId?: string;
-  /** A small word shown inside the heading after the title, for example "Cancelled". */
-  titleTag?: string;
+  /** A small word (or several) shown inside the heading after the title, for example "Cancelled" or ["Retired", "Private"]. */
+  titleTag?: string | string[];
   /** Up to two actions. */
   children?: ReactNode;
 }) {
+  const tags = (Array.isArray(titleTag) ? titleTag : titleTag ? [titleTag] : []).filter((t) => t !== "");
   return (
     <div className="club-band">
       <div className="club-band-inner">
@@ -32,7 +33,11 @@ export function PageBand({
           {eyebrow ? <p className="club-band-eyebrow">{eyebrow}</p> : null}
           <h1 data-testid={titleTestId}>
             {title}
-            {titleTag ? <span className="club-tag">{titleTag}</span> : null}
+            {tags.map((tag) => (
+              <span key={tag} className="club-tag">
+                {tag}
+              </span>
+            ))}
           </h1>
         </div>
         {children ? <div className="club-band-actions">{children}</div> : null}

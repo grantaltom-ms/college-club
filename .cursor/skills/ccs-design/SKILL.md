@@ -59,7 +59,8 @@ Two looks (Grant, Nov 4). Light mode only in both.
 |--------|------|--------|
 | Public / marketing | `/site`, homepage refresh | `ds-*` header, footer, Sun CTA, hero budget (brand + one headline + one short line + CTA + dominant image) |
 | Member & staff | `/club` (inside `(member)`) | Oyster top bar (`MemberNav`), Waterloo title band (`PageBand`), Waterloo buttons, white cards, functional density OK if still clear |
-| Sign-in, iPads, test landing page | `/club/sign-in`, `/club/ipad`, `/club/snacks`, `/club/start` | Their own layouts and looks; not inside `.club-app` |
+| Sign-in | `/club/sign-in` | Its own layout and look (the Oct 29 refresh); not inside `.club-app` |
+| iPads, test landing page | `/club/ipad`, `/club/snacks`, `/club/start` | Their own layouts, no bar or band, in the package's colours only (`club-kiosk.css`, inside `.club-kiosk`) |
 
 Public pages never show the bar, Happy Hour, drinks, access codes, or staff phone numbers. Only the main club line (206) 622-0624.
 

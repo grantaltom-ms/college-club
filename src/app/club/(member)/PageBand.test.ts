@@ -19,6 +19,13 @@ describe("PageBand", () => {
     expect(heading).toBe('Morning session<span class="club-tag">Cancelled</span>');
   });
 
+  it("draws several tags in order and skips empty ones", () => {
+    const html = renderToStaticMarkup(h(PageBand, { title: "Heron", titleTag: ["Retired", "", "Private", "Pool"] }));
+    const heading = /<h1[^>]*>(.*?)<\/h1>/.exec(html)![1];
+    expect(heading).toBe('Heron<span class="club-tag">Retired</span><span class="club-tag">Private</span><span class="club-tag">Pool</span>');
+    expect(renderToStaticMarkup(h(PageBand, { title: "Heron", titleTag: [""] }))).not.toContain("club-tag");
+  });
+
   it("draws the actions to the right of the heading when given", () => {
     const html = renderToStaticMarkup(h(PageBand, { title: "Events" }, h("button", { type: "button" }, "Add an event")));
     expect(html).toContain('<div class="club-band-actions"><button type="button">Add an event</button></div>');

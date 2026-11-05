@@ -12,6 +12,7 @@ import { getClubStore } from "@/club/store/instance";
 import { formatDay, pacificDate } from "@/club/time";
 import { SignedOut } from "../../SignedOut";
 import { CloseMonthForm } from "./CloseMonthForm";
+import { PageBand } from "../../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
 
@@ -65,7 +66,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
   return (
     <section>
-      <h1>Monthly billing</h1>
+      <PageBand eyebrow="Billing" title="Monthly billing" />
       <p>
         Close a month that has finished to freeze every household&apos;s bill and make the files for QuickBooks. A bill is: monthly dues, event tickets for everyone who held spots, visitor fees, and bar and snack-bar charges. Months are closed in order, and a
         closed month is never reopened: put a mistake right with an <Link href="/club/admin/charges">adjustment</Link> dated today, and it goes on the next bill.

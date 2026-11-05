@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { pickerEnabled } from "@/club/enabled";
 import { requireClub } from "@/club/guard";
+import "../club-kiosk.css";
 
 /**
  * The test landing page's frame: a plain header and the test-build banner, with none of the member menu (nobody is signed in
@@ -12,7 +13,7 @@ export default async function StartLayout({ children }: { children: React.ReactN
   await requireClub();
   if (!pickerEnabled()) notFound();
   return (
-    <>
+    <div className="club-kiosk">
       <header className="club-header">
         <div className="club-frame">
           <Link href="/club" className="club-wordmark">
@@ -26,6 +27,6 @@ export default async function StartLayout({ children }: { children: React.ReactN
         </p>
         <main>{children}</main>
       </div>
-    </>
+    </div>
   );
 }

@@ -10,6 +10,7 @@ import { formatDay } from "@/club/time";
 import { NOTICES } from "@/club/web";
 import { DeparturePreviewView } from "../../../DeparturePreviewView";
 import { SignedOut } from "../../../../SignedOut";
+import { PageBand } from "../../../../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
 
@@ -28,7 +29,7 @@ export default async function EndMembership({ params, searchParams }: { params: 
   if (household.status === "ended") {
     return (
       <section>
-        <h1>{household.displayName}</h1>
+        <PageBand eyebrow="Members" title={household.displayName} />
         <p>This membership already ended on {formatDay(household.endedOn!)}. Nothing in it can be changed.</p>
         <p>
           <Link href={`/club/household/${household.id}`}>Back to the household</Link>
@@ -40,7 +41,7 @@ export default async function EndMembership({ params, searchParams }: { params: 
   const preview = departurePreview(state, adults.map((m) => m.id), clubNow());
   return (
     <section>
-      <h1>End the membership of {household.displayName}?</h1>
+      <PageBand eyebrow="Members" title={`End the membership of ${household.displayName}?`} />
       {notice && (
         <p className="club-alert" role="alert">
           {notice}

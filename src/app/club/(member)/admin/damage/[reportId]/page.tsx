@@ -10,6 +10,7 @@ import { OPEN_DAMAGE } from "@/club/types";
 import { DamageNoteForm } from "../../../damage/DamageForms";
 import { SignedOut } from "../../../SignedOut";
 import { AssignForm, DismissForm, OutOfServiceForm, PriorityForm, RepairedForm, StartButton } from "../StaffDamageForms";
+import { PageBand } from "../../../PageBand";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -30,10 +31,7 @@ export default async function DamageReportPage({ params }: { params: Promise<{ r
 
   return (
     <section>
-      <h1>
-        {detail.itemName}
-        {r.major && <span className="club-tag">Major</span>}
-      </h1>
+      <PageBand eyebrow="Safety" title={detail.itemName} titleTag={r.major ? "Major" : undefined} />
       <p>
         <Link href="/club/admin/damage">Back to damage reports</Link>
       </p>

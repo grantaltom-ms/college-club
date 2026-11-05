@@ -10,6 +10,7 @@ import { getClubStore } from "@/club/store/instance";
 import { NOTICES } from "@/club/web";
 import { SignedOut } from "../../SignedOut";
 import { AttendanceRowView } from "../AttendanceRowView";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -42,7 +43,7 @@ export default async function CheckIn({ searchParams }: { searchParams: Promise<
 
   return (
     <section>
-      <h1>Check someone in</h1>
+      <PageBand eyebrow="Front desk" title="Check someone in" />
       <p className="club-meta">For when a member cannot check themselves in. Check-in opens {ATTENDANCE_RULES.defaults.checkInOpensMinutesBefore} minutes before the start (placeholder).</p>
       {notice && (
         <p className="club-alert" role="alert">

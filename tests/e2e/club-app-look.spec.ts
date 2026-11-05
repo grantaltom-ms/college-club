@@ -2,9 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { mockAll } from "./helpers";
 
 /**
- * The members' and staff look (design package "Waterloo Blocks", Nov 4 2026), checked on the screens that have been converted so far:
- * part 1 (the member home, the staff Households list and the Reservations screens) and part 2 (every other member screen). Each later
- * pull request adds the screens it converts to SCREENS below, so "no colour outside the palette" keeps growing to cover the whole app.
+ * The members' and staff look (design package "Waterloo Blocks", Nov 4 2026), checked on every screen of the logged-in app:
+ * part 1 (the member home, the staff Households list and the Reservations screens), part 2 (every other member screen) and part 3
+ * (the staff screens). The front-desk and snack-bar iPads and the test landing page have no top bar or band and are held to the
+ * palette in club-kiosk-look.spec.ts instead.
  *
  * Everything is measured as the browser actually draws it: the colours it paints, the sizes of what you tap, and whether a screen
  * scrolls sideways. What the browser draws is what a member sees, so that is what is held.
@@ -33,6 +34,15 @@ type Screen = { name: string; who: string | null; path: string; h1: string | Reg
 /** Go to a page, press the first link that matches, and wait until the address has really changed to the one it leads to. */
 const follow = (from: string, link: string, arrives: RegExp) => async (page: Page) => {
   await page.goto(from);
+  await page.locator(link).first().click();
+  await page.waitForURL(arrives);
+};
+
+/** From the staff Households list into one household, then by one of its links to a desk step (end, change details, remove). */
+const viaHousehold = (family: string, link: string, arrives: RegExp) => async (page: Page) => {
+  await page.goto("/club");
+  await page.locator('main a[href^="/club/household/"]', { hasText: family }).first().click();
+  await page.waitForURL(/\/club\/household\/[^/?]+$/);
   await page.locator(link).first().click();
   await page.waitForURL(arrives);
 };
@@ -82,6 +92,32 @@ const SCREENS: Screen[] = [
   { name: "Report an incident (a coach)", who: "Kenji Tanaka", path: "/club/incidents", h1: "Report an incident" },
   { name: "the sign-in prompt", who: null, path: "/club/my-bookings", h1: "Choose a test member" },
   { name: "the test member picker", who: null, path: "/club/act-as", h1: "Act as a test member" },
+  // Part 3: the staff screens
+  { name: "Staff office", who: "Test staff", path: "/club/admin", h1: "Staff office" },
+  { name: "Check someone in", who: "Test staff", path: "/club/admin/check-in", h1: "Check someone in" },
+  { name: "Reservation attendance", who: "Test staff", path: "/club/admin/reservations", h1: "Reservation attendance" },
+  { name: "Add a household", who: "Test staff", path: "/club/admin/households/new", h1: "Add a household" },
+  { name: "End a membership", who: "Test staff", path: "", h1: /^End the membership of /, go: viaHousehold("Abernathy", '[data-testid="end-link"]', /\/households\/[^/]+\/end$/) },
+  { name: "Change a person's details", who: "Test staff", path: "", h1: /^Change details for /, go: viaHousehold("Abernathy", '[data-testid="edit-link"]', /\/members\/[^/]+\/edit$/) },
+  { name: "Remove an adult", who: "Test staff", path: "", h1: /^Remove .+ from /, go: viaHousehold("Lindqvist", '[data-testid="remove-link"]', /\/remove\/[^/?]+$/) },
+  { name: "Import households", who: "Test staff", path: "/club/admin/import", h1: "Import households" },
+  { name: "End memberships from a file", who: "Test staff", path: "/club/admin/resignations", h1: "End memberships from a file" },
+  { name: "Charges", who: "Test staff", path: "/club/admin/charges", h1: "Charges" },
+  { name: "Visitors", who: "Test staff", path: "/club/admin/visitors", h1: "Visitors" },
+  { name: "Monthly billing", who: "Test staff", path: "/club/admin/billing", h1: "Monthly billing" },
+  { name: "Old bookings (staff)", who: "Test staff", path: "/club/admin/history", h1: "Old bookings" },
+  { name: "Tour requests", who: "Test staff", path: "/club/admin/tours", h1: "Tour requests" },
+  { name: "Front-desk iPad (staff page)", who: "Test staff", path: "/club/admin/ipad", h1: "Front-desk iPad" },
+  { name: "Private boats (staff)", who: "Test staff", path: "/club/admin/boats", h1: "Private boats" },
+  { name: "Damage reports (staff)", who: "Test staff", path: "/club/admin/damage", h1: "Damage reports" },
+  { name: "one damage report", who: "Test staff", path: "", h1: /\S/, go: follow("/club/admin/damage", 'main a[href^="/club/admin/damage/"]', /\/club\/admin\/damage\/[^/?]+$/) },
+  { name: "Incident reports (staff)", who: "Test staff", path: "/club/admin/incidents", h1: "Incident reports" },
+  { name: "one incident report", who: "Test staff", path: "", h1: /^Incident on /, go: follow("/club/admin/incidents", 'main a[href^="/club/admin/incidents/"]', /\/club\/admin\/incidents\/[^/?]+$/) },
+  { name: "Equipment", who: "Test staff", path: "/club/equipment", h1: "Equipment" },
+  { name: "one item of equipment", who: "Test staff", path: "", h1: /\S/, go: follow("/club/equipment", '[data-testid="equipment-edit-link"]', /\/club\/equipment\/[^/?]+$/) },
+  { name: "Load the equipment list", who: "Test staff", path: "/club/admin/equipment-import", h1: "Load the equipment list" },
+  { name: "Set up classes", who: "Test staff", path: "/club/classes/manage", h1: "Set up classes" },
+  { name: "Add an event", who: "Test staff", path: "/club/events/manage", h1: "Add an event" },
 ];
 
 /** The package's colours, as the browser writes them: rgb(r, g, b). */
@@ -126,6 +162,24 @@ test.describe("the members' and staff look", () => {
           return [...new Set(out)];
         }, [...ALLOWED]);
         expect(stray, `colours outside the palette on ${screen.name}`).toEqual([]);
+      });
+
+      test("reads in the package's faces: no text is drawn in the older sans (Figtree) except inside My bill's receipt", async ({ page }) => {
+        await page.setViewportSize({ width: 1180, height: 900 });
+        await actAs(page, screen.who);
+        await visit(page, screen);
+        await expect(page.locator(".club-band h1")).toBeVisible();
+        const sans = await page.evaluate(() => {
+          const out: string[] = [];
+          for (const el of document.querySelectorAll<HTMLElement>("body *")) {
+            const s = getComputedStyle(el);
+            if (s.display === "none" || s.visibility === "hidden") continue;
+            if (!([...el.childNodes].some((n) => n.nodeType === 3 && (n.textContent ?? "").trim() !== ""))) continue;
+            if (s.fontFamily.includes("Figtree") && !el.closest('[class*="club-bill"]')) out.push(`${el.tagName.toLowerCase()}.${typeof el.className === "string" ? el.className.split(" ")[0] : ""} ${s.fontSize}`);
+          }
+          return [...new Set(out)];
+        });
+        expect(sans, `older sans on ${screen.name}`).toEqual([]);
       });
 
       test("has one H1, in the Waterloo title band, in white Cinzel", async ({ page }) => {

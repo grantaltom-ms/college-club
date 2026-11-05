@@ -8,6 +8,7 @@ import { pacificWall } from "@/club/time";
 import { centsFromForm, dateParam, NOTICES, timeParam } from "@/club/web";
 import { EventPlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -39,7 +40,7 @@ export default async function ManageEvents({ searchParams }: { searchParams: Pro
 
   return (
     <section>
-      <h1>Add an event</h1>
+      <PageBand eyebrow="Events" title="Add an event" />
       <EventPlaceholderNote />
       <p className="club-meta">After adding it you can edit it, see who is coming, cancel it, and download everyone&rsquo;s personal RSVP links from its page.</p>
       {notice && (

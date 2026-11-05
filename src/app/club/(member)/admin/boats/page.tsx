@@ -11,6 +11,7 @@ import { idParam } from "@/club/web";
 import { AddToBoatButton, RemoveFromBoatButton } from "../../BoatButtons";
 import { SignedOut } from "../../SignedOut";
 import { inviteAsStaff, makeOwner, takeOffBoat } from "./actions";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -34,7 +35,7 @@ export default async function PrivateBoatsPage({ searchParams }: { searchParams:
 
   return (
     <section>
-      <h1>Private boats</h1>
+      <PageBand eyebrow="Boats and spaces" title="Private boats" />
       <p>
         A private boat belongs to members. Only its owners, and the people an owner has invited, can see or book it, and its skill level is not checked. Staff name the owners; an owner can invite others from{" "}
         <em>My boats</em>. If a boat has no owner who can still use it, it is locked until you add one here. <Link href="/club/admin">Back to the Staff office</Link> &middot; <Link href="/club/admin/equipment-import">Load the equipment list</Link>

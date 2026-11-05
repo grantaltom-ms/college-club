@@ -1,0 +1,68 @@
+/*
+ * The kiosk screens' colours: the front-desk check-in iPad, the honor snack bar iPad and the test landing page (/club/start), Nov 2026.
+ *
+ * Grant's rule for these three (Nov 4): they take the new design package's colours and nothing else. They keep their own layouts,
+ * their large taps and their own fonts and shapes, and they have no top bar and no title band, because a shared screen must not show
+ * anyone's menu. So this is only a palette swap: the older warm tokens (cream paper, warm lines, beige tint) are remapped to the
+ * package's white and cool lines inside `.club-kiosk`, and the three kinds of note are drawn in the package's palette.
+ *
+ * Where it applies: ONLY inside `.club-kiosk`, which the ipad, snacks and start layouts put around their pages. Nothing else imports
+ * this file, and club-kiosk.test.ts holds that, the palette and the scope.
+ */
+
+.club-kiosk {
+  /* The palette (the package's values, the same ones club-app.css uses). */
+  --kiosk-canvas: #ffffff;
+  --kiosk-line: #c3cbce;
+  --kiosk-selected: #e6ebed;
+  --kiosk-focus: #7f96a0;
+  --kiosk-waterloo: #536872;
+  --kiosk-waterloo-hover: #435661;
+  --kiosk-ink: #33363a;
+
+  /* Remap the older tokens inside this scope only. */
+  --paper: var(--kiosk-canvas);
+  --card: var(--kiosk-canvas);
+  --hairline: var(--kiosk-line);
+  --grid: var(--kiosk-line);
+  --oyster-50: var(--kiosk-selected);
+  --waterloo-dark: var(--kiosk-waterloo-hover);
+  --focus: var(--kiosk-focus);
+  --shadow-xs: 0 1px 2px rgba(51, 54, 58, 0.06);
+  --shadow-md: 0 8px 24px rgba(51, 54, 58, 0.1);
+
+  min-height: 100vh;
+  background: var(--kiosk-canvas);
+}
+
+/* The landing page's plain header: white, with the cool line (it used to be a see-through cream). */
+.club-kiosk .club-header {
+  background: var(--kiosk-canvas);
+  backdrop-filter: none;
+}
+
+/* The three kinds of note, in the palette: a refusal has the one error red, everything else is the cool tint. */
+.club-kiosk .club-banner {
+  background: var(--kiosk-selected);
+  border-color: var(--kiosk-line);
+  color: var(--kiosk-ink);
+}
+
+.club-kiosk .club-alert {
+  background: var(--kiosk-canvas);
+  border-color: var(--error);
+  color: var(--kiosk-ink);
+}
+
+.club-kiosk .club-success {
+  background: var(--kiosk-selected);
+  border-color: var(--kiosk-waterloo);
+  color: var(--kiosk-ink);
+}
+
+.club-kiosk .club-placeholder {
+  background: var(--kiosk-selected);
+  border-color: var(--kiosk-waterloo-hover);
+  border-style: dashed;
+  color: var(--kiosk-ink);
+}

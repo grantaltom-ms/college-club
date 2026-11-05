@@ -6,6 +6,7 @@ import { getCurrentActor } from "@/club/identity";
 import { RESIGNATION_RULES } from "@/club/settings/resignation-rules";
 import { SignedOut } from "../../SignedOut";
 import { ResignationsForm } from "./ResignationsForm";
+import { PageBand } from "../../PageBand";
 
 /** Staff only: move-out day. Upload a list of households that resigned, see exactly what ending them would do, then end them. */
 export default async function ResignationsPage() {
@@ -16,7 +17,7 @@ export default async function ResignationsPage() {
   const max = RESIGNATION_RULES.defaults.maxHouseholdsPerFile;
   return (
     <section>
-      <h1>End memberships from a file</h1>
+      <PageBand eyebrow="Members" title="End memberships from a file" />
       <p>
         For a batch of resignations. You will see exactly which households the file would end, and everything that would be cancelled, before anything happens. Each household ends today, the same way it does in the household desk: its adults are signed out and
         blocked from booking, their future bookings, class places and event RSVPs are cancelled, and the waiting lists move up behind them. Ending a membership is final. This tool only ever ends households: nobody is added or changed, and a household that has already

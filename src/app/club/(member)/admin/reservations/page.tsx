@@ -10,6 +10,7 @@ import { formatDayLong, pacificDate } from "@/club/time";
 import { NOTICES } from "@/club/web";
 import { SignedOut } from "../../SignedOut";
 import { AttendanceRowView } from "../AttendanceRowView";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -33,26 +34,21 @@ export default async function ReservationAttendance({ searchParams }: { searchPa
 
   return (
     <section>
-      <header className="club-page-head">
-        <div>
-          <p className="club-kicker">
-            <Link href="/club/admin">Staff office</Link>
-          </p>
-          <h1>Reservation attendance</h1>
-          <p className="club-meta">
-            {formatDayLong(pacificDate(now))}. For the boat and booking record — not the front-desk chase list. A missed check-in
-            (including rowing) does not need staff action; use this page only when you want to correct a record.
-          </p>
-        </div>
-        <p className="club-page-actions">
-          <Link href="/club/my-bookings" className="club-button club-button-quiet club-button-link">
-            All bookings
-          </Link>
-          <Link href="/club/admin/check-in" className="club-button club-button-link">
-            Check someone in
-          </Link>
-        </p>
-      </header>
+      <PageBand eyebrow="Bookings" title="Reservation attendance">
+        <Link href="/club/admin/check-in" className="club-button club-button-link">
+          Check someone in
+        </Link>
+        <Link href="/club/my-bookings" className="club-button club-button-quiet club-button-link">
+          All bookings
+        </Link>
+      </PageBand>
+      <p className="club-kicker">
+        <Link href="/club/admin">Staff office</Link>
+      </p>
+      <p className="club-meta">
+        {formatDayLong(pacificDate(now))}. For the boat and booking record — not the front-desk chase list. A missed check-in
+        (including rowing) does not need staff action; use this page only when you want to correct a record.
+      </p>
 
       {notice && (
         <p className="club-alert" role="alert">

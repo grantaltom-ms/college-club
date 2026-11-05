@@ -5,6 +5,7 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { SignedOut } from "../../SignedOut";
 import { EquipmentForm } from "./EquipmentForm";
+import { PageBand } from "../../PageBand";
 
 /** Staff only: the unit list. Upload the sheet of the club's boats, kayaks, paddle boards and work rooms, see exactly what it would add, then add them. */
 export default async function EquipmentImportPage() {
@@ -15,7 +16,7 @@ export default async function EquipmentImportPage() {
   const required = new Set(["Name", "Type", "Seats", "Owned by"]);
   return (
     <section>
-      <h1>Load the equipment list</h1>
+      <PageBand eyebrow="Boats and spaces" title="Load the equipment list" />
       <p>
         For putting the club&rsquo;s real boats, kayaks, paddle boards and work rooms into the booking system from a sheet staff prepared. You will see exactly what the file would add before anything is saved. This only ever adds: an item that is
         already here is left alone, so a second upload never changes or removes anything.

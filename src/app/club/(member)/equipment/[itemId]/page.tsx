@@ -11,6 +11,7 @@ import { idParam } from "@/club/web";
 import { SignedOut } from "../../SignedOut";
 import { EditItemForm, ItemLifecycle } from "../ItemForms";
 import { LeftInPlace } from "../LeftInPlace";
+import { PageBand } from "../../PageBand";
 
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
@@ -53,12 +54,7 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
 
   return (
     <section>
-      <h1>
-        {line.name}
-        {retired && <span className="club-tag">Retired</span>}
-        {line.isPrivate && <span className="club-tag">Private</span>}
-        {line.pool && <span className="club-tag">Pool</span>}
-      </h1>
+      <PageBand eyebrow="Boats and spaces" title={line.name} titleTag={[retired ? "Retired" : "", line.isPrivate ? "Private" : "", line.pool ? "Pool" : ""].filter(Boolean)} />
       <p>
         <Link href="/club/equipment">Back to equipment</Link>
       </p>

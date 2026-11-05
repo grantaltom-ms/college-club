@@ -12,6 +12,7 @@ import { CLASS_ROOM_TYPES } from "@/club/types";
 import { dateParam, idParam, intParam, NOTICES, timeParam } from "@/club/web";
 import { ClassPlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
@@ -60,7 +61,7 @@ export default async function ManageClasses({ searchParams }: { searchParams: Pr
 
   return (
     <section>
-      <h1>Set up classes</h1>
+      <PageBand eyebrow="Classes" title="Set up classes" />
       <ClassPlaceholderNote />
       <p className="club-meta">
         Add a kind of class, then schedule dates for it. A scheduled class holds its room: members cannot book that gym or room while it runs. To cancel a date, open it from{" "}
