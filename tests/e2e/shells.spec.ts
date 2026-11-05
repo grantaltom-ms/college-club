@@ -5,7 +5,7 @@ import { dashboardNav, openNavMenu } from "./helpers";
 /** Serve invented sample outings from the shells endpoint, so no test touches the real database. */
 async function mockShells(page: Page) {
   const body = JSON.stringify(sampleShells());
-  await page.route("**/api/shells", (route) => route.fulfill({ status: 200, contentType: "application/json", body }));
+  await page.route("**/api/shells*", (route) => route.fulfill({ status: 200, contentType: "application/json", body }));
   return body;
 }
 
@@ -97,10 +97,58 @@ test("the data sent to the browser never carries rower names or codes", async ({
   await expect(page.getByText(/different members took a shell out/)).toBeVisible();
 });
 
+test("ownership checkboxes default to club boats and can add member-owned boats without a 2025 member year", async ({ page }) => {
+  const { sampleShells: shells, yearToDate } = await import("../../src/lib/shells");
+  const club = shells();
+  const member = shells("member");
+  const both = shells("club,member");
+  const clubYtd = yearToDate(club.outings, club.through).at(-1)!.outings;
+  const bothYtd = yearToDate(both.outings, both.through).at(-1)!.outings;
+  expect(bothYtd).toBeGreaterThan(clubYtd);
+  const requested: string[] = [];
+  await page.route("**/api/shells*", (route) => {
+    const url = route.request().url();
+    requested.push(url);
+    const ownership = new URL(url).searchParams.get("ownership") ?? "club";
+    const data = ownership === "member" ? member : ownership.includes("member") ? both : club;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+  });
+  await page.goto("/shells");
+  const clubBox = page.getByRole("checkbox", { name: "Club" });
+  const memberBox = page.getByRole("checkbox", { name: "Member-owned" });
+  await expect(clubBox).toBeChecked();
+  await expect(memberBox).not.toBeChecked();
+  await expect(page.getByTestId("shells-ytd")).toHaveText(clubYtd.toLocaleString("en-US"));
+  await expect(page.getByTestId("shells-ownership-note")).toHaveCount(0);
+  await expect(group(page, "Shell outings by month, 2025 and 2026")).toBeVisible();
+  expect(new URL(requested.at(-1)!).searchParams.get("ownership")).toBe("club");
+
+  await memberBox.check();
+  await expect(page.getByTestId("shells-ownership-note")).toContainText("does not fill in a 2025 member-owned year");
+  await expect(page.getByTestId("shells-ytd")).toHaveText(bothYtd.toLocaleString("en-US"));
+  await expect(group(page, "Shell outings by month, 2025 and 2026")).toBeVisible();
+  expect(new URL(requested.at(-1)!).searchParams.get("ownership")).toBe("club,member");
+
+  await clubBox.uncheck();
+  await expect(clubBox).not.toBeChecked();
+  await expect(memberBox).toBeChecked();
+  await expect(page.getByTestId("shells-ownership-note")).toContainText("does not invent one");
+  await expect(page.getByRole("button", { name: "2025", exact: true })).toHaveCount(0);
+  await expect(group(page, "Shell outings by month, 2025 and 2026")).toHaveCount(0);
+  expect(new URL(requested.at(-1)!).searchParams.get("ownership")).toBe("member");
+  expect(member.outings.some((o) => o.day.startsWith("2025"))).toBe(false);
+
+  await memberBox.uncheck();
+  await expect(clubBox).toBeChecked();
+  await expect(memberBox).not.toBeChecked();
+  await expect(page.getByTestId("shells-ytd")).toHaveText(clubYtd.toLocaleString("en-US"));
+  await expect(group(page, "Shell outings by month, 2025 and 2026")).toBeVisible();
+});
+
 test("shows a plain error and recovers when the shell data fails to load", async ({ page }) => {
   let fail = true;
   const body = JSON.stringify(sampleShells());
-  await page.route("**/api/shells", (route) =>
+  await page.route("**/api/shells*", (route) =>
     fail
       ? route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "The shell data could not be loaded." }) })
       : route.fulfill({ status: 200, contentType: "application/json", body }),

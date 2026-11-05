@@ -12,9 +12,11 @@ import {
   changePct,
   monthCompare,
   seatLabel,
+  shellOwnershipQuery,
   shellYears,
   yearToDate,
   type ShellData,
+  type ShellOwnership,
 } from "@/lib/shells";
 import { fmtInt } from "@/lib/stats";
 
@@ -26,9 +28,9 @@ const yearColor = (i: number, n: number) => YEAR_COLORS[Math.max(0, YEAR_COLORS.
 
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; data: ShellData };
 
-async function load(): Promise<State> {
+async function load(ownership: string): Promise<State> {
   try {
-    const res = await fetch("/api/shells", { cache: "no-store" });
+    const res = await fetch(`/api/shells?ownership=${encodeURIComponent(ownership)}`, { cache: "no-store" });
     const body = await res.json();
     if (!res.ok) return { status: "error", message: body?.error ?? "The shell figures could not be loaded." };
     return { status: "ready", data: body as ShellData };
@@ -40,19 +42,43 @@ async function load(): Promise<State> {
 export default function ShellsPage() {
   const [state, setState] = useState<State>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
+  const [clubOn, setClubOn] = useState(true);
+  const [memberOn, setMemberOn] = useState(false);
+  const ownership = shellOwnershipQuery([...(clubOn ? ["club"] : []), ...(memberOn ? ["member"] : [])]);
   useEffect(() => {
     let cancelled = false;
-    load().then((next) => {
+    load(ownership).then((next) => {
       if (!cancelled) setState(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, ownership]);
+
+  function changeFleet(nextClub: boolean, nextMember: boolean) {
+    const club = nextClub || !nextMember;
+    const member = nextMember;
+    if (club === clubOn && member === memberOn) return;
+    setClubOn(club);
+    setMemberOn(member);
+    setState({ status: "loading" });
+  }
 
   return (
     <>
       <h1 className="page-title">Shells.</h1>
+      <div className="filter-row shells-ownership" role="group" aria-label="Boat ownership" data-testid="shells-ownership">
+        <span className="filter-label">Boats</span>
+        <label className="filter-check" htmlFor="shells-club">
+          <input id="shells-club" type="checkbox" checked={clubOn} onChange={(e) => changeFleet(e.target.checked, memberOn)} />
+          Club
+        </label>
+        <label className="filter-check" htmlFor="shells-member">
+          <input id="shells-member" type="checkbox" checked={memberOn} onChange={(e) => changeFleet(clubOn, e.target.checked)} />
+          Member-owned
+        </label>
+      </div>
+      <p className="page-sub">Club boats stay selected unless you add member-owned boats. Member-owned outings are logged for 2026 only.</p>
       {state.status === "loading" && (
         <p className="status" role="status">
           Loading shell figures
@@ -81,6 +107,31 @@ export default function ShellsPage() {
 const changeText = (change: number | null) => (change === null ? "—" : `${change > 0 ? "+" : ""}${change}%`);
 const moreOrFewer = (change: number) => `${Math.abs(change)}% ${change >= 0 ? "more" : "fewer"}`;
 
+function fleetsOf(data: ShellData): ShellOwnership[] {
+  return data.ownership ?? ["club"];
+}
+
+function fleetLead(data: ShellData): string {
+  const fleets = fleetsOf(data);
+  const club = fleets.includes("club");
+  const member = fleets.includes("member");
+  if (club && member) return "Every time a club or member-owned shell went out";
+  if (member) return "Every time a member-owned shell went out";
+  return "Every time a club shell went out";
+}
+
+function OwnershipNote({ data }: { data: ShellData }) {
+  if (!data.memberFrom) return null;
+  const withClub = fleetsOf(data).includes("club");
+  return (
+    <p className="page-sub" data-testid="shells-ownership-note">
+      {withClub
+        ? "2025 in the charts below is club boats only. Member-owned boats are added for 2026, so the comparison is not the same fleet. This page does not fill in a 2025 member-owned year."
+        : "These are member-owned boats in 2026. There is no 2025 member-owned year in the log, so there is no comparison with last year, and this page does not invent one."}
+    </p>
+  );
+}
+
 function Shells({ data }: { data: ShellData }) {
   const years = shellYears(data.outings);
   const [chosen, setChosen] = useState<number | null>(null);
@@ -104,7 +155,16 @@ function Shells({ data }: { data: ShellData }) {
   const newest = compare.years[compare.years.length - 1];
   const oldest = compare.years[0];
 
-  if (!now) return <p className="status">There are no shell outings yet.</p>;
+  if (!now) {
+    return (
+      <>
+        <OwnershipNote data={data} />
+        <p className="status">There are no shell outings yet.</p>
+      </>
+    );
+  }
+
+  const mixed = Boolean(data.memberFrom) && fleetsOf(data).includes("club");
 
   const compareGroups = compare.rows.map((r) => ({
     key: String(r.month),
@@ -134,13 +194,17 @@ function Shells({ data }: { data: ShellData }) {
   const finished = compare.rows.filter((r) => r.change !== null);
   const lower = finished.filter((r) => (r.change ?? 0) < 0);
   const higher = finished.filter((r) => (r.change ?? 0) > 0);
-  const compareTitle =
-    finished.length === 0
+  const exceptions = (lower.length > higher.length ? higher : lower).map((r) => `${r.label} (${changeText(r.change)})`);
+  const compareTitle = mixed
+    ? `Club and member-owned boats in ${newest}, against club boats in ${oldest}`
+    : finished.length === 0
       ? "Each month against last year"
       : lower.length > higher.length
         ? `Fewer outings than ${oldest} in ${lower.length} of ${finished.length} finished months`
         : `More outings than ${oldest} in ${higher.length} of ${finished.length} finished months`;
-  const exceptions = (lower.length > higher.length ? higher : lower).map((r) => `${r.label} (${changeText(r.change)})`);
+  const compareSubtitle = mixed
+    ? `Outings in ${compare.years.join(" and ")}, on one scale. 2025 is club boats only; member-owned boats are included from 2026, so the change is not the same fleet. Months not finished yet are left blank.`
+    : `All outings in ${compare.years.join(" and ")}, side by side on one scale.${exceptions.length ? ` The exception${exceptions.length > 1 ? "s" : ""}: ${exceptions.join(", ")}.` : ""} Months not finished yet are left blank.`;
   const shownBoats = allBoats ? boats.rows : boats.rows.slice(0, 10);
   const boatLine = (b: (typeof boats.rows)[number]) =>
     `${b.boat} (${b.sameDates.map(fmtInt).join(" \u2192 ")})`;
@@ -148,9 +212,10 @@ function Shells({ data }: { data: ShellData }) {
   return (
     <>
       <p className="page-sub">
-        Every time a club shell went out, from the iCrew shell log, {formatDay(data.outings[0].day, true)} to{" "}
-        {formatDay(data.through, true)}. Each outing is one boat going out once, whether one rower or four.
+        {fleetLead(data)}, from the iCrew shell log, {formatDay(data.outings[0].day, true)} to {formatDay(data.through, true)}. Each
+        outing is one boat going out once, whether one rower or four.
       </p>
+      <OwnershipNote data={data} />
       {data.source === "sample" && (
         <p className="sample-banner" role="note">
           Sample data. These are made-up boats and numbers for testing, not the real club.
@@ -165,7 +230,9 @@ function Shells({ data }: { data: ShellData }) {
           <div className="hero-copy">
             <p className="hero-lead">
               outings from Jan 1 to {cutoffLabel}, {now.year}
-              {before && ytdChange !== null ? `, ${moreOrFewer(ytdChange)} than the same dates in ${before.year} (${fmtInt(before.outings)}).` : "."}
+              {before && ytdChange !== null
+                ? `, ${moreOrFewer(ytdChange)} than the same dates in ${before.year} (${fmtInt(before.outings)})${mixed ? ". 2025 counts club boats only" : ""}.`
+                : "."}
             </p>
             <p className="hero-support">
               {fmtInt(now.member)} were members rowing on their own
@@ -186,7 +253,7 @@ function Shells({ data }: { data: ShellData }) {
         {compare.years.length > 1 && (
           <ChartCard
             title={compareTitle}
-            subtitle={`All outings in ${compare.years.join(" and ")}, side by side on one scale.${exceptions.length ? ` The exception${exceptions.length > 1 ? "s" : ""}: ${exceptions.join(", ")}.` : ""} Months not finished yet are left blank.`}
+            subtitle={compareSubtitle}
             legend={compare.years.map((y, i) => ({ label: String(y), color: yearColor(i, compare.years.length) }))}
             table={{
               headers: ["Month", ...compare.years.map(String), `Change, ${oldest} to ${newest}`],
@@ -250,7 +317,11 @@ function Shells({ data }: { data: ShellData }) {
 
         <ChartCard
           title={allBoats ? `All ${boats.rows.length} boats` : `The ${Math.min(10, boats.rows.length)} busiest boats`}
-          subtitle={`Jan 1 to ${cutoffLabel} in each year, so the years compare fairly. Busiest boat this year first.`}
+          subtitle={
+            mixed
+              ? `Jan 1 to ${cutoffLabel}. 2025 is club boats only; member-owned boats are included from 2026. Busiest boat this year first.`
+              : `Jan 1 to ${cutoffLabel} in each year, so the years compare fairly. Busiest boat this year first.`
+          }
           legend={boats.years.map((y, i) => ({ label: String(y), color: yearColor(i, boats.years.length) }))}
           table={{
             headers: ["Boat", "Type", ...boats.years.map((y) => `${y}, to ${cutoffLabel}`), ...(boats.years.length > 1 ? ["Change"] : [])],
@@ -315,7 +386,9 @@ function Shells({ data }: { data: ShellData }) {
           <p>
             This is the iCrew shell log: one line each time a boat was taken out. It counts outings, not people, so a
             double with two rowers is one outing. Camps and team sessions are counted by boat too. The log does not
-            record distance, so meters are left out. Rowers are counted, never named, on this page.
+            record distance, so meters are left out. Rowers are counted, never named, on this page. The checkboxes choose
+            club boats, member-owned boats, or both. Year-over-year starts on club boats. Member-owned boats are in the
+            log from 2026 only, and this page does not fill in a 2025 member-owned year.
           </p>
         </aside>
       </div>
