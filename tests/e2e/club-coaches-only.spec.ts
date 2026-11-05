@@ -76,6 +76,24 @@ test.describe("the 8x is for coaches and staff", () => {
     await expect(page.getByTestId("booking-row").filter({ hasText: LOOKING.name })).toHaveCount(0);
   });
 
+  test("the crew list for an eight offers every other active member, including one with no qualification, even though the boat carries a skill level", async ({ page }) => {
+    await actAs(page, "Kenji Tanaka");
+    await openEights(page, LOOKING);
+    await freeLink(page, LOOKING).click();
+    await expect(page.getByRole("heading", { level: 1, name: `Book ${LOOKING.name}` })).toBeVisible();
+    // The sample's eight carries iCrew's own skill level (Advanced), which is not checked for an eight. Ines Castellanos holds no
+    // qualification at all, and a coach can still seat her.
+    const crew = page.getByRole("group", { name: /^Crew/ });
+    await expect(crew.getByLabel("Ines Castellanos")).toBeVisible();
+    await expect(crew.getByText("No other member holds the qualification this boat needs.")).toHaveCount(0);
+    expect(await crew.getByRole("checkbox").count()).toBeGreaterThan(5);
+    // And the staff screen for the boat says no skill level is checked, rather than showing the stored one.
+    await actAs(page, "Test staff");
+    await page.goto("/club/equipment?find=Betty");
+    await page.getByRole("link", { name: `Edit or retire ${LOOKING.name}`, exact: true }).click();
+    await expect(page.getByTestId("item-skill")).toHaveText("Skill level needed: not checked on a coaches-only boat");
+  });
+
   test("a coach books an eight, sees it in My bookings, and cancels it", async ({ page }) => {
     await actAs(page, "Kenji Tanaka");
     await cancelAll(page);

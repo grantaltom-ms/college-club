@@ -64,7 +64,7 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
           {line.type} &middot; {line.className}
           {line.pool ? ` · ${plural(line.places, "place")}, counted rather than numbered` : ` · ${plural(line.seats, "seat")}`}
         </p>
-        <p data-testid="item-skill">Skill level needed: {line.isPrivate ? "not checked on a private boat" : line.skill}</p>
+        <p data-testid="item-skill">Skill level needed: {line.isPrivate ? "not checked on a private boat" : cls.coachesOnly ? "not checked on a coaches-only boat" : line.skill}</p>
         {(cls.type === "Shell" || cls.type === "Kayak" || cls.type === "Paddle Board") && (
           <>
             <p data-testid="item-weight">Weight class: {weightRangeWords(line.minWeightLbs, line.maxWeightLbs)}</p>
