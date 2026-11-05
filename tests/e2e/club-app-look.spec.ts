@@ -179,6 +179,34 @@ test.describe("the members' and staff look", () => {
     });
   }
 
+  test("a small tag inside the title band (a cancelled practice) is a white chip with Ink text you can read, and a tag elsewhere is the status chip", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 900 });
+    await actAs(page, "Kenji Tanaka");
+    await page.goto("/club/practices");
+    await expect(page.locator(".club-band h1")).toBeVisible();
+    // No practice in the sample is cancelled, so put the tag where PageBand puts it and measure what the browser draws.
+    const look = await page.evaluate(() => {
+      const mk = (parent: Element) => {
+        const tag = document.createElement("span");
+        tag.className = "club-tag";
+        tag.textContent = "Cancelled";
+        parent.appendChild(tag);
+        const s = getComputedStyle(tag);
+        return { background: s.backgroundColor, color: s.color, radius: s.borderTopLeftRadius, family: s.fontFamily, size: s.fontSize };
+      };
+      return { inBand: mk(document.querySelector(".club-band h1")!), inPage: mk(document.querySelector("main p:not(.club-band-eyebrow)")!) };
+    });
+    expect(look.inBand.background).toBe(rgb("#ffffff"));
+    expect(look.inBand.color).toBe(rgb("#33363a"));
+    expect(look.inPage.background).toBe(rgb("#e6ebed"));
+    expect(look.inPage.color).toBe(rgb("#435661"));
+    for (const t of [look.inBand, look.inPage]) {
+      expect(t.radius).toBe("0px");
+      expect(t.family).toContain("Cinzel");
+      expect(t.size).toBe("11px");
+    }
+  });
+
   test("the top bar is Oyster with the warm line under it, the club's name as the link home, and who is acting at the right", async ({ page }) => {
     await page.setViewportSize({ width: 1180, height: 900 });
     await actAs(page, "Nora Abernathy");

@@ -984,6 +984,29 @@
   font-size: 17px;
 }
 
+/* The small word after a name or title (Private, Major, Cancelled, Retired): the same square chip as the status chips. The old one was a pale yellow pill that took its text colour from whatever it sat in. */
+.club-app .club-tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 5px 9px;
+  border-radius: 0;
+  background: var(--app-selected);
+  color: var(--app-waterloo-hover);
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Inside a title band (a cancelled practice) the chip is white with Ink text, so it reads on the Waterloo band. */
+.club-app .club-band .club-tag {
+  background: #ffffff;
+  color: var(--app-ink);
+}
+
 /* My bill's receipt header: white on its dark block, and the small rule under the month in Oyster (it was the Sun yellow, which is not in this palette). */
 .club-app .club-bill-month {
   color: #ffffff;

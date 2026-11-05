@@ -133,6 +133,30 @@ describe("the package's shapes and sizes", () => {
   });
 });
 
+describe("the small tag after a title or name", () => {
+  const rule = (selector: string) => {
+    const m = new RegExp(`(?:^|\\})\\s*${selector.replace(/[.[\]()*+?^$|\\]/g, "\\$&")}\\s*\\{([^{}]*)\\}`, "m").exec(css);
+    if (!m) throw new Error(`no rule for ${selector}`);
+    return m[1];
+  };
+
+  it("is a square status chip in the palette, not the old pale yellow pill", () => {
+    const tag = rule(".club-app .club-tag");
+    expect(tag).toMatch(/background:\s*var\(--app-selected\)/);
+    expect(tag).toMatch(/color:\s*var\(--app-waterloo-hover\)/);
+    expect(tag).toMatch(/border-radius:\s*0/);
+    expect(tag).not.toMatch(/sun/i);
+  });
+
+  it("is white with Ink text inside a title band, where the heading's white would otherwise vanish on a pale chip", () => {
+    const tag = rule(".club-app .club-band .club-tag");
+    expect(tag).toMatch(/background:\s*#ffffff/);
+    expect(tag).toMatch(/color:\s*var\(--app-ink\)/);
+    expect(contrast("#33363a", "#ffffff")).toBeGreaterThanOrEqual(4.5);
+    expect(contrast("#435661", "#e6ebed")).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 describe("the contrast the package relies on (WCAG)", () => {
   it.each([
     ["white on Waterloo (title band, buttons)", "#ffffff", "#536872", 5.8],
