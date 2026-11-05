@@ -718,7 +718,7 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
         const classes = (await pool.query("select code, booking_type, seats, required_qualification, rules from club.item_classes order by code")).rows;
         expect(classes.map((c) => c.code)).toEqual(RULE_BOOK.classes.map((c) => c.code).sort());
         expect(classes.find((c) => c.code === "shell-quad")).toMatchObject({ booking_type: "Shell", seats: 4, required_qualification: "scull-3", rules: {} });
-        expect(classes.find((c) => c.code === "shell-eight")).toMatchObject({ booking_type: "Shell", seats: 8, required_qualification: "scull-3", rules: {} });
+        expect(classes.find((c) => c.code === "shell-eight")).toMatchObject({ booking_type: "Shell", seats: 8, required_qualification: null, rules: {} });
         expect((await pool.query("select placeholder, rules from club.booking_rule_defaults")).rows).toEqual([{ placeholder: true, rules: RULE_BOOK.defaults }]);
         await store.syncRules({ ...RULE_BOOK, defaults: { ...RULE_BOOK.defaults, windowDays: 5 } });
         expect((await pool.query("select rules from club.booking_rule_defaults")).rows[0].rules.windowDays).toBe(5);

@@ -4,6 +4,7 @@ import { HOLDING_STATUSES, type Booking, type BookingType, type ClassSession, ty
 import { boatLocked, isPrivate, itemVisibleTo } from "./boat-access";
 import { dayWindow, opensAt, outOfServiceAt } from "./bookings";
 import { meetsQualification } from "./eligibility";
+import { activeCoach } from "./practices";
 import { placesOf } from "./pools";
 import { fullName, memberById, practiceHold } from "./queries";
 
@@ -45,6 +46,10 @@ export interface ItemDayView {
   isPrivate: boolean;
   /** A private boat with no owner who can use it: nobody can book it until staff add an owner. */
   locked: boolean;
+  /** A coaches-only boat (the 8x): shown to everyone, bookable only by staff and by members marked as coaches. */
+  coachesOnly: boolean;
+  /** True when this viewer cannot book it because it is coaches-only and they are not a coach: the page marks it "Coaches only". */
+  coachBlocked: boolean;
 }
 
 export interface DayView {
@@ -110,7 +115,7 @@ export function dayView(
           holders: [],
         });
       }
-      const need = requiredQualification && !isPrivate(item) ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;
+      const need = requiredQualification && !isPrivate(item) && !cls.coachesOnly ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;
       let note: string | null = null;
       if (now.getTime() < opens.getTime()) {
         const openDay = pacificDate(opens);
@@ -129,6 +134,8 @@ export function dayView(
         note,
         isPrivate: isPrivate(item),
         locked: boatLocked(state, item),
+        coachesOnly: cls.coachesOnly === true,
+        coachBlocked: cls.coachesOnly === true && viewer.kind === "member" && !activeCoach(state, viewer.memberId),
       };
     });
   return { day, items };

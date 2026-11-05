@@ -29,7 +29,7 @@ export default defineConfig({
       ? [
           {
             name: "postgres",
-            testMatch: /club(-booking|-classes|-events|-staff|-checkin|-signin|-details|-import|-billing|-history|-resignations|-tours|-equipment-import|-equipment-edit|-private-boats|-pools|-damage|-practices|-incidents|-snacks|-start|-notices)?\.spec\.ts/,
+            testMatch: /club(-booking|-classes|-events|-staff|-checkin|-signin|-details|-import|-billing|-history|-resignations|-tours|-equipment-import|-equipment-edit|-private-boats|-pools|-damage|-practices|-incidents|-snacks|-start|-notices|-coaches-only|-my-account)?\.spec\.ts/,
             use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${PORT_POSTGRES}` },
           },
         ]

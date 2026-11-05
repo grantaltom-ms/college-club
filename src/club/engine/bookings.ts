@@ -24,6 +24,7 @@ import {
 import { accessKind, boatLocked, crewNotAllowedWords, isPrivate, isRetired, lockedWords, notAllowedWords } from "./boat-access";
 import { bookingBlockReason, meetsQualification } from "./eligibility";
 import type { BookingLedger, Ctx } from "./households";
+import { activeCoach } from "./practices";
 import { firstFullStretch, holdingIn, placesOf } from "./pools";
 import { classClash, fullName, householdOf, memberById, practiceHold, practiceSeatClash } from "./queries";
 
@@ -35,6 +36,7 @@ export type ReasonCode =
   | "boat_locked"
   | "not_allowed_on_boat"
   | "crew_not_allowed"
+  | "coaches_only"
   | "item_retired"
   | "out_of_service"
   | "starts_in_past"
@@ -173,6 +175,12 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
     }
   }
 
+  // A coaches-only boat (the 8x): a member books it only if staff have marked them as a coach (and they are still an active member).
+  // Staff book it for anyone, with no reason needed, because staff can run practices too. Crew can be any member.
+  if (cls.coachesOnly && ctx.actor.kind !== "staff" && !activeCoach(state, booker.id)) {
+    add("coaches_only", `${item.name} can only be booked by coaches and club staff. Ask a coach or club staff to book it.`);
+  }
+
   // The item. A retired one is gone for good (until staff bring it back): a fact, not a rule, so staff cannot book past it.
   if (isRetired(item)) add("item_retired", `${item.name} has been retired and can no longer be booked.`);
   for (const p of state.outOfService) {
@@ -205,8 +213,8 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
   if (minutes < rules.minMinutes) add("too_short", `The shortest booking is ${formatMinutes(rules.minMinutes)}.`);
   if (minutes > rules.maxMinutes) add("too_long", `The longest booking is ${formatMinutes(rules.maxMinutes)}.`);
 
-  // Skill. A private boat's skill level is not checked: its owner vouches for who uses it.
-  const need = requiredQualification && !isPrivate(item) ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;
+  // Skill. A private boat's skill level is not checked: its owner vouches for who uses it. Nor is a coaches-only boat's: the coach decides.
+  const need = requiredQualification && !isPrivate(item) && !cls.coachesOnly ? state.qualifications.find((q) => q.code === requiredQualification) : undefined;
   if (need && !meetsQualification(state, booker.id, need.code)) {
     add("not_qualified", `${who(booker.id)} ${isYou(booker.id) ? "need" : "needs"} ${need.name} to use ${item.name}.`);
   }

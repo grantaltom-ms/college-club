@@ -706,7 +706,8 @@ a.slot-free:focus-visible {
   color: var(--ink);
 }
 
-.slot-practice {
+.slot-practice,
+.slot-coaches {
   background: #dcebe6;
   border-color: #8fb8ab;
   color: var(--ink);
