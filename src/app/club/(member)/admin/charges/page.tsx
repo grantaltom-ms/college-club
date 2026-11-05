@@ -11,6 +11,7 @@ import { formatDay, pacificDate } from "@/club/time";
 import { SignedOut } from "../../SignedOut";
 import { VoidForm } from "../VoidForm";
 import { ChargeForm } from "./ChargeForm";
+import { PageBand } from "../../PageBand";
 
 /** Staff only: bar and snack-bar sales, and adjustments, entered on a household's account. */
 export default async function ChargesPage() {
@@ -23,7 +24,7 @@ export default async function ChargesPage() {
   const snacks = snackBarMonth(state, pacificDate(clubNow()));
   return (
     <section>
-      <h1>Charges</h1>
+      <PageBand eyebrow="Billing" title="Charges" />
       <p>
         Bar and snack-bar sales, and adjustments (a credit, or an extra charge), go on a household&apos;s account here. Each is billed in the month of the day it happened, on that household&apos;s invoice for the month.
         Once a month is closed, nothing can be dated in it: put a mistake right with an adjustment dated today. <Link href="/club/admin/billing">Monthly billing</Link>

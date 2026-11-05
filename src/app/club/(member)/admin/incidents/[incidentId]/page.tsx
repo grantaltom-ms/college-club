@@ -9,6 +9,7 @@ import { formatMoment } from "@/club/time";
 import { IncidentNoteForm } from "../../../incidents/IncidentForms";
 import { SignedOut } from "../../../SignedOut";
 import { CloseIncidentForm, ReviewIncidentForm } from "../StaffIncidentForms";
+import { PageBand } from "../../../PageBand";
 
 /** Staff only: one incident report with everything on it, its log, and the buttons that record what was found and close it. */
 export default async function IncidentReportPage({ params }: { params: Promise<{ incidentId: string }> }) {
@@ -26,7 +27,7 @@ export default async function IncidentReportPage({ params }: { params: Promise<{
 
   return (
     <section>
-      <h1>Incident on {detail.occurredWords}</h1>
+      <PageBand eyebrow="Safety" title={`Incident on ${detail.occurredWords}`} />
       <p>
         <Link href="/club/admin/incidents">Back to incident reports</Link>
       </p>

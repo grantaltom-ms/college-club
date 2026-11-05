@@ -5,6 +5,7 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { SignedOut } from "../../SignedOut";
 import { ImportForm } from "./ImportForm";
+import { PageBand } from "../../PageBand";
 
 /** Staff only: move-in day. Upload the club's roster, see exactly what it would add, then add it. */
 export default async function ImportPage() {
@@ -14,7 +15,7 @@ export default async function ImportPage() {
   if (actor.kind !== "staff") notFound();
   return (
     <section>
-      <h1>Import households</h1>
+      <PageBand eyebrow="Members" title="Import households" />
       <p>
         Load the club&apos;s roster from a spreadsheet. You will see exactly what the file would add before anything is saved, and the import only ever adds: a household that is already here is left alone, and nobody is ever
         removed.

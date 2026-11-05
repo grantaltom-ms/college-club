@@ -10,6 +10,7 @@ import { getClubStore } from "@/club/store/instance";
 import { formatClock, formatDay, formatDayLong, pacificDate } from "@/club/time";
 import { NOTICES } from "@/club/web";
 import { SignedOut } from "../SignedOut";
+import { PageBand } from "../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -40,20 +41,15 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
 
   return (
     <section>
-      <header className="club-page-head">
-        <div>
-          <h1>Staff office</h1>
-          <p className="club-meta">
-            {formatDayLong(pacificDate(now))}. Front desk board — today, then what needs a decision. Everything here is invented test
-            data.
-          </p>
-        </div>
-        <p className="club-page-actions">
-          <Link href="/club/admin/check-in" className="club-button club-button-link" data-testid="check-in-link">
-            Check someone in
-          </Link>
-        </p>
-      </header>
+      <PageBand eyebrow="Front desk" title="Staff office">
+        <Link href="/club/admin/check-in" className="club-button club-button-link" data-testid="check-in-link">
+          Check someone in
+        </Link>
+      </PageBand>
+      <p className="club-meta">
+        {formatDayLong(pacificDate(now))}. Front desk board — today, then what needs a decision. Everything here is invented test
+        data.
+      </p>
       {notice && (
         <p className="club-alert" role="alert">
           {notice}

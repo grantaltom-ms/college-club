@@ -9,6 +9,7 @@ import { getClubStore } from "@/club/store/instance";
 import { NOTICES } from "@/club/web";
 import { DeparturePreviewView } from "../../../../DeparturePreviewView";
 import { SignedOut } from "../../../../../SignedOut";
+import { PageBand } from "../../../../../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
 
@@ -33,7 +34,7 @@ export default async function RemoveAdult({ params, searchParams }: { params: Pr
   if (household.status === "ended" || member.status !== "active") {
     return (
       <section>
-        <h1>{fullName(member)}</h1>
+        <PageBand eyebrow="Members" title={fullName(member)} />
         <p>{household.status === "ended" ? "This membership has ended, so nothing in it can be changed." : `${fullName(member)} is already off this household's membership.`}</p>
         {back}
       </section>
@@ -43,7 +44,7 @@ export default async function RemoveAdult({ params, searchParams }: { params: Pr
   if (others.length === 0) {
     return (
       <section>
-        <h1>{fullName(member)} is the last adult</h1>
+        <PageBand eyebrow="Members" title={`${fullName(member)} is the last adult`} />
         <p>
           A household needs at least one adult. To remove {fullName(member)}, <Link href={`/club/admin/households/${household.id}/end`}>end the whole membership</Link> instead.
         </p>
@@ -54,7 +55,7 @@ export default async function RemoveAdult({ params, searchParams }: { params: Pr
   const preview = departurePreview(state, [member.id], clubNow());
   return (
     <section>
-      <h1>Remove {fullName(member)} from {household.displayName}?</h1>
+      <PageBand eyebrow="Members" title={`Remove ${fullName(member)} from ${household.displayName}?`} />
       {notice && (
         <p className="club-alert" role="alert">
           {notice}

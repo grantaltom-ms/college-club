@@ -11,6 +11,7 @@ import { formatDay, pacificDate } from "@/club/time";
 import { SignedOut } from "../../SignedOut";
 import { VoidForm } from "../VoidForm";
 import { VisitorsForm } from "./VisitorsForm";
+import { PageBand } from "../../PageBand";
 
 /** Staff only: the visitors members brought, signed in on the front-desk iPad or entered here. */
 export default async function VisitorsPage() {
@@ -22,7 +23,7 @@ export default async function VisitorsPage() {
   const rows = visitorRows(state, BILLING_RULES);
   return (
     <section>
-      <h1>Visitors</h1>
+      <PageBand eyebrow="Billing" title="Visitors" />
       <p data-testid="visitor-rule">{visitorRuleWords(BILLING_RULES.defaults)}</p>
       {BILLING_RULES.placeholder && (
         <p className="club-placeholder" data-testid="placeholder-note">

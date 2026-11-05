@@ -7,6 +7,7 @@ import { getCurrentActor } from "@/club/identity";
 import { getClubStore } from "@/club/store/instance";
 import { formatMoment } from "@/club/time";
 import { SignedOut } from "../../SignedOut";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -30,7 +31,7 @@ export default async function IncidentQueuePage({ searchParams }: { searchParams
 
   return (
     <section>
-      <h1>Incident reports</h1>
+      <PageBand eyebrow="Safety" title="Incident reports" />
       <p>
         Staff and coaches file these when someone is hurt or something nearly goes wrong. Only staff read them all. <Link href="/club/admin">Back to the Staff office</Link> &middot; <Link href="/club/incidents">Report an incident</Link>
       </p>

@@ -8,6 +8,7 @@ import { getTourStore } from "@/club/store/tours-instance";
 import { formatMoment } from "@/club/time";
 import { SignedOut } from "../../SignedOut";
 import { FollowUpButton } from "./FollowUpButton";
+import { PageBand } from "../../PageBand";
 
 /** Staff only: the cards visitors left through the public Request a tour form, newest first. */
 export default async function TourRequestsPage() {
@@ -18,7 +19,7 @@ export default async function TourRequestsPage() {
   const { items, total, newCount } = await listTourRequests(getTourStore(), TOUR_RULES, toEngineActor(actor));
   return (
     <section>
-      <h1>Tour requests</h1>
+      <PageBand eyebrow="Public site" title="Tour requests" />
       <p data-testid="tour-counts">
         {total === 0 ? "No one has asked for a tour yet." : `${newCount} to follow up, ${total} in all.`}
       </p>

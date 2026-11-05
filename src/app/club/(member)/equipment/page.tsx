@@ -10,6 +10,7 @@ import { getClubStore } from "@/club/store/instance";
 import { formatDay, formatDayLong, formatMoment, formatRange, pacificDate } from "@/club/time";
 import { idParam, NOTICES } from "@/club/web";
 import { SignedOut } from "../SignedOut";
+import { PageBand } from "../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -43,7 +44,7 @@ export default async function Equipment({ searchParams }: { searchParams: Promis
 
   return (
     <section>
-      <h1>Equipment</h1>
+      <PageBand eyebrow="Boats and spaces" title="Equipment" />
       <p className="club-meta">Taking something out of service stops new bookings. Bookings already made are kept; you will see who to contact.</p>
       {notice && (
         <p className="club-alert" role="alert">

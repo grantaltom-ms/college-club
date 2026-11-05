@@ -10,6 +10,7 @@ import { formatDay, formatMoment, formatRange } from "@/club/time";
 import { HISTORY_LIST_LIMIT } from "@/club/web-history";
 import { SignedOut } from "../../SignedOut";
 import { HistoryForm } from "./HistoryForm";
+import { PageBand } from "../../PageBand";
 
 const MATCH_WORDS = { one: "one member", many: "more than one member", none: "no member" } as const;
 
@@ -28,7 +29,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
 
   return (
     <section>
-      <h1>Old bookings</h1>
+      <PageBand eyebrow="Record" title="Old bookings" />
       <p>
         The bookings from iCrew, kept as a record. They are a filing cabinet, not part of today&apos;s calendar: they never count against anyone&apos;s limits, never become a no-show and never appear on a bill. The import only ever adds, and a booking
         that is already stored is skipped.

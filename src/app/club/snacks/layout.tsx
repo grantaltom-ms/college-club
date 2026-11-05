@@ -1,4 +1,5 @@
 import { requireClub } from "@/club/guard";
+import "../club-kiosk.css";
 
 /**
  * The honor snack bar iPad: a plain screen with no menu bar, no test-member picker and no links into the rest of the member
@@ -7,7 +8,7 @@ import { requireClub } from "@/club/guard";
 export default async function SnackLayout({ children }: { children: React.ReactNode }) {
   await requireClub();
   return (
-    <div className="ipad">
+    <div className="ipad club-kiosk">
       <header className="ipad-header">
         <span className="club-wordmark">College Club Seattle</span>
         <span className="ipad-title">Snack bar</span>

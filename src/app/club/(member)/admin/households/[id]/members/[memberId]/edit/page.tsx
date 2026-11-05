@@ -7,6 +7,7 @@ import { getCurrentActor } from "@/club/identity";
 import { getClubStore } from "@/club/store/instance";
 import { NOTICES } from "@/club/web";
 import { SignedOut } from "@/app/club/(member)/SignedOut";
+import { PageBand } from "../../../../../../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
 
@@ -31,7 +32,7 @@ export default async function EditAdult({ params, searchParams }: { params: Prom
   if (household.status === "ended" || member.status !== "active") {
     return (
       <section>
-        <h1>{fullName(member)}</h1>
+        <PageBand eyebrow="Members" title={fullName(member)} />
         <p>{household.status === "ended" ? "This membership has ended, so nothing in it can be changed." : `${fullName(member)} is no longer on this household's membership, so their details cannot be changed.`}</p>
         {back}
       </section>
@@ -46,7 +47,7 @@ export default async function EditAdult({ params, searchParams }: { params: Prom
   const notice = comingBack ? undefined : NOTICES[one(query.notice)];
   return (
     <section>
-      <h1>Change details for {fullName(member)}</h1>
+      <PageBand eyebrow="Members" title={`Change details for ${fullName(member)}`} />
       <p className="club-meta">{household.displayName}. Each change is written to the household&apos;s file, with what it said before.</p>
       {problem && (
         <p className="club-alert" role="alert" data-testid="edit-problem">

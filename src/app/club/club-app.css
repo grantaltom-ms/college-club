@@ -968,7 +968,12 @@
   border-color: var(--app-waterloo);
 }
 
-/* The other kinds of text box (the time of a practice or an incident, a search box, a number): the same white box with a Waterloo edge as the rest. */
+/* The other kinds of text box (the time of a practice or an incident, a search box, a number, and the date, email, phone and plain boxes on forms that are not inside .club-form, such as staff's Charges and Visitors): the same white box with a Waterloo edge as the rest. */
+.club-app input:not([type]),
+.club-app input[type="text"],
+.club-app input[type="email"],
+.club-app input[type="tel"],
+.club-app input[type="date"],
 .club-app input[type="time"],
 .club-app input[type="search"],
 .club-app input[type="number"],
@@ -1018,4 +1023,38 @@
 
 .club-app .club-bill-dot {
   background: var(--app-waterloo);
+}
+
+/* ---------- Part 3: the staff screens ---------- */
+
+/* A long address or code (the iPad's private address) wraps instead of pushing the page sideways on a phone. */
+.club-app code {
+  overflow-wrap: anywhere;
+}
+
+/* The last of the older sans (Figtree) on the members' and staff screens: the tool links, the Today counts, the inline call to action and the class catalogue's lines take the package's reading face. My bill's receipt keeps its own sans for its figures. */
+.club-app .club-tool-links a,
+.club-app .club-inline-cta,
+.club-app .club-class-catalog-when,
+.club-app .club-class-of-when {
+  font-family: var(--body);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.club-app .club-today-count {
+  font-family: var(--body);
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.club-app .club-class-catalog-blurb {
+  font-family: var(--body);
+  font-size: 16px;
+}
+
+/* The minus and plus on the event party picker. */
+.club-app .party-step {
+  font-family: var(--body);
+  font-size: 1.6rem;
 }

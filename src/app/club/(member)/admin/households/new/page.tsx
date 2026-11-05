@@ -8,6 +8,7 @@ import { MEMBERSHIP_TYPES } from "@/club/types";
 import { NOTICES } from "@/club/web";
 import { householdFromQuery } from "@/club/web-households";
 import { SignedOut } from "../../../SignedOut";
+import { PageBand } from "../../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -28,7 +29,7 @@ export default async function NewHousehold({ searchParams }: { searchParams: Pro
 
   return (
     <section>
-      <h1>Add a household</h1>
+      <PageBand eyebrow="Members" title="Add a household" />
       <p className="club-meta">One household is one membership and one bill. Each adult gets their own record and, later, their own login.</p>
       {notice && (
         <p className="club-alert" role="alert">

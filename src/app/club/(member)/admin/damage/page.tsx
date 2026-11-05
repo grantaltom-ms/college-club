@@ -7,6 +7,7 @@ import { getCurrentActor } from "@/club/identity";
 import { getClubStore } from "@/club/store/instance";
 import { formatDay, pacificDate } from "@/club/time";
 import { SignedOut } from "../../SignedOut";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -30,7 +31,7 @@ export default async function DamageQueuePage({ searchParams }: { searchParams: 
 
   return (
     <section>
-      <h1>Damage reports</h1>
+      <PageBand eyebrow="Safety" title="Damage reports" />
       <p>
         Anyone signed in can report damage on a boat or space. A report marked major does not close the boat by itself: open it and press &ldquo;Take out of service&rdquo; if it should be. <Link href="/club/admin">Back to the Staff office</Link> &middot; <Link href="/club/damage">Report damage</Link>
       </p>

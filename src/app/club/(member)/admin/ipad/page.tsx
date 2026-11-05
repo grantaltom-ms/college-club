@@ -5,6 +5,7 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { getIpadSecret } from "@/club/ipad-secret";
 import { SignedOut } from "../../SignedOut";
+import { PageBand } from "../../PageBand";
 
 /**
  * Staff only: the front-desk iPad's private address. Open it once on the iPad and add it to the Home Screen. Anyone with the
@@ -27,7 +28,7 @@ export default async function IpadSetup() {
 
   return (
     <section>
-      <h1>Front-desk iPad</h1>
+      <PageBand eyebrow="Front desk" title="Front-desk iPad" />
       <p>Members check themselves in on this screen: they type the first letters of their name, tap it, and tap &ldquo;I&apos;m here&rdquo;.</p>
       {path === null ? (
         <p className="club-alert" role="status" data-testid="ipad-off">
