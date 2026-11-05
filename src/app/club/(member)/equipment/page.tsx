@@ -45,7 +45,7 @@ export default async function Equipment({ searchParams }: { searchParams: Promis
   return (
     <section>
       <PageBand eyebrow="Boats and spaces" title="Equipment" />
-      <p className="club-meta">Taking something out of service stops new bookings. Bookings already made are kept; you will see who to contact.</p>
+      <p className="club-meta">Taking something out of service stops new bookings. Bookings already made are kept; you will see who to contact, and each of those members is emailed.</p>
       {notice && (
         <p className="club-alert" role="alert">
           {notice}
@@ -66,6 +66,7 @@ export default async function Equipment({ searchParams }: { searchParams: Promis
               <p>
                 {affected.length} existing booking{affected.length === 1 ? " is" : "s are"} affected. Nothing was cancelled; please contact:
               </p>
+              <p className="club-meta">Each of these members was also emailed that the boat is out of service. Call anyone who may need more help.</p>
               <ul>
                 {affected.map((a) => (
                   <li key={a.bookingId} data-testid="affected-booking">

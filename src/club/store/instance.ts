@@ -1,6 +1,8 @@
 import { clubNow } from "../clock";
 import { attendanceSettler } from "../engine/attendance";
 import { clubEnabled } from "../enabled";
+import { defaultNotifyDeps } from "../notify/defaults";
+import { notifyingStore } from "../notify/notifying-store";
 import { buildSampleStore, seedSample } from "../sample/club";
 import { ATTENDANCE_RULES } from "../settings/attendance-rules";
 import { CLASS_RULES } from "../settings/class-rules";
@@ -37,7 +39,8 @@ export function getClubStore(): Promise<ClubStore> {
   if (!clubEnabled()) throw new Error("The member area is switched off.");
   const url = process.env.CLUB_DATABASE_URL;
   if (!g.__ccsClubStore) {
-    const opening = url ? openPostgres(url) : buildSampleStore(undefined, undefined, { settle });
+    // Every way of changing the club goes through the wrapper, which emails the people a change affects once it is saved.
+    const opening = (url ? openPostgres(url) : buildSampleStore(undefined, undefined, { settle })).then((store) => notifyingStore(store, defaultNotifyDeps()));
     // If opening fails (the database is down, or the address is refused), do not remember the failure: try again next time.
     opening.catch(() => {
       if (g.__ccsClubStore === opening) delete g.__ccsClubStore;

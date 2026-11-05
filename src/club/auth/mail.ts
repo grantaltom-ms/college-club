@@ -1,6 +1,7 @@
 import { clubEnabled, outboxEnabled } from "../enabled";
 import { MailSettingsError, parseMailSettings } from "./mail-settings.ts";
 import { createResendMailer } from "./resend.ts";
+import { sharedTestMail } from "./test-mail-instance";
 
 /** An email the club wants to send. Plain text only: it is a one-click sign-in link. */
 export interface OutgoingMail {
@@ -19,7 +20,7 @@ export interface OutboxEntry extends OutgoingMail {
   at: string;
 }
 
-const MOST = 50;
+const MOST = 100;
 /** Shared by every part of the server (pages and handlers are bundled separately, so a module variable would not be shared). */
 const SHARED = Symbol.for("ccs.club.testOutbox");
 const box = () => {
@@ -42,10 +43,20 @@ export function clearOutbox(): void {
  */
 export const outboxMailer: Mailer = {
   async send(mail, now) {
-    box().unshift({ ...mail, at: now.toISOString() });
+    const entry = { ...mail, at: now.toISOString() };
+    box().unshift(entry);
     box().length = Math.min(box().length, MOST);
+    // With a shared test database (a preview, or a local server with CLUB_DATABASE_URL) the email is also kept there, so every
+    // server shows the same list and a restart does not lose it.
+    await sharedTestMail()?.add(entry);
   },
 };
+
+/** What the test outbox page shows: the shared test database's newest emails when there is one, else this server's own. */
+export async function outboxMessagesShared(): Promise<OutboxEntry[]> {
+  const shared = sharedTestMail();
+  return shared ? shared.recent(MOST) : outboxMessages();
+}
 
 /** Mistakes in the mail settings already reported on this server, so a bad setting is logged once and not on every page view. */
 const reported = new Set<string>();

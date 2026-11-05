@@ -6,6 +6,7 @@ import { fullName, memberById } from "./engine/queries";
 import { getCurrentActor, getRsvpLinkActor, ipadCodeIsGenuine, snackCodeIsGenuine, toEngineActor, type CurrentActor } from "./identity";
 import { getClubStore } from "./store/instance";
 import type { Ctx } from "./engine/households";
+import { configuredSiteOrigin } from "./site-url";
 
 /** What every club form handler starts with: the area must be on, someone must be acting, and the form must be readable. */
 export async function startPost(request: NextRequest): Promise<{ response: NextResponse } | { actor: CurrentActor; ctx: Ctx; form: FormData; store: Awaited<ReturnType<typeof getClubStore>> }> {
@@ -127,15 +128,7 @@ export function sameOrigin(request: NextRequest): boolean {
  * "email" never leaves the server, is the address of the request itself good enough.
  */
 export function siteOrigin(request: NextRequest): string | null {
-  const configured = process.env.CLUB_SITE_URL?.trim();
-  if (configured) {
-    try {
-      const url = new URL(configured);
-      if (url.protocol === "https:" || url.protocol === "http:") return url.origin;
-    } catch {
-      // fall through: a bad setting is no setting
-    }
-    return null;
-  }
+  const configured = configuredSiteOrigin();
+  if (configured !== undefined) return configured;
   return outboxEnabled() ? request.nextUrl.origin : null;
 }
