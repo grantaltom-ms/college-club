@@ -25,7 +25,7 @@ async function dinner() {
   const before = await f.store.read();
   const after = structuredClone(before);
   for (const r of after.rsvps) if (r.memberId === f.m.Ben) r.status = "going";
-  return { f, e, before, after, basis: basisOf(before) };
+  return { f, e, before, after, basis: basisOf(before, NOW) };
 }
 
 describe("a spot opened for you: the moment it stops being news", () => {
@@ -78,7 +78,7 @@ describe("a spot opened for you: a class", () => {
     const before = await f.store.read();
     const after = structuredClone(before);
     for (const g of after.signups) if (g.memberId === f.m.Ben) g.status = "enrolled";
-    return { session, template, basis: basisOf(before), after };
+    return { session, template, basis: basisOf(before, NOW), after };
   }
 
   it("is news up to the moment the automatic move-up ends, and not from then on", async () => {
@@ -94,6 +94,23 @@ describe("a spot opened for you: a class", () => {
     const cancelled = structuredClone(after);
     cancelled.sessions[0].status = "cancelled";
     expect(noticesFromChange(basis, cancelled, NOW, RULES)).toEqual([]);
+  });
+});
+
+describe("a waiting place whose hour has run out", () => {
+  it("is not on the list at the moment of the change, so it is not in the before-snapshot or told about anything", async () => {
+    const { f, e, before } = await dinner();
+    const held = structuredClone(before);
+    const ben = held.rsvps.find((r) => r.memberId === f.m.Ben)!;
+    ben.holdUntil = new Date(NOW.getTime() + 60 * 60_000).toISOString();
+    // One minute before the hold ends Ben is still waiting; at the moment it ends he is not.
+    const stillWaiting = basisOf(held, new Date(NOW.getTime() + 59 * 60_000));
+    const ranOut = basisOf(held, new Date(NOW.getTime() + 60 * 60_000));
+    expect(stillWaiting.waitingRsvps.has(ben.id)).toBe(true);
+    expect(stillWaiting.events.get(e.id)!.live.some((l) => l.memberId === f.m.Ben)).toBe(true);
+    expect(ranOut.waitingRsvps.has(ben.id)).toBe(false);
+    expect(ranOut.events.get(e.id)!.live.some((l) => l.memberId === f.m.Ben)).toBe(false);
+    expect(ranOut.events.get(e.id)!.live.some((l) => l.memberId === f.m.Ada)).toBe(true);
   });
 });
 
@@ -136,7 +153,7 @@ describe("a change that calls for nothing", () => {
     const { before, after } = await dinner();
     const cancelledBefore = structuredClone(before);
     cancelledBefore.events[0].status = "cancelled";
-    const basis = basisOf(cancelledBefore);
+    const basis = basisOf(cancelledBefore, NOW);
     const again = structuredClone(after);
     again.events[0].status = "cancelled";
     expect(noticesFromChange(basis, again, NOW, RULES)).toEqual([]);

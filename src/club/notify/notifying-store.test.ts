@@ -202,6 +202,51 @@ describe.each(STORE_KINDS)("emails when something changes, on the %s store", (ki
       expect(waiting.text).toContain("Your place on the waiting list is released.");
     });
 
+    it("does not email someone whose place on the waiting list ran out before the event was cancelled", async () => {
+      const f = await fixtureFor(kind)();
+      const sent: OutgoingMail[] = [];
+      const clock = { now: NOW };
+      const holding: EventRules = { placeholder: true, defaults: { ...EVENT_RULES.defaults, waitlistHoldMinutes: 60 } };
+      const store = notifyingStore(f.store, {
+        now: () => clock.now,
+        rules: { events: holding, classes: CLASS_RULES },
+        mailer: () => ({ async send(m) { sent.push(m); } }),
+        links: () => NO_LINKS,
+        run: (job) => job(),
+        log: () => undefined,
+      });
+      const e = await createEvent(store, staffCtx(), { title: "Dinner", startsAt: at(3, 18), endsAt: at(3, 21), capacity: 1 });
+      await rsvp(store, holding, memberCtx(f.m.Ada, "Ada"), { eventId: e.id, memberId: f.m.Ada, guests: 0 });
+      await rsvp(store, holding, memberCtx(f.m.Ben, "Ben"), { eventId: e.id, memberId: f.m.Ben, guests: 0 }); // waits, held for an hour
+      await rsvp(store, holding, memberCtx(f.m.Cy, "Cy"), { eventId: e.id, memberId: f.m.Cy, guests: 0 });
+      const later = new Date(NOW.getTime() + 61 * 60_000); // Ben's and Cy's holds have run out
+      clock.now = later;
+      await cancelEvent(store, staffCtx(later), e.id, { reason: "The venue is closed" });
+      expect(sent.map((m) => m.to)).toEqual(["ada@example.com"]);
+    });
+
+    it("does still email someone whose hold has not yet run out", async () => {
+      const f = await fixtureFor(kind)();
+      const sent: OutgoingMail[] = [];
+      const clock = { now: NOW };
+      const holding: EventRules = { placeholder: true, defaults: { ...EVENT_RULES.defaults, waitlistHoldMinutes: 60 } };
+      const store = notifyingStore(f.store, {
+        now: () => clock.now,
+        rules: { events: holding, classes: CLASS_RULES },
+        mailer: () => ({ async send(m) { sent.push(m); } }),
+        links: () => NO_LINKS,
+        run: (job) => job(),
+        log: () => undefined,
+      });
+      const e = await createEvent(store, staffCtx(), { title: "Dinner", startsAt: at(3, 18), endsAt: at(3, 21), capacity: 1 });
+      await rsvp(store, holding, memberCtx(f.m.Ada, "Ada"), { eventId: e.id, memberId: f.m.Ada, guests: 0 });
+      await rsvp(store, holding, memberCtx(f.m.Ben, "Ben"), { eventId: e.id, memberId: f.m.Ben, guests: 0 });
+      const soon = new Date(NOW.getTime() + 59 * 60_000); // one minute of the hold left
+      clock.now = soon;
+      await cancelEvent(store, staffCtx(soon), e.id, { reason: "The venue is closed" });
+      expect(sent.map((m) => m.to).sort()).toEqual(["ada@example.com", "ben@example.com"]);
+    });
+
     it("sends nothing when somebody who is not staff tries", async () => {
       const h = await harness(kind);
       const e = await mkEvent(h);

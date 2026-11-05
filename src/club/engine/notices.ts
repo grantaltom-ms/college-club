@@ -2,7 +2,7 @@ import { classRulesFor } from "../settings/class-rules";
 import type { ClassRules, ClubState, EventRules } from "../types";
 import { promoteCutoff as classPromoteCutoff } from "./classes";
 import { noticeWords, openDamageNotices } from "./damage";
-import { promoteCutoff as eventPromoteCutoff } from "./events";
+import { holdExpired, promoteCutoff as eventPromoteCutoff } from "./events";
 import { householdOf, memberById } from "./queries";
 
 /**
@@ -117,12 +117,17 @@ interface EventBasis {
   live: { memberId: string; status: "going" | "waitlisted"; guests: number; priceCents: number | null }[];
 }
 
-/** Takes the digest. Cheap: one pass over the lists a notice can come from. */
-export function basisOf(state: ClubState): ChangeBasis {
+/**
+ * Takes the digest. Cheap: one pass over the lists a notice can come from. `now` is the moment of the change: a waiting place
+ * whose hour has already run out is not really on the list any more (every change to an event removes it first, as the change
+ * itself does), so it is left out, and nobody is told about an event they were no longer waiting for.
+ */
+export function basisOf(state: ClubState, now: Date): ChangeBasis {
   const events = new Map<string, EventBasis>();
   for (const e of state.events) events.set(e.id, { status: e.status, startsAt: e.startsAt, endsAt: e.endsAt, location: e.location, live: [] });
   const waitingRsvps = new Set<string>();
   for (const r of state.rsvps) {
+    if (holdExpired(r, now)) continue;
     if (r.status === "waitlisted") waitingRsvps.add(r.id);
     if (r.status === "going" || r.status === "waitlisted") events.get(r.eventId)?.live.push({ memberId: r.memberId, status: r.status, guests: r.guests, priceCents: r.priceCents });
   }

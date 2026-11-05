@@ -33,7 +33,7 @@ export function notifyingStore(inner: ClubStore, deps: NotifyDeps): ClubStore {
       let notices: Notice[] = [];
       const result = await inner.transaction(async (state, newId) => {
         notices = [];
-        const basis = basisOf(state);
+        const basis = basisOf(state, deps.now());
         const out = await fn(state, newId);
         try {
           notices = noticesFromChange(basis, state, deps.now(), deps.rules);
