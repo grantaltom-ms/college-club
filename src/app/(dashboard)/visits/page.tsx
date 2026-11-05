@@ -6,7 +6,7 @@ import { WithData } from "@/components/DataProvider";
 import { StackedBarChart } from "@/components/StackedBarChart";
 import { useElementWidth } from "@/components/useElementWidth";
 import { formatDay } from "@/lib/dates";
-import { BAND_COLORS, BAND_LABELS, bandSummary, dataRange, fmtInt, headline, multiBooking, percent, quietByJoined, visitsByType } from "@/lib/stats";
+import { BAND_COLORS, BAND_LABELS, bandSummary, dataRange, fmtInt, headline, multiBooking, OFTEN_EXTRA_BOOKINGS, percent, quietByJoined, visitsByType } from "@/lib/stats";
 import { BAND_ORDER, type DashboardData } from "@/lib/types";
 
 const SERIES_COLORS = BAND_ORDER.map((b) => BAND_COLORS[b]);
@@ -179,12 +179,14 @@ function Visits({ data }: { data: DashboardData }) {
           <details className="how">
             <summary>How we tell</summary>
             <p>
-              The reservation export has no start times, so a member counts as double-booking when they have more
-              bookings than booking days. {fmtInt(mb.often)} do it often (5 or more extra bookings). We set aside{" "}
+              The reservation export has no start times, so a member counts as booking more than once in a day
+              when they have more reservation rows than booking days. Each row is one reservation other than the gym
+              (a shell, a dock space, a room, a work space, and so on). {fmtInt(mb.often)} do it often ({OFTEN_EXTRA_BOOKINGS}{" "}
+              or more extra rows from July to September). We set aside{" "}
               {fmtInt(mb.earlyBirds)} who mostly arrive 4 to 8 am (rowers booking two boats), {fmtInt(mb.households)}{" "}
-              shared accounts for two people, and {fmtInt(mb.unknown)} with no door data. A double booking can also be a
-              boat plus a class, so this is a good estimate, not a count. A day with one or more bookings counts as one
-              visit everywhere else on this page.
+              shared accounts for two people, and {fmtInt(mb.unknown)} with no door data. Extra rows can also be two
+              different bookings on the same day, so this is a good estimate, not a count. A day with one or more
+              bookings counts as one visit everywhere else on this page.
             </p>
           </details>
         </section>

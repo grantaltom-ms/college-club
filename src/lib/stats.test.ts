@@ -18,6 +18,7 @@ import {
   monthComparison,
   multiBooking,
   monthSeries,
+  OFTEN_EXTRA_BOOKINGS,
   percent,
   weekdaySeries,
   yearOverYear,
@@ -238,20 +239,41 @@ describe("reservation views", () => {
 });
 
 describe("multiBooking", () => {
-  const wfc = { bookingDays: 10, bookings: 16, earlyShare: 0.1, weekendShare: 0.1 };
+  // Exactly on the habit bar: weekday daytime door pattern, not a shared account.
+  const wfc = { bookingDays: 40, bookings: 40 + OFTEN_EXTRA_BOOKINGS, earlyShare: 0.1, weekendShare: 0.1 };
   it("counts members who booked twice in a day and the work-from-club pattern", () => {
     const members = [
       member({ bookingDays: 0, bookings: 0 }),
       member({ bookingDays: 5, bookings: 5 }),
       member({ bookingDays: 5, bookings: 7 }),
+      member({ bookingDays: 40, bookings: 40 + OFTEN_EXTRA_BOOKINGS - 1, earlyShare: 0.1, weekendShare: 0.1 }),
       member(wfc),
-      member({ ...wfc, earlyShare: 0.8 }),
+      member({ ...wfc, earlyShare: 0.5 }),
+      member({ ...wfc, weekendShare: 0.5 }),
       member({ ...wfc, household: true }),
       member({ ...wfc, earlyShare: null, weekendShare: null }),
     ];
     const r = multiBooking(members);
-    expect(r).toMatchObject({ total: 7, booked: 6, multiDay: 5, often: 4, workFromClub: 1, earlyBirds: 1, households: 1, unknown: 1 });
-    expect(r.multiDayShare).toBe(83);
+    expect(r).toMatchObject({ total: 9, booked: 8, multiDay: 7, often: 5, workFromClub: 1, earlyBirds: 1, households: 1, unknown: 1 });
+    expect(r.multiDayShare).toBe(88);
+    // The weekend-daytime member is often, and is in none of the named groups.
+    expect(r.earlyBirds + r.workFromClub + r.households + r.unknown).toBe(r.often - 1);
+  });
+  it("keeps the habit bar at 35 extra rows, one short of it is not often", () => {
+    // Five extras was "often" on the boat-and-class export. Counting every non-gym reservation
+    // ID multiplies those extras by about seven, so the same habit is 35.
+    expect(OFTEN_EXTRA_BOOKINGS).toBe(35);
+    expect(OFTEN_EXTRA_BOOKINGS).toBe(5 * 7);
+    const shares = { earlyShare: 0.1, weekendShare: 0.1 };
+    const once = member({ bookingDays: 20, bookings: 21, ...shares });
+    const shy = member({ bookingDays: 20, bookings: 20 + OFTEN_EXTRA_BOOKINGS - 1, ...shares });
+    const habit = member({ bookingDays: 20, bookings: 20 + OFTEN_EXTRA_BOOKINGS, ...shares });
+    expect(multiBooking([once])).toMatchObject({ multiDay: 1, often: 0, workFromClub: 0 });
+    expect(multiBooking([shy])).toMatchObject({ multiDay: 1, often: 0, workFromClub: 0 });
+    expect(multiBooking([habit])).toMatchObject({ multiDay: 1, often: 1, workFromClub: 1 });
+    // The old bar of 5 extras is a one-off under the details count, not a habit.
+    const oldBar = member({ bookingDays: 20, bookings: 25, ...shares });
+    expect(multiBooking([oldBar])).toMatchObject({ multiDay: 1, often: 0, workFromClub: 0 });
   });
   it("is stable on repeated use and with no bookings", () => {
     expect(multiBooking([])).toMatchObject({ booked: 0, multiDayShare: 0, workFromClub: 0 });
@@ -259,6 +281,8 @@ describe("multiBooking", () => {
     for (let i = 0; i < 5; i++) expect(multiBooking(data.members)).toEqual(a);
     expect(a.workFromClub).toBeLessThanOrEqual(a.often);
     expect(a.multiDay).toBeLessThanOrEqual(a.booked);
+    // Sample extras stay under the details-era bar, so the invented club does not look like a habit.
+    expect(a.often).toBe(0);
   });
 });
 

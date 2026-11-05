@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { sampleData } from "../../src/lib/sample";
-import { quietByJoined, visitsByType } from "../../src/lib/stats";
+import { OFTEN_EXTRA_BOOKINGS, quietByJoined, visitsByType } from "../../src/lib/stats";
 import { mockDashboard } from "./helpers";
 
 const sample = sampleData();
@@ -46,6 +46,11 @@ test("the work-from-the-club card leads with the count and keeps its method one 
   const first = await page.getByTestId("multi-share").innerText();
   expect(first).toMatch(/^\d+%$/);
   const how = tile.getByText("The reservation export has no start times");
+  await expect(how).toBeHidden();
+  await tile.getByText("How we tell").click();
+  await expect(how).toBeVisible();
+  await expect(tile).toContainText(`${OFTEN_EXTRA_BOOKINGS} or more extra rows`);
+  await tile.getByText("How we tell").click();
   await expect(how).toBeHidden();
   for (let i = 0; i < 3; i++) {
     await tile.getByText("How we tell").click();

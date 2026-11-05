@@ -15,9 +15,12 @@ export interface Member {
   /** Days with a door entry or a boat/class booking, Jan 1 to data end. */
   visitDays: number;
   doorEntries: number;
-  /** Days with a boat/class booking, Jul 1 to Sep 30. */
+  /** Days with at least one non-gym iCrew reservation, Jul 1 to Sep 30. Gym Space is left out. */
   bookingDays: number;
-  /** Boat/class bookings (not days), Jul 1 to Sep 30. More than bookingDays means some day had 2+. */
+  /**
+   * Non-gym iCrew reservation rows, Jul 1 to Sep 30. Gym Space is left out.
+   * More than bookingDays means some day had two or more rows (a second booking, or two amenities).
+   */
   bookings: number;
   /** Share of door entries between 4 and 8am, 0 to 1. Null when the member has no door data. */
   earlyShare: number | null;
