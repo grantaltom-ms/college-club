@@ -4,14 +4,19 @@ import {
   byBoat,
   byStartHour,
   byWeekday,
+  memberOutingsBefore,
+  memberYearComparable,
   monthCompare,
+  monthStacks,
   monthTimeline,
   normalizeShellOwnership,
+  outingsForShellCharts,
   sameDateCutoff,
   sampleShells,
   shellOwnershipQuery,
   yearToDate,
   type Outing,
+  type ShellData,
 } from "./shells";
 import { countRowers, toOuting, toShellData, type ShellRow } from "./supabase";
 
@@ -203,6 +208,75 @@ describe("shell ownership", () => {
     expect(both.through).toBe(club.through);
     expect(both.rowers.find((r) => r.year === 2025)).toEqual(club.rowers.find((r) => r.year === 2025));
     expect(both.ownership).toEqual(["club", "member"]);
+    expect(member.outings.every((o) => o.ownership === "member")).toBe(true);
+  });
+});
+
+describe("monthly ownership stacks", () => {
+  it("stacks club under member-owned and leaves an unfinished month blank", () => {
+    const through = "2026-11-04";
+    const rows = [
+      outing("2025-01-10"),
+      outing("2025-01-11"),
+      outing("2025-01-12"),
+      outing("2025-01-13"),
+      outing("2025-11-02"),
+      outing("2026-01-08"),
+      outing("2026-01-09"),
+      outing("2026-01-10", { ownership: "member", boat: "Puffin" }),
+      outing("2026-01-11", { ownership: "member", boat: "Puffin" }),
+      outing("2026-11-01", { ownership: "member", boat: "Puffin" }),
+      outing("2026-11-02"),
+    ];
+    const stacks = monthStacks(rows, through);
+    const jan = stacks.rows[0];
+    expect(jan.columns.map((c) => c.segments)).toEqual([
+      [4, 0],
+      [2, 2],
+    ]);
+    expect(jan.columns.map((c) => c.total)).toEqual([4, 4]);
+    expect(jan.clubChange).toBe(Math.round((2 / 4 - 1) * 100));
+    const nov = stacks.rows[10];
+    expect(nov.columns[0]).toMatchObject({ total: 1, segments: [1, 0] });
+    expect(nov.columns[1]).toEqual({ year: 2026, total: 0, segments: [0, 0] });
+    expect(nov.clubChange).toBeNull();
+    expect(stacks.rows[11].columns[1].total).toBe(0);
+  });
+
+  it("keeps club segments equal to the club-only series on the sample", () => {
+    const club = sampleShells();
+    const both = sampleShells("club,member");
+    const clubStacks = monthStacks(club.outings, club.through);
+    const bothStacks = monthStacks(both.outings, both.through);
+    expect(bothStacks.years).toEqual([2025, 2026]);
+    for (const row of bothStacks.rows) {
+      const clubRow = clubStacks.rows[row.month - 1];
+      expect(row.columns[0].segments[0]).toBe(clubRow.columns[0].segments[0]);
+      expect(row.columns[0].segments[1]).toBe(0);
+      expect(row.columns[1].segments[0]).toBe(clubRow.columns[1].segments[0]);
+    }
+    expect(bothStacks.rows[6].columns[1].segments[1]).toBeGreaterThan(0);
+    expect(bothStacks.rows[9].columns[1].total).toBe(0);
+  });
+
+  it("uses a real prior member year and does not treat a handful of rows as a fleet", () => {
+    const thin = [outing("2025-03-01", { ownership: "member" }), outing("2026-03-01", { ownership: "member" })];
+    expect(memberYearComparable(1)).toBe(false);
+    expect(memberYearComparable(50)).toBe(true);
+    expect(memberOutingsBefore(thin, 2026)).toBe(1);
+    const memberOnly: Pick<ShellData, "outings" | "ownership"> = { outings: thin, ownership: ["member"] };
+    expect(outingsForShellCharts(memberOnly).map((o) => o.day)).toEqual(["2026-03-01"]);
+    const full = [
+      ...Array.from({ length: 50 }, (_, i) => outing(`2025-06-${String((i % 28) + 1).padStart(2, "0")}`, { ownership: "member", boat: "Puffin" })),
+      outing("2026-06-01", { ownership: "member", boat: "Puffin" }),
+    ];
+    expect(outingsForShellCharts({ outings: full, ownership: ["member"] })).toHaveLength(51);
+    const both: Pick<ShellData, "outings" | "ownership"> = { outings: [outing("2025-01-02"), ...thin], ownership: ["club", "member"] };
+    expect(outingsForShellCharts(both)).toHaveLength(3);
+    const stacked = monthStacks(both.outings, "2026-04-01");
+    expect(stacked.rows[0].columns[0].segments).toEqual([1, 0]);
+    expect(stacked.rows[2].columns[0].segments).toEqual([0, 1]);
+    expect(stacked.rows[2].columns[1].segments).toEqual([0, 1]);
   });
 });
 

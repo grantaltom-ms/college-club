@@ -225,7 +225,7 @@ describe("shell ownership load", () => {
     row("2026-07-01", "OnlyInClubTable", "club", "rower-only-club"),
   ];
   const allTable = [
-    row("2025-08-01", "ShouldNotAppear", "member", "rower-invented-2025"),
+    row("2025-08-01", "PriorMember", "member", "rower-member-2025"),
     row("2026-06-01", "Heron", "club", "rower-club-2026"),
     row("2026-06-02", "Puffin", "member", "rower-member-2026"),
   ];
@@ -263,35 +263,49 @@ describe("shell ownership load", () => {
     expect(data.ownership).toEqual(["club"]);
     expect(data.memberFrom).toBeUndefined();
     expect(data.outings.map((o) => `${o.day} ${o.boat}`)).toEqual(["2025-06-01 Heron", "2026-06-01 Heron", "2026-07-01 OnlyInClubTable"]);
+    expect(data.outings.every((o) => o.ownership === "club")).toBe(true);
     expect(JSON.stringify(data)).not.toMatch(/rower-/);
+    expect(JSON.stringify(data)).not.toContain("PriorMember");
   });
 
-  it("member reads 2026 rows from shell_outings_all and does not invent a 2025 member year", async () => {
+  it("member reads every member row from shell_outings_all, including a prior year the table actually has", async () => {
     const urls = serve();
     const data = await loadShells(cfg, "2026-11-04", "member");
     expect(urls).toEqual([
-      "https://example.supabase.co/rest/v1/shell_outings_all?select=*&order=day.asc,id.asc&limit=1000&offset=0&ownership=eq.member&day=gte.2026-01-01",
+      "https://example.supabase.co/rest/v1/shell_outings_all?select=*&order=day.asc,id.asc&limit=1000&offset=0&ownership=eq.member",
     ]);
     expect(data.ownership).toEqual(["member"]);
     expect(data.memberFrom).toBe("2026-01-01");
-    expect(data.outings.map((o) => o.boat)).toEqual(["Puffin"]);
-    expect(data.outings.every((o) => o.day >= "2026-01-01")).toBe(true);
+    expect(data.outings.map((o) => `${o.day} ${o.boat}`)).toEqual(["2025-08-01 PriorMember", "2026-06-02 Puffin"]);
+    expect(data.outings.every((o) => o.ownership === "member")).toBe(true);
     expect(JSON.stringify(data)).not.toContain("rower-member-2026");
-    expect(JSON.stringify(data)).not.toContain("ShouldNotAppear");
+    expect(JSON.stringify(data)).not.toContain("Heron");
   });
 
-  it("club plus member keeps 2025 from the club table and 2026 from the full table, without double counting", async () => {
+  it("club plus member keeps 2025 club from the club table, adds real prior member rows, and splits 2026 by ownership", async () => {
     const urls = serve();
     const data = await loadShells(cfg, "2026-11-04", ["club", "member"]);
     expect(urls).toEqual([
       "https://example.supabase.co/rest/v1/shell_outings?select=*&order=day.asc,id.asc&limit=1000&offset=0&day=lt.2026-01-01",
+      "https://example.supabase.co/rest/v1/shell_outings_all?select=*&order=day.asc,id.asc&limit=1000&offset=0&ownership=eq.member&day=lt.2026-01-01",
       "https://example.supabase.co/rest/v1/shell_outings_all?select=*&order=day.asc,id.asc&limit=1000&offset=0&ownership=in.(club,member)&day=gte.2026-01-01",
     ]);
-    expect(data.outings.map((o) => `${o.day} ${o.boat}`)).toEqual(["2025-06-01 Heron", "2026-06-01 Heron", "2026-06-02 Puffin"]);
+    expect(data.outings.map((o) => `${o.day} ${o.boat} ${o.ownership}`)).toEqual([
+      "2025-06-01 Heron club",
+      "2025-08-01 PriorMember member",
+      "2026-06-01 Heron club",
+      "2026-06-02 Puffin member",
+    ]);
     expect(data.ownership).toEqual(["club", "member"]);
     expect(data.memberFrom).toBe("2026-01-01");
     expect(JSON.stringify(data)).not.toContain("OnlyInClubTable");
-    expect(JSON.stringify(data)).not.toContain("ShouldNotAppear");
+    const stacks = (await import("./shells")).monthStacks(data.outings, "2026-11-04");
+    expect(stacks.rows[5].columns.map((c) => c.segments)).toEqual([
+      [1, 0],
+      [1, 1],
+    ]);
+    expect(stacks.rows[7].columns[0].segments).toEqual([0, 1]);
+    expect(stacks.rows[7].columns[1]).toEqual({ year: 2026, total: 0, segments: [0, 0] });
   });
 
   it("an unknown fleet falls back to the club series", async () => {
@@ -301,7 +315,7 @@ describe("shell ownership load", () => {
     expect(urls.some((url) => url.includes("shell_outings_all"))).toBe(false);
     expect(data.ownership).toEqual(["club"]);
     expect(toShellData([row("2026-03-02", "Puffin", "member", "secret")], "2026-11-04", ["member"]).outings).toEqual([
-      { boat: "Puffin", seats: 1, day: "2026-03-02", team: false, minutes: 60, startHour: 7 },
+      { boat: "Puffin", seats: 1, day: "2026-03-02", team: false, minutes: 60, startHour: 7, ownership: "member" },
     ]);
   });
 });

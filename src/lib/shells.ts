@@ -12,6 +12,8 @@ export interface Outing {
   minutes: number;
   /** Clock hour the outing started, 0 to 23, or null if unknown. */
   startHour: number | null;
+  /** Club or member-owned boat. Absent means club, the historical series. */
+  ownership?: ShellOwnership;
 }
 
 /** Different rowers in a year, counted on the server so no rower identity reaches the browser. */
@@ -25,8 +27,17 @@ export interface RowerCount {
 
 export type ShellOwnership = "club" | "member";
 
-/** First day member-owned outings exist. The log has none before this, and the page must not invent them. */
+/**
+ * First day the tagged member-owned fleet is logged in bulk.
+ * Earlier member rows are shown only when `shell_outings_all` actually has them.
+ */
 export const SHELL_MEMBER_FROM = "2026-01-01";
+
+/**
+ * A member-owned year smaller than this is a handful of rows, not a fleet to compare.
+ * The page says how many there were and does not draw a year-over-year member chart from them.
+ */
+export const SHELL_MEMBER_YEAR_MIN = 50;
 
 const SHELL_FLEETS: ShellOwnership[] = ["club", "member"];
 
@@ -50,6 +61,36 @@ export function shellOwnershipQuery(raw: readonly string[] | string | null | und
   return normalizeShellOwnership(raw).join(",");
 }
 
+/** True when a member-owned year is large enough to compare with another year. */
+export function memberYearComparable(count: number): boolean {
+  return count >= SHELL_MEMBER_YEAR_MIN;
+}
+
+export function memberOutingsIn(outings: Outing[], year: number): number {
+  const prefix = `${year}-`;
+  return outings.filter((o) => o.ownership === "member" && o.day.startsWith(prefix)).length;
+}
+
+/** Member-owned outings strictly before `year`. */
+export function memberOutingsBefore(outings: Outing[], year: number): number {
+  const start = `${year}-01-01`;
+  return outings.filter((o) => o.ownership === "member" && o.day < start).length;
+}
+
+/**
+ * Member-only charts drop a prior year that is missing or only a handful of rows,
+ * so the page does not pretend that handful is a fleet. Club rows are left as they are.
+ */
+export function outingsForShellCharts(data: Pick<ShellData, "outings" | "ownership">): Outing[] {
+  const fleets = data.ownership ?? ["club"];
+  const memberOnly = fleets.includes("member") && !fleets.includes("club");
+  if (!memberOnly || data.outings.length === 0) return data.outings;
+  const latest = Math.max(...data.outings.map((o) => Number(o.day.slice(0, 4))));
+  const prior = memberOutingsBefore(data.outings, latest);
+  if (prior === 0 || memberYearComparable(prior)) return data.outings;
+  return data.outings.filter((o) => o.day >= `${latest}-01-01`);
+}
+
 export interface ShellData {
   /** "live" comes from Supabase; "sample" is made-up data for development and tests. */
   source: "live" | "sample";
@@ -60,8 +101,8 @@ export interface ShellData {
   /** Fleets included in `outings`. Absent means club only, the historical series. */
   ownership?: ShellOwnership[];
   /**
-   * Set when member-owned boats are included. Those rows start on this day (2026).
-   * A prior year in the same response, if any, is club boats only.
+   * Set when member-owned boats are included. The tagged fleet is logged from this day.
+   * Any earlier member-owned rows are whatever `shell_outings_all` actually returned.
    */
   memberFrom?: string;
 }
@@ -117,6 +158,10 @@ export interface MonthPoint {
   label: string;
   member: number;
   team: number;
+  /** Club boats. An outing with no ownership tag counts as club. */
+  club: number;
+  /** Member-owned boats. */
+  owned: number;
   /** False when the data stops partway through the month. */
   complete: boolean;
 }
@@ -124,12 +169,14 @@ export interface MonthPoint {
 /** Every month from the first outing to `through`, oldest first. */
 export function monthTimeline(outings: Outing[], through: string): MonthPoint[] {
   if (outings.length === 0) return [];
-  const counts = new Map<string, { member: number; team: number }>();
+  const counts = new Map<string, { member: number; team: number; club: number; owned: number }>();
   for (const o of outings) {
     const key = o.day.slice(0, 7);
-    const c = counts.get(key) ?? { member: 0, team: 0 };
+    const c = counts.get(key) ?? { member: 0, team: 0, club: 0, owned: 0 };
     if (o.team) c.team += 1;
     else c.member += 1;
+    if (o.ownership === "member") c.owned += 1;
+    else c.club += 1;
     counts.set(key, c);
   }
   const first = outings.reduce((min, o) => (o.day < min ? o.day : min), outings[0].day);
@@ -138,7 +185,7 @@ export function monthTimeline(outings: Outing[], through: string): MonthPoint[] 
   const last = through.slice(0, 7);
   const points: MonthPoint[] = [];
   for (let key = `${year}-${pad2(month)}`; key <= last; ) {
-    const c = counts.get(key) ?? { member: 0, team: 0 };
+    const c = counts.get(key) ?? { member: 0, team: 0, club: 0, owned: 0 };
     points.push({ key, year, month, label: formatMonth(key), ...c, complete: monthEnd(year, month) <= through });
     month += 1;
     if (month > 12) {
@@ -177,6 +224,47 @@ export function monthCompare(outings: Outing[], through: string): { years: numbe
     };
   });
   return { years, rows: years.length ? rows : [] };
+}
+
+export interface MonthStackColumn {
+  year: number;
+  /** 0 when the month is unfinished or has not started, so the column stays blank. */
+  total: number;
+  /** Club on the bottom, member-owned on top. Both 0 when the column is blank. */
+  segments: [number, number];
+}
+
+export interface MonthStackRow {
+  month: number;
+  label: string;
+  columns: MonthStackColumn[];
+  /** Club boats only, oldest finished month to the newest, when both are finished. */
+  clubChange: number | null;
+}
+
+/**
+ * One column per year, each a stack of club then member-owned.
+ * An unfinished month is a blank column, the same rule as the plain year-over-year chart.
+ */
+export function monthStacks(outings: Outing[], through: string): { years: number[]; rows: MonthStackRow[] } {
+  const compare = monthCompare(outings, through);
+  const rows = compare.rows.map((r) => {
+    const columns: MonthStackColumn[] = r.years.map((m, i) => {
+      const year = compare.years[i];
+      if (!m?.complete) return { year, total: 0, segments: [0, 0] };
+      return { year, total: m.club + m.owned, segments: [m.club, m.owned] };
+    });
+    const first = r.years[0];
+    const last = r.years[r.years.length - 1];
+    const comparable = compare.years.length > 1 && !!first?.complete && !!last?.complete;
+    return {
+      month: r.month,
+      label: r.label,
+      columns,
+      clubChange: comparable ? changePct(last!.club, first!.club) : null,
+    };
+  });
+  return { years: compare.years, rows: compare.years.length ? rows : [] };
 }
 
 /* ---------- Boats ---------- */
@@ -378,6 +466,7 @@ function memberSample(): ShellData {
         team: false,
         minutes: [60, 90, 90, 120][Math.floor(rand() * 4)],
         startHour: SAMPLE_HOURS[Math.floor(rand() * SAMPLE_HOURS.length)],
+        ownership: "member",
       });
       rowerDays.push({ day, rower: 200 + Math.floor(rand() * 12) });
     }
