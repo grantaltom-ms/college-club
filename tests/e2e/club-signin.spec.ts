@@ -228,7 +228,8 @@ test.describe("addresses that cannot sign in", () => {
     const out = await page.request.post("/api/club/sign-out", { headers: { Origin: "https://evil.example" }, maxRedirects: 0 });
     expect(out.status()).toBe(403);
     await page.goto("/club/outbox");
-    await expect(page.getByTestId("outbox-message").filter({ hasText: "To lars.eriksen@example.com" })).toHaveCount(0);
+    // Other tests share this outbox, and the club now emails people about their events, so only a sign-in link counts here.
+    await expect(page.getByTestId("outbox-message").filter({ hasText: "To lars.eriksen@example.com" }).filter({ hasText: "sign-in link" })).toHaveCount(0);
   });
 
   test("a forged or leftover session cookie opens nothing", async ({ page }) => {
