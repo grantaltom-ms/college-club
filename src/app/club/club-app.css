@@ -958,3 +958,64 @@
 .club-app .club-book-shell-size-hint {
   color: var(--app-slate);
 }
+
+/* ---------- Part 2: the rest of the member screens ---------- */
+
+/* Native tick boxes and round choices (the practice and incident forms). The package has no design for them, so they take Waterloo for their accent and edge. */
+.club-app input[type="checkbox"],
+.club-app input[type="radio"] {
+  accent-color: var(--app-waterloo);
+  border-color: var(--app-waterloo);
+}
+
+/* The other kinds of text box (the time of a practice or an incident, a search box, a number): the same white box with a Waterloo edge as the rest. */
+.club-app input[type="time"],
+.club-app input[type="search"],
+.club-app input[type="number"],
+.club-app input[type="datetime-local"],
+.club-app input[type="month"],
+.club-app input[type="url"],
+.club-app input[type="password"] {
+  background: #ffffff;
+  border: 1px solid var(--app-waterloo);
+  border-radius: 4px;
+  color: var(--app-cyberspace);
+  font-family: var(--body);
+  font-size: 17px;
+}
+
+/* The small word after a name or title (Private, Major, Cancelled, Retired): the same square chip as the status chips. The old one was a pale yellow pill that took its text colour from whatever it sat in. */
+.club-app .club-tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 5px 9px;
+  border-radius: 0;
+  background: var(--app-selected);
+  color: var(--app-waterloo-hover);
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Inside a title band (a cancelled practice) the chip is white with Ink text, so it reads on the Waterloo band. */
+.club-app .club-band .club-tag {
+  background: #ffffff;
+  color: var(--app-ink);
+}
+
+/* My bill's receipt header: white on its dark block, and the small rule under the month in Oyster (it was the Sun yellow, which is not in this palette). */
+.club-app .club-bill-month {
+  color: #ffffff;
+}
+
+.club-app .club-bill-sun-rule {
+  background: var(--app-oyster);
+}
+
+.club-app .club-bill-dot {
+  background: var(--app-waterloo);
+}

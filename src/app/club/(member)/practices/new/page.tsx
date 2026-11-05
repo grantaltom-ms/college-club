@@ -11,6 +11,7 @@ import { pacificDate } from "@/club/time";
 import { PracticePlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
 import { NewPracticeForm } from "../PracticeForms";
+import { PageBand } from "../../PageBand";
 
 /** Coaches and staff set up a practice: when, which boats to reserve, and who runs it. Anyone else gets "page not found". */
 export default async function NewPracticePage() {
@@ -23,7 +24,7 @@ export default async function NewPracticePage() {
 
   return (
     <section>
-      <h1>Set up a practice</h1>
+      <PageBand eyebrow="Coaching" title="Set up a practice" />
       <p>
         <Link href="/club/practices">Back to practices</Link>
       </p>

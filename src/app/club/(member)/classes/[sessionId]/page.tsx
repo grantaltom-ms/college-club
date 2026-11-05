@@ -17,6 +17,7 @@ import { SignedOut } from "../../SignedOut";
 import { howCheckedIn, rowFor } from "@/club/engine/attendance";
 import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
 import { AttendanceButtons } from "../../AttendanceButtons";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
@@ -80,12 +81,12 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
 
   return (
     <section>
+      <PageBand eyebrow="Fitness class" title={template.name} />
       <p>
         <Link href={`/club/classes/of/${template.id}`}>All {template.name} dates</Link>
         {" · "}
         <Link href="/club/classes">All fitness classes</Link>
       </p>
-      <h1>{template.name}</h1>
       <ClassPlaceholderNote />
       <p data-testid="class-when">
         {whenWords}

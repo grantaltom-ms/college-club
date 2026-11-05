@@ -15,6 +15,7 @@ import { pickDay } from "@/club/web";
 import { viewerOf } from "@/club/web-actor";
 import { ClassPlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
+import { PageBand } from "../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
@@ -40,21 +41,16 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
 
   return (
     <section className={byDay ? "club-classes-day" : "club-classes-catalog"}>
-      <header className="club-page-head">
-        <div>
-          <h1>Fitness classes</h1>
-          <p className="club-meta">
-            {byDay ? "Pick a day, see places left, and take a place." : "Every class with its usual days. Tap a class to see dates and sign up."}
-          </p>
-        </div>
+      <PageBand eyebrow="Classes" title="Fitness classes">
         {actor.kind === "staff" && (
-          <p className="club-page-actions">
-            <Link href="/club/classes/manage" className="club-button club-button-link">
-              Set up classes and sessions
-            </Link>
-          </p>
+          <Link href="/club/classes/manage" className="club-button club-button-link">
+            Set up classes and sessions
+          </Link>
         )}
-      </header>
+      </PageBand>
+      <p className="club-meta club-band-facts">
+        {byDay ? "Pick a day, see places left, and take a place." : "Every class with its usual days. Tap a class to see dates and sign up."}
+      </p>
       <ClassPlaceholderNote />
 
       <nav aria-label="How to browse classes" className="club-chips" data-testid="classes-view-toggle">

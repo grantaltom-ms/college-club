@@ -10,6 +10,7 @@ import { idParam } from "@/club/web";
 import { AddToBoatButton, RemoveFromBoatButton } from "../BoatButtons";
 import { SignedOut } from "../SignedOut";
 import { inviteToMyBoat, removeFromMyBoat } from "./actions";
+import { PageBand } from "../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -25,7 +26,7 @@ export default async function MyBoatsPage({ searchParams }: { searchParams: Prom
   if (actor.kind === "staff") {
     return (
       <section>
-        <h1>My boats</h1>
+        <PageBand eyebrow="Private boats" title="My boats" />
         <p>
           Staff manage private boats on the <Link href="/club/admin/boats">Private boats</Link> screen.
         </p>
@@ -42,7 +43,7 @@ export default async function MyBoatsPage({ searchParams }: { searchParams: Prom
 
   return (
     <section>
-      <h1>My boats</h1>
+      <PageBand eyebrow="Private boats" title="My boats" />
       <p>
         A private boat can be booked, and sat in, only by its owners and the people an owner has invited. Nobody else is shown it. <Link href="/club/book">Book a boat</Link>
       </p>

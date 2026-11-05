@@ -3,22 +3,42 @@ import { mockAll } from "./helpers";
 
 /**
  * The members' and staff look (design package "Waterloo Blocks", Nov 4 2026), checked on the screens that have been converted so far:
- * the member home, the staff Households list and the Reservations screens. Each later pull request adds the screens it converts to
- * SCREENS below, so "no colour outside the palette" keeps growing to cover the whole app.
+ * part 1 (the member home, the staff Households list and the Reservations screens) and part 2 (every other member screen). Each later
+ * pull request adds the screens it converts to SCREENS below, so "no colour outside the palette" keeps growing to cover the whole app.
  *
  * Everything is measured as the browser actually draws it: the colours it paints, the sizes of what you tap, and whether a screen
  * scrolls sideways. What the browser draws is what a member sees, so that is what is held.
  */
 
-const actAs = async (page: Page, who: string) => {
+const actAs = async (page: Page, who: string | null) => {
+  if (who === null) return; // the signed-out screens are looked at by nobody
   await page.goto("/club/act-as");
   await page.getByRole("button", { name: `Act as ${who}`, exact: true }).click();
   await expect(page.getByTestId("acting-as")).toHaveText(`Acting as ${who}.`);
 };
 
-type Screen = { name: string; who: string; path: string; h1: string | RegExp };
+/** Open a screen: straight to its address, or by following links for one whose address is made when it is built. */
+const visit = async (page: Page, screen: Screen) => {
+  if (screen.go) await screen.go(page);
+  else await page.goto(screen.path);
+};
+
+/**
+ * One screen to hold to the look. `who` is the test member to act as (null: nobody, for the signed-out screens). `path` is where to go;
+ * `go` is for a screen whose address is made when it is built (a class, an event, a practice, a booking form): it finds its own way
+ * there the way a person would, by following a link.
+ */
+type Screen = { name: string; who: string | null; path: string; h1: string | RegExp; go?: (page: Page) => Promise<void> };
+
+/** Go to a page, press the first link that matches, and wait until the address has really changed to the one it leads to. */
+const follow = (from: string, link: string, arrives: RegExp) => async (page: Page) => {
+  await page.goto(from);
+  await page.locator(link).first().click();
+  await page.waitForURL(arrives);
+};
 
 const SCREENS: Screen[] = [
+  // Part 1
   { name: "member home", who: "Nora Abernathy", path: "/club", h1: "The Abernathy household" },
   { name: "staff households list", who: "Test staff", path: "/club", h1: "Households" },
   { name: "Reservations: what to reserve", who: "Nora Abernathy", path: "/club/book", h1: "Reservations" },
@@ -26,6 +46,42 @@ const SCREENS: Screen[] = [
   { name: "Reservations: the shell list", who: "Nora Abernathy", path: "/club/book?what=shell&kind=single", h1: "Reservations" },
   { name: "Reservations: a space with time slots", who: "Nora Abernathy", path: "/club/book?what=gym", h1: "Reservations" },
   { name: "Reservations as staff", who: "Test staff", path: "/club/book?what=shell&kind=single", h1: "Reservations" },
+  // Part 2: every other member screen
+  { name: "My bookings", who: "Nora Abernathy", path: "/club/my-bookings", h1: "My bookings" },
+  { name: "All bookings (staff)", who: "Test staff", path: "/club/my-bookings", h1: "All bookings" },
+  { name: "the booking form", who: "Nora Abernathy", path: "", h1: /^Book \S/, go: follow("/club/book?what=gym", 'main a[href^="/club/book/new"]', /\/club\/book\/new\?/) },
+  { name: "My classes", who: "Nora Abernathy", path: "/club/my-classes", h1: "My classes" },
+  { name: "My classes (staff)", who: "Test staff", path: "/club/my-classes", h1: "My classes" },
+  { name: "Fitness classes", who: "Nora Abernathy", path: "/club/classes", h1: "Fitness classes" },
+  { name: "Fitness classes by day", who: "Nora Abernathy", path: "/club/classes?view=day", h1: "Fitness classes" },
+  { name: "Fitness classes (staff)", who: "Test staff", path: "/club/classes", h1: "Fitness classes" },
+  { name: "one class and its dates", who: "Nora Abernathy", path: "", h1: /\S/, go: follow("/club/classes", 'main a[href^="/club/classes/of/"]', /\/club\/classes\/of\//) },
+  {
+    name: "one class session",
+    who: "Nora Abernathy",
+    path: "",
+    h1: /\S/,
+    go: async (page) => {
+      await follow("/club/classes", 'main a[href^="/club/classes/of/"]', /\/club\/classes\/of\//)(page);
+      await page.locator('main a[href^="/club/classes/"]:not([href^="/club/classes/of/"]):not([href="/club/classes/manage"])').first().click();
+      await page.waitForURL(/\/club\/classes\/(?!of\/|manage)[^/?]+$/);
+    },
+  },
+  { name: "Events", who: "Nora Abernathy", path: "/club/events", h1: "Events" },
+  { name: "Events (staff)", who: "Test staff", path: "/club/events", h1: "Events" },
+  { name: "one event", who: "Nora Abernathy", path: "", h1: /\S/, go: follow("/club/events", 'main a[href^="/club/events/"]:not([href="/club/events/manage"])', /\/club\/events\/(?!manage)[^/?]+$/) },
+  { name: "My bill", who: "Nora Abernathy", path: "/club/my-bill", h1: "My bill" },
+  { name: "My bill (staff, no household chosen)", who: "Test staff", path: "/club/my-bill", h1: "My bill" },
+  { name: "My boats", who: "Nora Abernathy", path: "/club/my-boats", h1: "My boats" },
+  { name: "My old bookings", who: "Nora Abernathy", path: "/club/my-history", h1: "My old bookings" },
+  { name: "My practices", who: "Nora Abernathy", path: "/club/my-practices", h1: "My practices" },
+  { name: "Practices (a coach)", who: "Kenji Tanaka", path: "/club/practices", h1: "Practices" },
+  { name: "Set up a practice", who: "Kenji Tanaka", path: "/club/practices/new", h1: "Set up a practice" },
+  { name: "one practice", who: "Kenji Tanaka", path: "", h1: /\S/, go: follow("/club/practices", 'main a[href^="/club/practices/"]:not([href="/club/practices/new"])', /\/club\/practices\/(?!new)[^/?]+$/) },
+  { name: "Report damage", who: "Nora Abernathy", path: "/club/damage", h1: "Report damage" },
+  { name: "Report an incident (a coach)", who: "Kenji Tanaka", path: "/club/incidents", h1: "Report an incident" },
+  { name: "the sign-in prompt", who: null, path: "/club/my-bookings", h1: "Choose a test member" },
+  { name: "the test member picker", who: null, path: "/club/act-as", h1: "Act as a test member" },
 ];
 
 /** The package's colours, as the browser writes them: rgb(r, g, b). */
@@ -44,7 +100,7 @@ test.describe("the members' and staff look", () => {
       test("draws only the package's colours", async ({ page }) => {
         await page.setViewportSize({ width: 1180, height: 900 });
         await actAs(page, screen.who);
-        await page.goto(screen.path);
+        await visit(page, screen);
         await expect(page.locator(".club-band h1")).toBeVisible();
         // Measure the colours a page settles on, not a link half-way through its 220ms fade because the mouse is resting over it.
         await page.addStyleTag({ content: "*, *::before, *::after { transition: none !important; animation: none !important; }" });
@@ -75,7 +131,7 @@ test.describe("the members' and staff look", () => {
       test("has one H1, in the Waterloo title band, in white Cinzel", async ({ page }) => {
         await page.setViewportSize({ width: 1180, height: 900 });
         await actAs(page, screen.who);
-        await page.goto(screen.path);
+        await visit(page, screen);
         await expect(page.locator("h1")).toHaveCount(1);
         const h1 = page.locator(".club-band h1");
         await expect(h1).toHaveText(screen.h1);
@@ -95,7 +151,7 @@ test.describe("the members' and staff look", () => {
         await actAs(page, screen.who);
         for (const width of WIDTHS) {
           await page.setViewportSize({ width, height: 900 });
-          await page.goto(screen.path);
+          await visit(page, screen);
           await expect(page.locator(".club-band h1")).toBeVisible();
           const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
           expect(over, `${screen.name} at ${width}px`).toBeLessThanOrEqual(0);
@@ -106,7 +162,7 @@ test.describe("the members' and staff look", () => {
         await actAs(page, screen.who);
         for (const width of [390, 1180]) {
           await page.setViewportSize({ width, height: 900 });
-          await page.goto(screen.path);
+          await visit(page, screen);
           await expect(page.locator(".club-band h1")).toBeVisible();
           const small = await page.evaluate(() => {
             const out: string[] = [];
@@ -122,6 +178,34 @@ test.describe("the members' and staff look", () => {
       });
     });
   }
+
+  test("a small tag inside the title band (a cancelled practice) is a white chip with Ink text you can read, and a tag elsewhere is the status chip", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 900 });
+    await actAs(page, "Kenji Tanaka");
+    await page.goto("/club/practices");
+    await expect(page.locator(".club-band h1")).toBeVisible();
+    // No practice in the sample is cancelled, so put the tag where PageBand puts it and measure what the browser draws.
+    const look = await page.evaluate(() => {
+      const mk = (parent: Element) => {
+        const tag = document.createElement("span");
+        tag.className = "club-tag";
+        tag.textContent = "Cancelled";
+        parent.appendChild(tag);
+        const s = getComputedStyle(tag);
+        return { background: s.backgroundColor, color: s.color, radius: s.borderTopLeftRadius, family: s.fontFamily, size: s.fontSize };
+      };
+      return { inBand: mk(document.querySelector(".club-band h1")!), inPage: mk(document.querySelector("main p:not(.club-band-eyebrow)")!) };
+    });
+    expect(look.inBand.background).toBe(rgb("#ffffff"));
+    expect(look.inBand.color).toBe(rgb("#33363a"));
+    expect(look.inPage.background).toBe(rgb("#e6ebed"));
+    expect(look.inPage.color).toBe(rgb("#435661"));
+    for (const t of [look.inBand, look.inPage]) {
+      expect(t.radius).toBe("0px");
+      expect(t.family).toContain("Cinzel");
+      expect(t.size).toBe("11px");
+    }
+  });
 
   test("the top bar is Oyster with the warm line under it, the club's name as the link home, and who is acting at the right", async ({ page }) => {
     await page.setViewportSize({ width: 1180, height: 900 });

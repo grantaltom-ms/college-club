@@ -6,6 +6,7 @@ import { getClubStore } from "@/club/store/instance";
 import { getHistoryStore } from "@/club/store/history-instance";
 import { formatDayLong, formatRange } from "@/club/time";
 import { SignedOut } from "../SignedOut";
+import { PageBand } from "../PageBand";
 
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
@@ -18,7 +19,7 @@ export default async function MyHistory({ searchParams }: { searchParams: Promis
   if (actor.kind === "staff") {
     return (
       <section>
-        <h1>Old bookings</h1>
+        <PageBand eyebrow="Record" title="Old bookings" />
         <p>
           Staff look up old bookings by name in <Link href="/club/admin/history">the staff office</Link>.
         </p>
@@ -33,7 +34,7 @@ export default async function MyHistory({ searchParams }: { searchParams: Promis
 
   return (
     <section>
-      <h1>My old bookings</h1>
+      <PageBand eyebrow="Record" title="My old bookings" />
       <p>These are your bookings from the club&apos;s previous reservation system. They are a record only.</p>
       {!view.findable ? (
         <p data-testid="history-unfindable">We could not match your name to your old bookings with confidence, so none are shown here. Please ask club staff to look them up.</p>

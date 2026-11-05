@@ -8,6 +8,7 @@ import { RULE_BOOK } from "@/club/settings/rulebook";
 import { getClubStore } from "@/club/store/instance";
 import { SignedOut } from "../SignedOut";
 import { whenWords } from "./words";
+import { PageBand } from "../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
@@ -29,7 +30,7 @@ export default async function PracticesPage({ searchParams }: { searchParams: Pr
 
   return (
     <section>
-      <h1>Practices</h1>
+      <PageBand eyebrow="Coaching" title="Practices" />
       <p>
         A practice is a coached or organized rowing session. It reserves its boats while it runs and holds the lineup: who sits where. Ordinary bookings never need one.{" "}
         <Link href="/club/practices/new" data-testid="new-practice-link">

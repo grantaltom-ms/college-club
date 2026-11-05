@@ -12,6 +12,7 @@ export function PageBand({
   eyebrow,
   title,
   titleTestId,
+  titleTag,
   children,
 }: {
   /** Context above the heading, for example the date or the section name. */
@@ -19,6 +20,8 @@ export function PageBand({
   title: string;
   /** Some tests find the heading by this id. */
   titleTestId?: string;
+  /** A small word shown inside the heading after the title, for example "Cancelled". */
+  titleTag?: string;
   /** Up to two actions. */
   children?: ReactNode;
 }) {
@@ -27,7 +30,10 @@ export function PageBand({
       <div className="club-band-inner">
         <div className="club-band-text">
           {eyebrow ? <p className="club-band-eyebrow">{eyebrow}</p> : null}
-          <h1 data-testid={titleTestId}>{title}</h1>
+          <h1 data-testid={titleTestId}>
+            {title}
+            {titleTag ? <span className="club-tag">{titleTag}</span> : null}
+          </h1>
         </div>
         {children ? <div className="club-band-actions">{children}</div> : null}
       </div>

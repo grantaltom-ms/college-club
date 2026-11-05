@@ -17,6 +17,7 @@ import { blockedReason, viewerOf } from "@/club/web-actor";
 import { LiveChoicesForm } from "../../LiveChoicesForm";
 import { PlaceholderNote } from "../../PlaceholderNote";
 import { SignedOut } from "../../SignedOut";
+import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
@@ -89,18 +90,15 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
 
   return (
     <section className="club-confirm">
+      <PageBand eyebrow="Confirm" title={`Book ${item.name}`} />
       <p className="club-back">
         <Link href={`/club/book?day=${pacificDate(start)}`}>← Back to times</Link>
       </p>
-      <header className="club-launch-head">
-        <p className="club-kicker">Confirm</p>
-        <h1>Book {item.name}</h1>
-        <p className="club-confirm-when" data-testid="booking-when">
-          <strong>
-            {formatDayLong(pacificDate(start))}, {formatRange(start, end)}
-          </strong>
-        </p>
-      </header>
+      <p className="club-confirm-when" data-testid="booking-when">
+        <strong>
+          {formatDayLong(pacificDate(start))}, {formatRange(start, end)}
+        </strong>
+      </p>
       <PlaceholderNote />
       {notice && (
         <p className="club-alert" role="alert">

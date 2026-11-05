@@ -5,6 +5,7 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { getClubStore } from "@/club/store/instance";
 import { formatDay } from "@/club/time";
+import { PageBand } from "../PageBand";
 
 /**
  * The test shortcut for trying the club as different invented people. It only exists where invented data is allowed
@@ -18,7 +19,7 @@ export default async function ActAs() {
   const households = [...state.households].sort((a, b) => a.displayName.localeCompare(b.displayName));
   return (
     <section>
-      <h1>Act as a test member</h1>
+      <PageBand eyebrow="Test build" title="Act as a test member" />
       <p>Pick who you want to be. This test shortcut lets us try the club as different invented people; real people sign in by email link.</p>
       <form method="post" action="/api/club/act-as">
         <p>

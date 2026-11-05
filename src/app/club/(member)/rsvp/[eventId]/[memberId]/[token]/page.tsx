@@ -12,6 +12,7 @@ import { formatClock, formatDayLong, pacificDate } from "@/club/time";
 import { idParam, intParam } from "@/club/web";
 import { EventPlaceholderNote } from "../../../../PlaceholderNote";
 import { PartyStepper } from "../../../../PartyStepper";
+import { PageBand } from "../../../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
@@ -59,7 +60,7 @@ export default async function RsvpLinkPage({ params, searchParams }: { params: P
 
   return (
     <section>
-      <h1>{event.title}</h1>
+      <PageBand eyebrow="RSVP" title={event.title} />
       <EventPlaceholderNote />
       <p className="club-meta" data-testid="link-who">
         Replying as {fullName(member)}. This link works for you only, for this event only. It does not sign you in.

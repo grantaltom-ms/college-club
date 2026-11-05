@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { pickerEnabled } from "@/club/enabled";
+import { PageBand } from "./PageBand";
 
 export function SignedOut() {
   return (
     <section className="club-empty">
-      <h1>{pickerEnabled() ? "Choose a test member" : "Sign in"}</h1>
+      <PageBand eyebrow="Members" title={pickerEnabled() ? "Choose a test member" : "Sign in"} />
       <p className="club-lead">
         <Link href="/club/sign-in">Sign in</Link> with your email address to see this page.
       </p>
