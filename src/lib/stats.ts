@@ -181,8 +181,16 @@ export function quietByJoined(members: Member[], through: string): CohortRow[] {
 
 /* ---------- Several reservations in one day ---------- */
 
-/** Extra bookings (beyond one per day) that make a repeat habit rather than a one-off. */
-export const OFTEN_EXTRA_BOOKINGS = 5;
+/**
+ * Extra reservation rows (bookings minus booking days), July to September, that
+ * mark a repeat habit rather than a one-off.
+ *
+ * Five extras was "often" when a row was a boat or a class. The Details baseline
+ * counts every reservation ID, every item type, so a shell, a gym visit and a
+ * work space on one day are two extras. Those extras run about eight times higher,
+ * and five times eight (40) is that same habit on the new count.
+ */
+export const OFTEN_EXTRA_BOOKINGS = 5 * 8;
 
 export interface MultiBooking {
   total: number;
@@ -207,8 +215,10 @@ export interface MultiBooking {
 
 /**
  * The reservation export has no start times, so "more bookings than booking days" is the only
- * way to see someone booked twice in a day. Door-time shares then separate people who seem to
- * be working from the club from early-morning rowers and shared accounts.
+ * way to see someone reserved more than one thing in a day. Each booking is one reservation ID
+ * of any item type, including the gym, so several amenities on the same day count as several extras.
+ * Door-time shares then separate people who seem to be working from the club from
+ * early-morning rowers and shared accounts.
  */
 export function multiBooking(members: Member[]): MultiBooking {
   const booked = members.filter((m) => m.bookingDays > 0);

@@ -193,7 +193,7 @@ function Summary({ data, shells, email, membership }: { data: DashboardData; she
             area="Working from the club"
             value={fmtInt(mb.workFromClub)}
             lead={`members often book more than once a day, on weekday daytimes or evenings (${mb.workFromClubShareOfAll}% of members).`}
-            detail="A good estimate from July to September bookings and door times, not an exact count."
+            detail="A good estimate from July to September reservations and door times, not an exact count."
             href="/visits"
             linkText="Visits"
           />

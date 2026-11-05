@@ -53,7 +53,11 @@ export function ruleBookWith(defaults: Partial<RuleValues>, classes?: (cls: Reco
 
 export const TEST_RULES: RuleBook = ruleBookWith({});
 
-/** The tests that matter run on both stores: the in-memory copy, and Postgres when CLUB_TEST_DATABASE_URL is set (CI always sets it). */
+/**
+ * The tests that matter run on both stores: the in-memory copy, and Postgres when CLUB_TEST_DATABASE_URL is set
+ * (CI always sets it). Vitest then allows 30 seconds per test (vitest.config.ts). The first Postgres test in a file
+ * builds the migrated template, which can take longer than 5 seconds when the runner is busy.
+ */
 export type StoreKind = "memory" | "postgres";
 const POSTGRES_URL = process.env.CLUB_TEST_DATABASE_URL;
 export const STORE_KINDS: StoreKind[] = POSTGRES_URL ? ["memory", "postgres"] : ["memory"];
