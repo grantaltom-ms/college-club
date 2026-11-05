@@ -445,7 +445,7 @@ export async function createEvent(store: ClubStore, ctx: Ctx, input: NewEvent): 
 
 /**
  * Staff change an event. Raising or removing the limit moves the waiting list up at once; the limit cannot go below the
- * people already going. A new price only applies to RSVPs made after the change. Nobody is emailed about a change.
+ * people already going. A new price only applies to RSVPs made after the change. The emails a change calls for (a spot opened, a new time or place) are worked out by the store wrapper in notify/, not here.
  */
 export async function updateEvent(store: ClubStore, eventRules: EventRules, ctx: Ctx, eventId: string, patch: Partial<EventFields>): Promise<{ event: ClubEvent; promoted: Rsvp[] }> {
   requireStaff(ctx.actor);

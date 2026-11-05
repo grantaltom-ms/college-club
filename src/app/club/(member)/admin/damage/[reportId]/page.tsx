@@ -103,7 +103,7 @@ export default async function DamageReportPage({ params }: { params: Promise<{ r
             <>
               <h2>Take it out of service</h2>
               <p className="club-meta">
-                {r.major ? "The filer marked this major. " : ""}New bookings are refused from now on. Bookings already made stay, and the Equipment page lists who to contact.
+                {r.major ? "The filer marked this major. " : ""}New bookings are refused from now on. Bookings already made stay, and the Equipment page lists who to contact. Each of those members is emailed when you take the boat out of service.
               </p>
               <OutOfServiceForm reportId={r.id} boat={detail.itemName} />
             </>

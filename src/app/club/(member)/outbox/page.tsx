@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { outboxMessages } from "@/club/auth/mail";
+import { outboxMessagesShared } from "@/club/auth/mail";
 import { outboxEnabled } from "@/club/enabled";
 import { requireClub } from "@/club/guard";
 import { formatClock, formatDayLong, pacificDate } from "@/club/time";
@@ -13,12 +13,12 @@ import { PageBand } from "../PageBand";
 export default async function Outbox() {
   await requireClub();
   if (!outboxEnabled()) notFound();
-  const messages = outboxMessages();
+  const messages = await outboxMessagesShared();
   return (
     <section>
       <PageBand eyebrow="Test build" title="Test outbox" />
       <p className="club-placeholder" data-testid="outbox-warning">
-        <strong>Test build.</strong> No real email is sent. Emails the club would send appear here instead, newest first. This page does not exist on the live site.
+        <strong>Test build.</strong> No real email is sent. Emails the club would send appear here instead, newest first: sign-in links, and the notices for a spot that opened, an event that was cancelled or changed, and a boat that was taken out of service. This page does not exist on the live site.
       </p>
       {messages.length === 0 ? (
         <p data-testid="outbox-empty">Nothing has been sent yet.</p>

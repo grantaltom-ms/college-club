@@ -40,7 +40,7 @@ export default async function DamagePage({ searchParams }: { searchParams: Promi
         )}
       </p>
       <p className="club-meta">
-        A report marked major does not close the boat by itself: club staff look at it first and decide. If someone is hurt or a boat is unsafe on the water right now, call the club first.
+        A report marked major does not close the boat by itself: club staff look at it first and decide. Members with an upcoming booking on the boat are emailed about a major report (never who filed it). If someone is hurt or a boat is unsafe on the water right now, call the club first.
       </p>
 
       <FileDamageForm items={items} selected={idParam(params.item) ?? ""} limits={{ description: limits.descriptionMax, location: limits.locationMax, how: limits.howMax }} />

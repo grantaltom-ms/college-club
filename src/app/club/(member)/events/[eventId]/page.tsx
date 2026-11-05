@@ -323,7 +323,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
                         </label>{" "}
                         <input id="e-replyby-time" name="replyByTime" type="time" defaultValue={event.replyBy ? clockValue(event.replyBy) : ""} />
                       </p>
-                      <p className="club-meta">Raising or removing the limit moves the waitlist up at once. A new price applies only to RSVPs made afterwards. Nobody is emailed about a change.</p>
+                      <p className="club-meta">Raising or removing the limit moves the waitlist up at once, and each person moved up is emailed. A new time or place emails everyone going or waiting. A new price applies only to RSVPs made afterwards, and a change to the price, title or description alone emails nobody.</p>
                       <button type="submit" className="club-button">
                         Save changes
                       </button>
@@ -332,7 +332,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
                   <form method="post" action="/api/club/events/cancel" className="club-form">
                     <input type="hidden" name="event" value={event.id} />
                     <p>
-                      <label htmlFor="why">Cancel this event (members will see the reason)</label>
+                      <label htmlFor="why">Cancel this event (members will see the reason, and everyone going or waiting is emailed)</label>
                       <input id="why" name="reason" type="text" maxLength={300} required />{" "}
                       <button type="submit" className="club-button" aria-label={`Cancel ${event.title}`}>
                         Cancel event

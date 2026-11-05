@@ -18,12 +18,12 @@ describe("the test outbox", () => {
     ]);
   });
 
-  it("keeps only the newest 50", async () => {
-    for (let i = 0; i < 60; i++) await outboxMailer.send({ to: `p${i}@example.com`, subject: String(i), text: "x" }, new Date());
+  it("keeps only the newest 100", async () => {
+    for (let i = 0; i < 120; i++) await outboxMailer.send({ to: `p${i}@example.com`, subject: String(i), text: "x" }, new Date());
     const all = outboxMessages();
-    expect(all).toHaveLength(50);
-    expect(all[0].subject).toBe("59");
-    expect(all.at(-1)!.subject).toBe("10");
+    expect(all).toHaveLength(100);
+    expect(all[0].subject).toBe("119");
+    expect(all.at(-1)!.subject).toBe("20");
   });
 
   it("hands out copies, so reading cannot change it", async () => {
