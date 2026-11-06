@@ -15,7 +15,7 @@ test.describe("the dashboard menu bar", () => {
     await expect(nav(page).getByRole("link")).toHaveText(["CCS System", "Summary", "Goals"]);
     await expect(nav(page).getByRole("button")).toHaveText(["Usage", "Board Materials"]);
     // Email, Membership, Financials and Shells are no longer top-level links.
-    for (const gone of ["Shells", "Email", "Membership", "Financials", "Visits", "Timing", "Reservations"]) {
+    for (const gone of ["Shells", "Email", "Membership", "Financials", "Events and Marketing", "Visits", "Timing", "Reservations"]) {
       await expect(nav(page).getByRole("link", { name: gone, exact: true })).toHaveCount(0);
     }
     for (const button of [usageButton(page), boardButton(page)]) {
@@ -27,7 +27,7 @@ test.describe("the dashboard menu bar", () => {
     await expect(boardMenu(page)).toHaveCount(0);
   });
 
-  test("Usage holds Visits, Timing, Reservations and Shells, and Board Materials holds Email, Membership and Financials", async ({ page }) => {
+  test("Usage holds Visits, Timing, Reservations and Shells, and Board Materials holds Email, Membership, Financials and Events and Marketing", async ({ page }) => {
     await page.goto("/");
     await usageButton(page).click();
     await expect(usageButton(page)).toHaveAttribute("aria-expanded", "true");
@@ -36,7 +36,7 @@ test.describe("the dashboard menu bar", () => {
     await boardButton(page).click();
     await expect(usageMenu(page)).toHaveCount(0);
     await expect(boardButton(page)).toHaveAttribute("aria-expanded", "true");
-    await expect(boardMenu(page).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials"]);
+    await expect(boardMenu(page).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials", "Events and Marketing"]);
   });
 
   test("navigates to each Usage page and marks Usage active on each", async ({ page }) => {
@@ -66,6 +66,7 @@ test.describe("the dashboard menu bar", () => {
       ["Email", "/email", "Email."],
       ["Membership", "/membership", "Membership."],
       ["Financials", "/financials", "Financials."],
+      ["Events and Marketing", "/events", "Events and Marketing."],
     ] as const) {
       await page.goto("/");
       await (await openNavMenu(page, "Board Materials")).getByRole("menuitem", { name: label }).click();

@@ -352,7 +352,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
       await nav.getByRole("button", { name: "Usage" }).click();
       await expect(nav.getByRole("menu", { name: "Usage" }).getByRole("menuitem")).toHaveText(["Visits", "Timing", "Reservations", "Shells"]);
       await nav.getByRole("button", { name: "Board Materials" }).click();
-      await expect(nav.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials"]);
+      await expect(nav.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials", "Events and Marketing"]);
     });
   });
 }

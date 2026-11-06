@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isHouseholdName, loadLiveData, loadShells, toCell, toDoorMonth, toFinanceMonth, toMember, toMembershipMonth, toPeriod, toShellData, toTotal, type ShellRow } from "./supabase";
+import { isHouseholdName, loadLiveData, loadShells, toCell, toDoorMonth, toFinanceMonth, toMember, toMembershipMonth, toPeriod, toPromotedEvent, toShellData, toTotal, type ShellRow } from "./supabase";
 
 describe("database rows to dashboard data", () => {
   it("maps a members row, turning blanks into zeros and keeping dates", () => {
@@ -345,5 +345,59 @@ describe("membership_monthly rows", () => {
       waitlist: 20,
       note: "Total transferred cell blank in source.",
     });
+  });
+});
+
+describe("event_scoreboard rows", () => {
+  const row = {
+    event_name: "BINGO Night",
+    event_date: "2026-09-10",
+    price_label: "$20 buy-in",
+    capacity: 55,
+    times_promoted: 2,
+    rsvp_members: 16,
+    rsvp_persons: 43,
+    door_entries_window: 36,
+    door_comparison: "Baseline Thursdays Sep 3 and Sep 17: 27 and 24 entries in the same 4-9 PM window",
+    status: "held",
+    note: "Door entries agree with iCrew",
+  };
+
+  it("maps a row, naming every field", () => {
+    expect(toPromotedEvent(row)).toEqual({
+      name: "BINGO Night",
+      date: "2026-09-10",
+      priceLabel: "$20 buy-in",
+      capacity: 55,
+      timesPromoted: 2,
+      rsvpMembers: 16,
+      rsvpPersons: 43,
+      doorEntriesWindow: 36,
+      doorComparison: "Baseline Thursdays Sep 3 and Sep 17: 27 and 24 entries in the same 4-9 PM window",
+      status: "held",
+      note: "Door entries agree with iCrew",
+    });
+  });
+
+  it("keeps blank cells as null, so a missing capacity or door count is never shown as 0", () => {
+    const mapped = toPromotedEvent({ ...row, price_label: null, capacity: null, times_promoted: null, rsvp_members: null, rsvp_persons: null, door_entries_window: null, door_comparison: null, note: null });
+    expect(mapped).toMatchObject({ priceLabel: null, capacity: null, timesPromoted: null, rsvpMembers: null, rsvpPersons: null, doorEntriesWindow: null, doorComparison: null, note: null });
+  });
+
+  it("keeps a real zero as zero", () => {
+    expect(toPromotedEvent({ ...row, capacity: 0, rsvp_persons: 0, door_entries_window: 0 })).toMatchObject({ capacity: 0, rsvpPersons: 0, doorEntriesWindow: 0 });
+  });
+
+  it("reads upcoming as upcoming and anything else as held", () => {
+    expect(toPromotedEvent({ ...row, status: "upcoming" }).status).toBe("upcoming");
+    expect(toPromotedEvent({ ...row, status: "held" }).status).toBe("held");
+    expect(toPromotedEvent({ ...row, status: "something else" }).status).toBe("held");
+  });
+
+  it("passes nothing through that it was not told about", () => {
+    const mapped = toPromotedEvent({ ...row, id: 3, member_email: "someone@example.org" } as typeof row);
+    expect(Object.keys(mapped).sort()).toEqual(
+      ["capacity", "date", "doorComparison", "doorEntriesWindow", "name", "note", "priceLabel", "rsvpMembers", "rsvpPersons", "status", "timesPromoted"].sort(),
+    );
   });
 });

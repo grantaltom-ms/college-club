@@ -33,7 +33,7 @@ test.describe("the live dashboard's link to the demo", () => {
     // The dashboard stays where it was.
     await expect(page).toHaveURL(`${BASE}/`);
     await nav.getByRole("button", { name: "Board Materials" }).click();
-    await expect(nav.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials"]);
+    await expect(nav.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials", "Events and Marketing"]);
   });
 
   test("an address the server should never send is not drawn as the demo link", async ({ page }) => {

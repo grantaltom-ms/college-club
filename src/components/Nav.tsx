@@ -22,6 +22,7 @@ const BOARD_LINKS: NavLink[] = [
   { href: "/email", label: "Email" },
   { href: "/membership", label: "Membership" },
   { href: "/financials", label: "Financials" },
+  { href: "/events", label: "Events and Marketing" },
 ];
 
 /**

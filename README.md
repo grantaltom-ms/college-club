@@ -2,7 +2,7 @@
 
 A web page for College Club Seattle that shows how members use the club: how often they visit, which days and hours are busy, boat and shell use, reservations by type, email results, and a shared goals list. It shows counts only, never member names.
 
-It reads these tables in the CCS Supabase project: `members`, `qb_members`, `club_totals`, `membership_monthly`, `finance_monthly` and (later) `door_visits` / `reservations`.
+It reads these tables in the CCS Supabase project: `members`, `qb_members`, `club_totals`, `membership_monthly`, `finance_monthly`, `event_scoreboard` and (later) `door_visits` / `reservations`.
 
 **The roster is the QuickBooks member list** (`qb_members`, one row per QuickBooks record, which is one household). Each row says which `members` usage record its visits come from; members with a door fob but no reservation record use door entries as visit days, and members with no record count as no visits. New members who joined this year with no visit yet are shown as "Not started yet" and left out of the "rarely visit" counts. First time: run `db/qb_members.sql` in the Supabase SQL editor, then load the rows (the file has the steps). The member list holds names, so it is never committed. Until `qb_members` has rows, the dashboard shows an error rather than quietly falling back to the iCrew list.
 
@@ -58,6 +58,22 @@ First time: run `db/finance_monthly.sql` in the Supabase SQL editor. To load or 
 The figures are copied exactly as shown in the packages, even where a package's labeled year-to-date figures do not match the sum of its monthly sheets. The Financials page shows both figures side by side in each club year's subtotal row inside the table, with the gap flagged right in that row (for 2025-26: the monthly sheets add up to $1,513,613.39 income and $115,615.84 net, against labeled year-to-date figures of $1,512,233.89 and $91,561.71) instead of correcting either or picking one. To fix a figure, fix the package and reload the table.
 
 The Financials page is table-first: a compact summary strip (latest month, last full club year, loss months), one chart area with a switch between net income by month and income vs. expenses, and the monthly table itself — five columns by default (Month, Income, Expenses, Net income, Net margin), with a "Show full P&L lines" toggle expanding it to all twelve. One club-year filter controls the chart and the table together, and the subtotal rows reflect the filtered view. Below the table sits an "Ask the numbers" panel: deterministic questions computed from the loaded rows only — highest and lowest net-income month, club-year totals, month vs. previous month, month vs. club-year average, month vs. same month last year, loss months, income change over a range, and expenses vs. income over a range — each answered in a sentence with the months it rests on highlighted in the table, and a note when a highlighted month is not in the current club-year view. There is no model behind it, so an answer that cannot be computed from the data says so instead of guessing.
+
+## Loading the Events and Marketing tab
+
+The Events and Marketing tab (Board Materials menu, `/events`) reads its own table, `event_scoreboard`: one row for each promoted club event, with the counts the Watercooler, iCrew and the front door gave. The table holds counts and short labels only — never member names, emails or per-person rows.
+
+| Tab | Table | Source | Load it with |
+|---|---|---|---|
+| Events and Marketing | `event_scoreboard` | The Watercooler pilot, Sep–Nov 2026: iCrew registrations and Brivo door entries | `db/event_scoreboard.csv` |
+
+First time: run `db/event_scoreboard.sql` in the Supabase SQL editor (it turns row level security on with no policies, so only the server's service key can read it), then import `db/event_scoreboard.csv` with the Supabase Table Editor, matching columns by name (an empty cell loads as null). To refresh: `truncate` the table and import again, or add each new event as a row after its Watercooler goes out. Until the table is loaded, the scoreboard section of the page shows a plain "could not be loaded" message and the rest of the site is unaffected; the page's written sections (how to read the numbers, the tests, the board targets) still show.
+
+**Who loads it:** Grant, once, in the Supabase SQL editor and Table Editor. Nothing loads it automatically. The page needs the same `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as the other tabs.
+
+`capacity` may be left empty (the page then shows a dash instead of "capacity filled"). `status` is `held` for an event that has happened and `upcoming` for one still taking registrations, which the page labels "so far". `door_entries_window` and `door_comparison` are filled only when a door comparison was run for that event.
+
+Two parts of the page are written text, not table data, and are changed by editing `src/app/(dashboard)/events/page.tsx`: the "Where members stand" snapshot cards (each carries its as-of date in a comment) and the "Board targets" table, whose targets all read "Not set yet — board to set" until the board sets them. With no database set up, a development or preview server shows three invented events, labelled sample.
 
 ## The Goals page
 
