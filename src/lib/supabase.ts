@@ -215,6 +215,19 @@ export interface MembershipRow {
   transferred: number | null;
   with_months_approvals: number | null;
   waitlist: number | null;
+  /**
+   * The reason and category columns were added after the table was first made, so a table that has not been upgraded does not
+   * send them at all (undefined, not null). Both mean "no figure".
+   */
+  resignations_moved?: number | null;
+  resignations_not_using?: number | null;
+  resignations_other?: number | null;
+  cat_resident?: number | null;
+  cat_intermediate?: number | null;
+  cat_nonresident?: number | null;
+  cat_suburban?: number | null;
+  cat_honorary?: number | null;
+  total_all_categories?: number | null;
   note: string | null;
 }
 
@@ -229,6 +242,16 @@ export function toMembershipMonth(r: MembershipRow): MembershipMonth {
     transferred: r.transferred,
     withApprovals: r.with_months_approvals ?? 0,
     waitlist: r.waitlist,
+    // A missing column and an empty cell both mean "no figure": null, never 0.
+    resignationsMoved: r.resignations_moved ?? null,
+    resignationsNotUsing: r.resignations_not_using ?? null,
+    resignationsOther: r.resignations_other ?? null,
+    catResident: r.cat_resident ?? null,
+    catIntermediate: r.cat_intermediate ?? null,
+    catNonResident: r.cat_nonresident ?? null,
+    catSuburban: r.cat_suburban ?? null,
+    catHonorary: r.cat_honorary ?? null,
+    totalAllCategories: r.total_all_categories ?? null,
     note: r.note,
   };
 }
