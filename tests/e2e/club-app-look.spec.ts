@@ -106,6 +106,7 @@ const SCREENS: Screen[] = [
   { name: "Old bookings (staff)", who: "Test staff", path: "/club/admin/history", h1: "Old bookings" },
   { name: "Tour requests", who: "Test staff", path: "/club/admin/tours", h1: "Tour requests" },
   { name: "Front-desk iPad (staff page)", who: "Test staff", path: "/club/admin/ipad", h1: "Front-desk iPad" },
+  { name: "Ready to switch on? (staff)", who: "Test staff", path: "/club/admin/switch-on", h1: "Ready to switch on?" },
   { name: "Private boats (staff)", who: "Test staff", path: "/club/admin/boats", h1: "Private boats" },
   { name: "Damage reports (staff)", who: "Test staff", path: "/club/admin/damage", h1: "Damage reports" },
   { name: "one damage report", who: "Test staff", path: "", h1: /\S/, go: follow("/club/admin/damage", 'main a[href^="/club/admin/damage/"]', /\/club\/admin\/damage\/[^/?]+$/) },

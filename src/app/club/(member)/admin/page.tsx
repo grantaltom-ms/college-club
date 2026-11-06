@@ -223,6 +223,9 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
             <li>
               <Link href="/club/admin/reservations">Reservation attendance</Link>
             </li>
+            <li>
+              <Link href="/club/admin/switch-on">Ready to switch on?</Link>
+            </li>
           </ul>
         </article>
         <article className="club-card club-tool-card">
