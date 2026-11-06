@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { archiveFacts, switchOnReport, type CheckGroup, type CheckRow, type CheckStatus } from "@/club/engine/switch-on";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
-import { SAMPLE_ITEMS } from "@/club/sample/equipment";
+import { INVENTED_ITEM_NAMES } from "@/club/sample/equipment";
 import { SAMPLE_HISTORY_FILE } from "@/club/sample/icrew";
 import { placeholderRulesFiles } from "@/club/settings/placeholders";
 import { getHistoryStore } from "@/club/store/history-instance";
@@ -53,7 +53,7 @@ export default async function SwitchOn() {
     env: process.env,
     state,
     archive: archiveFacts(history),
-    sample: { itemNames: SAMPLE_ITEMS.map((i) => i.name), archiveFile: SAMPLE_HISTORY_FILE },
+    sample: { itemNames: INVENTED_ITEM_NAMES, archiveFile: SAMPLE_HISTORY_FILE },
     placeholderRules: placeholderRulesFiles(),
     databaseTarget: databaseUrl ? describeTarget(databaseUrl) : null,
   });

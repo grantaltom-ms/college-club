@@ -3,6 +3,8 @@ import type { ClubState, Household, Item, Member } from "../types";
 import { createHousehold, endHousehold, setQuickbooksId } from "./households";
 import { clubLedger } from "./ledger";
 import { SAMPLE_ID_PREFIX, archiveFacts, switchOnReport, type CheckRow, type SwitchOnInput } from "./switch-on";
+import { INVENTED_ITEM_NAMES } from "../sample/equipment";
+import { ICREW_SHELL_FLEET } from "../sample/icrew-shell-fleet";
 import { STORE_KINDS, makeStore, staffCtx } from "./testkit";
 
 /**
@@ -112,11 +114,34 @@ describe("the switch-on checklist: settings", () => {
     it("is not ready when empty or unset", () => {
       for (const value of [undefined, "", "  ;  \n "]) expect(rowOf(switchOnReport(withEnv({ CLUB_STAFF_LOGINS: value })), "staff_list").status, String(value)).toBe("not_ready");
     });
-    it("is not ready, in the list's own words, when an entry has a mistake", () => {
+    it("is not ready, and says what kind of mistake it is, when an entry has one", () => {
       const r = rowOf(switchOnReport(withEnv({ CLUB_STAFF_LOGINS: "alex.staffer@example.org" })), "staff_list");
       expect(r.status).toBe("not_ready");
-      expect(r.detail).toMatch(/equals sign/);
+      expect(r.detail).toMatch(/no equals sign/);
       expect(rowOf(switchOnReport(withEnv({ CLUB_STAFF_LOGINS: "a@example.org=A; a@example.org=B" })), "staff_list").detail).toMatch(/listed twice/);
+    });
+    it("never quotes an entry in a mistake, because an entry holds a private email address (the parser's own message does)", () => {
+      const secretName = "Hidden Person";
+      const cases: [string, string][] = [
+        ["no_equals", "zebra.quokka@example.org"],
+        ["bad_email", "zebra.quokka at example.org=Hidden Person"],
+        ["bad_email", "zebra..quokka@example.org=Hidden Person"],
+        ["no_name", "zebra.quokka@example.org="],
+        ["name_too_long", `zebra.quokka@example.org=${"Hidden".repeat(20)}`],
+        ["name_has_equals", "zebra.quokka@example.org=Hidden=Person"],
+        ["duplicate", `zebra.quokka@example.org=${secretName}; ZEBRA.quokka@example.org=Other`],
+        ["too_many", Array.from({ length: 51 }, (_, i) => `zebra${i}.quokka@example.org=${secretName} ${i}`).join(";")],
+      ];
+      const words = new Set<string>();
+      for (const [problem, raw] of cases) {
+        const r = rowOf(switchOnReport(withEnv({ CLUB_STAFF_LOGINS: raw })), "staff_list");
+        expect(r.status, problem).toBe("not_ready");
+        expect(r.detail, problem).toMatch(/^The staff list has a mistake\. .+ The entry itself is not shown here, because it holds a private address\.$/);
+        for (const piece of ["@", "example.org", "zebra", "quokka", "Hidden"]) expect(r.detail.toLowerCase(), `${problem} leaked ${piece}`).not.toContain(piece.toLowerCase());
+        words.add(r.detail);
+      }
+      // Each kind of mistake has its own words, so the line is still useful to whoever has to fix the list.
+      expect(words.size).toBe(7);
     });
     it("is ready with one person, and says how many there are", () => {
       const r = rowOf(switchOnReport(withEnv({ CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer" })), "staff_list");
@@ -319,6 +344,22 @@ describe("the switch-on checklist: records, from plain records", () => {
     // The words say which it is: only invented boats, or none at all.
     expect(rowOf(switchOnReport(input({ state: nothing })), "equipment_loaded").detail).toBe("Only the invented boats and spaces are on the list.");
     expect(rowOf(switchOnReport(input({ state: stateOf({ items: [boat("Retired", { retired: { at: "2026-10-01T00:00:00Z", by: { kind: "staff", label: "Test staff" }, reason: "Sold" } })] }) })), "equipment_loaded").detail).toBe("No boats or spaces are on the list yet.");
+  });
+
+  it("counts the club's real iCrew boats as real: only the invented boats mark the sample, never the fleet the real equipment list will also hold", () => {
+    // The real fleet shells (these names are in the club's own iCrew shell list) loaded into a fresh database are real boats.
+    const fleet = ICREW_SHELL_FLEET.slice(0, 5).map((s) => boat(s.name));
+    const state = stateOf({ households: [hh("a")], members: [adult("a1", "a")], items: fleet });
+    const report = switchOnReport(input({ state, sample: { itemNames: INVENTED_ITEM_NAMES, archiveFile: SAMPLE.archiveFile } }));
+    expect(rowOf(report, "no_sample_data").status).toBe("ready");
+    expect(rowOf(report, "equipment_loaded").status).toBe("ready");
+    expect(rowOf(report, "equipment_loaded").detail).toMatch(/^5 boats and spaces on the list/);
+    // The invented boats alongside them are still seen as invented.
+    const withInvented = stateOf({ households: [hh("a")], members: [adult("a1", "a")], items: [...fleet, boat("Cormorant"), boat("Dock berths")] });
+    const mixed = switchOnReport(input({ state: withInvented, sample: { itemNames: INVENTED_ITEM_NAMES, archiveFile: SAMPLE.archiveFile } }));
+    expect(rowOf(mixed, "no_sample_data").status).toBe("not_ready");
+    expect(rowOf(mixed, "no_sample_data").detail).toContain("2 invented boats and spaces");
+    expect(rowOf(mixed, "equipment_loaded").detail).toMatch(/^5 boats and spaces on the list/);
   });
 
   it("wants real old bookings: none, or only the invented ones, is not ready", () => {

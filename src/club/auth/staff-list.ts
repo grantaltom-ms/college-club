@@ -10,8 +10,21 @@ export interface StaffLogin {
 const MOST_STAFF = 50;
 const LONGEST_NAME = 80;
 
-/** A mistake in the staff list, worded so someone editing the setting can fix it. */
-export class StaffListError extends Error {}
+/**
+ * What was wrong with the staff list, as a fixed word. The message names the entry (and so a private email address) so that whoever
+ * edits the setting can find it; anything that shows a mistake to other eyes, such as the switch-on checklist, uses this instead.
+ */
+export type StaffListProblem = "too_many" | "no_equals" | "bad_email" | "no_name" | "name_too_long" | "name_has_equals" | "duplicate";
+
+/** A mistake in the staff list, worded so someone editing the setting can fix it. The message can hold a private address; `problem` never does. */
+export class StaffListError extends Error {
+  constructor(
+    message: string,
+    readonly problem: StaffListProblem,
+  ) {
+    super(message);
+  }
+}
 
 /**
  * Reads the staff list from the CLUB_STAFF_LOGINS setting: entries separated by semicolons or new lines, each one an email
@@ -27,18 +40,18 @@ export function parseStaffLogins(raw: string | undefined): StaffLogin[] {
     .split(/[;\n]/)
     .map((e) => e.trim())
     .filter((e) => e !== "");
-  if (entries.length > MOST_STAFF) throw new StaffListError(`CLUB_STAFF_LOGINS lists ${entries.length} people; the most it allows is ${MOST_STAFF}.`);
+  if (entries.length > MOST_STAFF) throw new StaffListError(`CLUB_STAFF_LOGINS lists ${entries.length} people; the most it allows is ${MOST_STAFF}.`, "too_many");
   const seen = new Set<string>();
   return entries.map((entry) => {
     const at = entry.indexOf("=");
-    if (at < 0) throw new StaffListError(`CLUB_STAFF_LOGINS: "${entry}" needs an equals sign between the email address and the name, like name@example.org=Their Name.`);
+    if (at < 0) throw new StaffListError(`CLUB_STAFF_LOGINS: "${entry}" needs an equals sign between the email address and the name, like name@example.org=Their Name.`, "no_equals");
     const email = normalizeEmail(entry.slice(0, at));
-    if (!email) throw new StaffListError(`CLUB_STAFF_LOGINS: "${entry.slice(0, at).trim()}" is not an email address.`);
+    if (!email) throw new StaffListError(`CLUB_STAFF_LOGINS: "${entry.slice(0, at).trim()}" is not an email address.`, "bad_email");
     const name = entry.slice(at + 1).trim().replace(/\s+/g, " ");
-    if (name === "") throw new StaffListError(`CLUB_STAFF_LOGINS: ${email} needs a name after the equals sign.`);
-    if (name.length > LONGEST_NAME) throw new StaffListError(`CLUB_STAFF_LOGINS: the name for ${email} is longer than ${LONGEST_NAME} characters.`);
-    if (name.includes("=")) throw new StaffListError(`CLUB_STAFF_LOGINS: the name for ${email} cannot contain an equals sign.`);
-    if (seen.has(email)) throw new StaffListError(`CLUB_STAFF_LOGINS: ${email} is listed twice.`);
+    if (name === "") throw new StaffListError(`CLUB_STAFF_LOGINS: ${email} needs a name after the equals sign.`, "no_name");
+    if (name.length > LONGEST_NAME) throw new StaffListError(`CLUB_STAFF_LOGINS: the name for ${email} is longer than ${LONGEST_NAME} characters.`, "name_too_long");
+    if (name.includes("=")) throw new StaffListError(`CLUB_STAFF_LOGINS: the name for ${email} cannot contain an equals sign.`, "name_has_equals");
+    if (seen.has(email)) throw new StaffListError(`CLUB_STAFF_LOGINS: ${email} is listed twice.`, "duplicate");
     seen.add(email);
     return { email, name };
   });

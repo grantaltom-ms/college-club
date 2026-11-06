@@ -1,6 +1,6 @@
 import { normalizeEmail } from "../auth/email";
 import { MailSettingsError, parseMailSettings } from "../auth/mail-settings";
-import { StaffListError, parseStaffLogins } from "../auth/staff-list";
+import { StaffListError, parseStaffLogins, type StaffListProblem } from "../auth/staff-list";
 import { sampleDataAllowed } from "../enabled";
 import { configuredSiteOrigin } from "../site-url";
 import type { ClubState } from "../types";
@@ -98,6 +98,17 @@ function databaseRow(env: Env, target: string | null): CheckRow {
   return row("database", "settings", title, "ready", `Records are kept in the database at ${target ?? "the address that is set"}.`);
 }
 
+/** What was wrong with the staff list, in words that never quote an entry (an entry holds a private email address). */
+const STAFF_PROBLEM_WORDS: Record<StaffListProblem, string> = {
+  too_many: "The list has more people than it allows.",
+  no_equals: "An entry has no equals sign between the email address and the name.",
+  bad_email: "An entry does not begin with a usable email address.",
+  no_name: "An entry has no name after the equals sign.",
+  name_too_long: "A name is longer than the limit.",
+  name_has_equals: "A name contains an equals sign.",
+  duplicate: "The same email address is listed twice.",
+};
+
 function staffRow(env: Env): CheckRow {
   const title = "Staff can sign in";
   try {
@@ -108,7 +119,7 @@ function staffRow(env: Env): CheckRow {
     return row("staff_list", "settings", title, "ready", `${plural(staff.length, "person is", "people are")} on the staff list: ${names(staff.map((s) => s.name))}.`);
   } catch (e) {
     if (!(e instanceof StaffListError)) throw e;
-    return row("staff_list", "settings", title, "not_ready", `The staff list has a mistake: ${e.message}`, "Fix CLUB_STAFF_LOGINS in the site's private settings.");
+    return row("staff_list", "settings", title, "not_ready", `The staff list has a mistake. ${STAFF_PROBLEM_WORDS[e.problem]} The entry itself is not shown here, because it holds a private address.`, "Fix CLUB_STAFF_LOGINS in the site's private settings.");
   }
 }
 
