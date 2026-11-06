@@ -115,6 +115,39 @@ export interface MembershipData {
 }
 
 /**
+ * One promoted club event, from the event_scoreboard table. Counts and short labels only:
+ * no member names, emails or per-person rows are ever stored in this table or sent to the browser.
+ */
+export interface PromotedEvent {
+  name: string;
+  /** The day of the event, YYYY-MM-DD. */
+  date: string;
+  /** How the price was shown to members ("$26", "Free", "Price TBA"). */
+  priceLabel: string | null;
+  /** Null when the event had no capacity set: the "filled" percentage cannot be shown. */
+  capacity: number | null;
+  /** How many times the event was promoted (for example, in how many Watercoolers). */
+  timesPromoted: number | null;
+  /** Members registered. */
+  rsvpMembers: number | null;
+  /** Members plus their guests: iCrew's header figure. */
+  rsvpPersons: number | null;
+  /** Front-door entries in the event's evening window. Null when no door comparison was run. */
+  doorEntriesWindow: number | null;
+  /** The baseline the door window was compared to, in words. */
+  doorComparison: string | null;
+  /** "held" has happened; "upcoming" has not, so its registrations are "so far". */
+  status: "held" | "upcoming";
+  note: string | null;
+}
+
+export interface EventsData {
+  /** "live" comes from Supabase; "sample" is made-up data for development and tests. */
+  source: "live" | "sample";
+  events: PromotedEvent[];
+}
+
+/**
  * One month of profit-and-loss figures, from the Finance Committee's
  * "CCS Board Reporting Package" workbooks. Organizational aggregates only:
  * no member names are ever stored in this table.

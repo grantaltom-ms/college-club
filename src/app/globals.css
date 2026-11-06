@@ -1482,3 +1482,80 @@ main.frame {
 .finance-lock-out {
   margin-top: 32px;
 }
+
+/* ---------- Events and Marketing page (/events) ---------- */
+
+/* The scoreboard is wide and short, so it scrolls sideways on a phone but never up and down. */
+.ev-table-scroll {
+  overflow-x: auto;
+}
+
+/* The shared table keeps every heading on one line; here the long ones wrap, so the note column is not pushed off the screen. */
+.ev-table-scroll th {
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+.ev-table-scroll .ev-nowrap {
+  white-space: nowrap;
+}
+
+.ev-table-scroll .ev-note-cell {
+  min-width: 220px;
+}
+
+.ev-table-scroll .ev-door-cell {
+  min-width: 190px;
+}
+
+/* A small "so far" after an upcoming event's registrations, and a quiet line under a door count. */
+.ev-so-far,
+.ev-door-note {
+  color: var(--slate);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.ev-door-note {
+  display: block;
+  max-width: 260px;
+}
+
+.ev-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--oyster-50);
+  color: var(--slate);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* Four snapshot cards sit two by two, so a long figure like "185 of 550 (34%)" has room. */
+.stat-grid.ev-two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ev-stand-value {
+  font-size: 40px;
+  overflow-wrap: anywhere;
+}
+
+/* A section heading's one-line note sits close to the cards under it. */
+.card-sub + .stat-grid.ev-two-up {
+  margin-top: 16px;
+}
+
+/* The same quiet italic as "Board target: not set yet" on the Summary cards, for a table cell. */
+.ev-target-unset {
+  color: var(--slate);
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .stat-grid.ev-two-up {
+    grid-template-columns: 1fr;
+  }
+}

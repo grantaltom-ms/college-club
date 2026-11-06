@@ -10,10 +10,12 @@ import {
   type DoorPeriod,
   type FinanceData,
   type FinanceMonth,
+  type EventsData,
   type Member,
   type MembershipData,
   type MembershipMonth,
   type Measure,
+  type PromotedEvent,
 } from "./types";
 
 const PAGE = 1000;
@@ -234,6 +236,47 @@ export function toMembershipMonth(r: MembershipRow): MembershipMonth {
 export async function loadMembership(cfg: { url: string; key: string }): Promise<MembershipData> {
   const rows = await fetchAll<MembershipRow>(cfg, "membership_monthly", "year.asc,month.asc");
   return { source: "live", months: rows.map(toMembershipMonth) };
+}
+
+/* ---------- Events and Marketing scoreboard ---------- */
+
+export interface EventScoreboardRow {
+  event_name: string;
+  event_date: string;
+  price_label: string | null;
+  capacity: number | null;
+  times_promoted: number | null;
+  rsvp_members: number | null;
+  rsvp_persons: number | null;
+  door_entries_window: number | null;
+  door_comparison: string | null;
+  status: string;
+  note: string | null;
+}
+
+/**
+ * An event_scoreboard row as the browser sees it. Every field is named here on purpose: nothing is spread
+ * from the row, so a column added to the table later never reaches the page by accident.
+ */
+export function toPromotedEvent(r: EventScoreboardRow): PromotedEvent {
+  return {
+    name: r.event_name,
+    date: r.event_date,
+    priceLabel: r.price_label,
+    capacity: r.capacity,
+    timesPromoted: r.times_promoted,
+    rsvpMembers: r.rsvp_members,
+    rsvpPersons: r.rsvp_persons,
+    doorEntriesWindow: r.door_entries_window,
+    doorComparison: r.door_comparison,
+    status: r.status === "upcoming" ? "upcoming" : "held",
+    note: r.note,
+  };
+}
+
+export async function loadEvents(cfg: { url: string; key: string }): Promise<EventsData> {
+  const rows = await fetchAll<EventScoreboardRow>(cfg, "event_scoreboard", "event_date.asc,id.asc");
+  return { source: "live", events: rows.map(toPromotedEvent) };
 }
 
 /* ---------- Financials ---------- */
