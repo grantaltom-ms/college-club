@@ -1,18 +1,20 @@
 import Link from "next/link";
 import { clubNow } from "@/club/clock";
 import { checkInNeeded, rowFor, selfCheckInPhase } from "@/club/engine/attendance";
+import { sessionTitle } from "@/club/engine/classes";
 import { bookingDamageNotices, noticeWords, type DamageNotice } from "@/club/engine/damage";
 import { myPractices, practiceNoticeFor, sideWords } from "@/club/engine/practices";
 import { fullName, memberById } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
-import { RULE_BOOK, rulesFor } from "@/club/settings/rulebook";
+import { RULE_BOOK, classOf, rulesFor } from "@/club/settings/rulebook";
 import { readClubOnce } from "@/club/store/read-once";
 import { formatDayLong, formatRange, pacificDate } from "@/club/time";
-import type { Booking, ClubState } from "@/club/types";
+import type { Booking, ClassSession, ClubState, SignUp } from "@/club/types";
 import { idParam, NOTICES } from "@/club/web";
 import { AttendanceButtons } from "../AttendanceButtons";
+import { ClassRow } from "./ClassRow";
 import { PlaceholderNote } from "../PlaceholderNote";
 import { SelfCheckIn } from "../SelfCheckIn";
 import { SignedOut } from "../SignedOut";
@@ -30,6 +32,8 @@ const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
 function Row({ state, booking, viewerId, now, staff, damage }: { state: ClubState; booking: Booking; viewerId: string | null; now: Date; staff: boolean; damage: DamageNotice[] }) {
   const item = state.items.find((i) => i.id === booking.itemId)!;
+  // What kind of thing it is, as the club names it: Shell, Kayak, Paddle Board, Dock Space, Gym Space, Room Space, Work Space.
+  const kind = classOf(RULE_BOOK, item).type;
   const practiceNotice = practiceNoticeFor(state, booking);
   const booker = memberById(state, booking.bookerId)!;
   const crew = booking.crew.map((id) => fullName(memberById(state, id)!));
@@ -49,7 +53,10 @@ function Row({ state, booking, viewerId, now, staff, damage }: { state: ClubStat
   const cutoff = rulesFor(RULE_BOOK, item).rules.cancelCutoffMinutes;
   const late = mine && Date.parse(booking.startsAt) - now.getTime() < cutoff * 60000;
   return (
-    <li className="club-card" data-testid="booking-row" data-status={booking.status} data-item={item.name}>
+    <li className="club-card" data-testid="booking-row" data-status={booking.status} data-item={item.name} data-kind={kind}>
+      <p className="club-row-kind" data-testid="row-kind">
+        {kind}
+      </p>
       <h3>{item.name}</h3>
       <p>
         {formatDayLong(pacificDate(new Date(booking.startsAt)))}, {formatRange(booking.startsAt, booking.endsAt)}
@@ -89,6 +96,9 @@ function Row({ state, booking, viewerId, now, staff, damage }: { state: ClubStat
   );
 }
 
+/** One line of the list: a boat or space booking, or a class sign-up. They share one list, soonest first, each tagged with what it is. */
+type Entry = { key: string; startsAt: string; booking: Booking; line?: undefined; session?: undefined } | { key: string; startsAt: string; line: SignUp; session: ClassSession; booking?: undefined };
+
 export default async function MyBookings({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireClub();
   const actor = await getCurrentActor();
@@ -104,16 +114,39 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
   const upcoming = all.filter((b) => (b.status === "upcoming" || b.status === "completed") && Date.parse(b.endsAt) > now.getTime()).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const past = all.filter((b) => !upcoming.includes(b)).sort((a, b) => b.startsAt.localeCompare(a.startsAt));
 
+  // A member's class sign-ups sit in the same list (this page used to be two: My bookings and My classes). Staff hold no class places.
+  const classes = viewerId
+    ? state.signups
+        .filter((g) => g.memberId === viewerId)
+        .map((line) => ({ line, session: state.sessions.find((x) => x.id === line.sessionId)! }))
+        .filter((x) => x.session)
+    : [];
+  const classUpcoming = (x: { line: SignUp; session: ClassSession }) =>
+    (x.line.status === "enrolled" || x.line.status === "waitlisted" || x.line.status === "attended") && x.session.status === "scheduled" && Date.parse(x.session.endsAt) > now.getTime();
+  const bookingEntry = (booking: Booking): Entry => ({ key: `b:${booking.id}`, startsAt: booking.startsAt, booking });
+  const classEntry = ({ line, session }: { line: SignUp; session: ClassSession }): Entry => ({ key: `c:${line.id}`, startsAt: session.startsAt, line, session });
+  const upcomingEntries: Entry[] = [...upcoming.map(bookingEntry), ...classes.filter(classUpcoming).map(classEntry)].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const pastEntries: Entry[] = [...past.map(bookingEntry), ...classes.filter((x) => !classUpcoming(x)).map(classEntry)].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+
   const bookedId = idParam(params.booked);
   const cancelledId = idParam(params.cancelled);
   const checkedInId = idParam(params.checkedin);
   const booked = bookedId ? state.bookings.find((b) => b.id === bookedId) : undefined;
   const cancelled = cancelledId ? state.bookings.find((b) => b.id === cancelledId) : undefined;
   const checkedIn = checkedInId ? state.bookings.find((b) => b.id === checkedInId && b.status === "completed" && viewerId && (b.bookerId === viewerId || b.crew.includes(viewerId))) : undefined;
+  const checkedInClass = checkedInId ? classes.find(({ line }) => line.id === checkedInId && line.status === "attended") : undefined;
+  const left = idParam(params.left) ? classes.find(({ line }) => line.id === idParam(params.left)) : undefined;
   const damage = viewerId ? bookingDamageNotices(state, viewerId, now) : {};
   const nameOf = (b: Booking) => state.items.find((i) => i.id === b.itemId)!.name;
   const notice = NOTICES[one(params.notice) ?? ""];
   const practices = viewerId && !staff ? myPractices(state, viewerId, now) : [];
+
+  const drawEntry = (e: Entry) =>
+    e.booking ? (
+      <Row key={e.key} state={state} booking={e.booking} viewerId={viewerId} now={now} staff={staff} damage={damage[e.booking.id] ?? []} />
+    ) : (
+      <ClassRow key={e.key} state={state} line={e.line} session={e.session} now={now} />
+    );
 
   return (
     <section className="club-bookings">
@@ -139,6 +172,18 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
       {checkedIn && (
         <p className="club-success" role="status" data-testid="checkedin-note">
           You are checked in for {nameOf(checkedIn)}. Have a good one.
+        </p>
+      )}
+      {checkedInClass && (
+        <p className="club-success" role="status" data-testid="checkedin-note">
+          You are checked in for {sessionTitle(state, checkedInClass.session)}. Enjoy the class.
+        </p>
+      )}
+      {left && (
+        <p className="club-success" role="status" data-testid="left-note">
+          {left.line.status === "late_cancelled"
+            ? `You left ${sessionTitle(state, left.session)}. It was after the cutoff, so it is recorded as a late cancellation.`
+            : `You left ${sessionTitle(state, left.session)}. Your place is free for others.`}
         </p>
       )}
       {cancelled && (
@@ -180,31 +225,33 @@ export default async function MyBookings({ searchParams }: { searchParams: Promi
       )}
 
       <h2>Upcoming</h2>
-      {upcoming.length === 0 ? (
+      {upcomingEntries.length === 0 ? (
         <p className="club-empty-inline" data-testid="no-upcoming">
           Nothing booked.{" "}
           {!staff && (
-            <Link href="/club/book" className="club-inline-cta">
-              Make a reservation
-            </Link>
+            <>
+              <Link href="/club/book" className="club-inline-cta">
+                Make a reservation
+              </Link>{" "}
+              or{" "}
+              <Link href="/club/classes" className="club-inline-cta">
+                join a class
+              </Link>
+            </>
           )}
         </p>
       ) : (
         <ul className="club-cards" aria-label="Upcoming bookings">
-          {upcoming.map((b) => (
-            <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} damage={damage[b.id] ?? []} />
-          ))}
+          {upcomingEntries.map((e) => drawEntry(e))}
         </ul>
       )}
 
       <h2>Past</h2>
-      {past.length === 0 ? (
+      {pastEntries.length === 0 ? (
         <p>Nothing yet.</p>
       ) : (
         <ul className="club-cards" aria-label="Past bookings">
-          {past.map((b) => (
-            <Row key={b.id} state={state} booking={b} viewerId={viewerId} now={now} staff={staff} damage={damage[b.id] ?? []} />
-          ))}
+          {pastEntries.map((e) => drawEntry(e))}
         </ul>
       )}
       {!staff && (

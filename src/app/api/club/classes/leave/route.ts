@@ -9,11 +9,11 @@ export async function POST(request: NextRequest) {
   if ("response" in started) return started.response;
   const { actor, ctx, form, store } = started;
   const id = idParam(field(form, "id"));
-  if (!id) return see(request, "/club/my-classes?notice=invalid");
+  if (!id) return see(request, "/club/my-bookings?notice=invalid");
   try {
     const { signUp } = await leaveClass(store, CLASS_RULES, ctx, id);
-    return see(request, actor.kind === "staff" ? `/club/classes/${signUp.sessionId}?changed=1` : `/club/my-classes?left=${id}`);
+    return see(request, actor.kind === "staff" ? `/club/classes/${signUp.sessionId}?changed=1` : `/club/my-bookings?left=${id}`);
   } catch (e) {
-    return see(request, `/club/my-classes?notice=${noticeCode(e)}`);
+    return see(request, `/club/my-bookings?notice=${noticeCode(e)}`);
   }
 }

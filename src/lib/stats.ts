@@ -519,7 +519,7 @@ export interface BookingMonth {
   month: number;
   label: string;
   bookings: number;
-  /** True when every day of the month is in the data. */
+  /** True when the data runs past the month's last day (and has started by then). A quiet day with no row does not make a month incomplete. */
   complete: boolean;
 }
 
@@ -529,20 +529,31 @@ export function bookingYears(totals: ClubTotal[]): number[] {
   return [...years].sort((a, b) => b - a);
 }
 
-/** All twelve months of a year; months the data has not reached have zero bookings. */
+/**
+ * All twelve months of a year; months the data has not reached have zero bookings.
+ *
+ * A month is complete when the data runs past its last day, not when every calendar day has a row. The series only holds days
+ * with at least one booking, so a quiet day (New Year's Day, a storm) has no row, and counting rows would drop the whole month
+ * from the year-over-year comparison. The month the data starts in counts as complete: an export whose first row is the 2nd
+ * cannot be told from one that starts on the 1st after a quiet day. Months before the data starts, and the month the data
+ * is still in, are not complete.
+ */
 export function bookingMonths(totals: ClubTotal[], year: number): BookingMonth[] {
-  const days = series(totals, "icrew_bookings_by_day").filter((t) => t.key.startsWith(`${year}-`));
+  const all = series(totals, "icrew_bookings_by_day");
+  const days = all.filter((t) => t.key.startsWith(`${year}-`));
+  const keys = all.map((t) => t.key).sort();
+  const firstMonth = keys.length ? keys[0].slice(0, 7) : null;
+  const lastDay = keys.length ? keys[keys.length - 1] : null;
   return Array.from({ length: 12 }, (_, i) => {
     const month = i + 1;
     const key = `${year}-${pad2(month)}`;
     const inMonth = days.filter((t) => t.key.startsWith(key));
-    const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
     return {
       key,
       month,
       label: formatMonth(key),
       bookings: inMonth.reduce((s, t) => s + t.allEntries, 0),
-      complete: inMonth.length === length,
+      complete: firstMonth !== null && lastDay !== null && key >= firstMonth && monthEnd(year, month) <= lastDay,
     };
   });
 }

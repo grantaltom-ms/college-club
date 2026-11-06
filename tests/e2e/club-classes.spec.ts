@@ -18,7 +18,7 @@ const actAs = async (page: Page, who: string) => {
 };
 
 const card = (page: Page, name: string) => page.getByTestId("class-card").filter({ hasText: name });
-const upcomingRows = (page: Page) => page.getByRole("list", { name: "Upcoming classes" }).getByTestId("class-row");
+const upcomingRows = (page: Page) => page.getByRole("list", { name: "Upcoming bookings" }).getByTestId("class-row");
 
 /** Open a class's upcoming-dates page from the bulletin, then open its first (or matching) session. */
 async function openClassSession(page: Page, name: string, sessionText?: RegExp | string) {
@@ -33,7 +33,7 @@ async function openClassSession(page: Page, name: string, sessionText?: RegExp |
 
 /** Leave everything this member still has coming up, so a retried test starts clean. */
 async function leaveAll(page: Page) {
-  await page.goto("/club/my-classes");
+  await page.goto("/club/my-bookings");
   const buttons = page.getByRole("button", { name: /^Leave / });
   while ((await buttons.count()) > 0) {
     await buttons.first().click();
@@ -41,7 +41,7 @@ async function leaveAll(page: Page) {
   }
 }
 
-test("core flow: pick a member, find a class, sign up, see it in My classes, leave, and see the place free again", async ({ page }) => {
+test("core flow: pick a member, find a class, sign up, see it in My bookings, leave, and see the place free again", async ({ page }) => {
   await actAs(page, "Rafael Castellanos");
   await leaveAll(page);
 
@@ -64,7 +64,7 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
   await expect(page.getByTestId("joined-note")).toContainText("Stretch & Mobility on Friday, Oct 30");
   await expect(page.locator("#joined .club-done-title")).toHaveText("You're in");
 
-  await page.goto("/club/my-classes");
+  await page.goto("/club/my-bookings");
   const row = upcomingRows(page).filter({ hasText: "Stretch & Mobility" });
   await expect(row).toContainText("Friday, Oct 30, 12:00 to 12:30 pm");
   await expect(row.getByTestId("class-status")).toHaveText("You have a place");
@@ -78,13 +78,60 @@ test("core flow: pick a member, find a class, sign up, see it in My classes, lea
   await expect(page.locator("body")).not.toContainText("Castellanos");
 
   await actAs(page, "Rafael Castellanos");
-  await page.goto("/club/my-classes");
+  await page.goto("/club/my-bookings");
   await upcomingRows(page).filter({ hasText: "Stretch & Mobility" }).getByRole("button", { name: /^Leave / }).click();
   await expect(page.getByTestId("left-note")).toContainText("Your place is free for others.");
-  await expect(page.getByTestId("no-upcoming-classes")).toBeVisible();
+  await expect(upcomingRows(page).filter({ hasText: "Stretch & Mobility" })).toHaveCount(0);
   await page.goto("/club/classes");
   await card(page, "Stretch & Mobility").getByRole("link", { name: "Stretch & Mobility" }).click();
   await expect(page.getByTestId("class-session").filter({ hasText: /Friday, Oct 30/ }).getByTestId("class-chairs")).toHaveText("10 places left");
+});
+
+test("My bookings holds class sign-ups and boat bookings in one list, soonest first, each tagged with what it is", async ({ page }) => {
+  // The sample's Julien Moreau holds a chair in Lunchtime Mobility at 1:15 pm today and has the Drift paddle board at 3 pm today.
+  await actAs(page, "Julien Moreau");
+  await page.goto("/club/my-bookings");
+  await expect(page.getByRole("heading", { level: 1, name: "My bookings" })).toBeVisible();
+  const list = page.getByRole("list", { name: "Upcoming bookings" });
+  const mobility = list.getByTestId("class-row").filter({ hasText: "Lunchtime Mobility" });
+  const drift = list.getByTestId("booking-row").filter({ hasText: "Drift" });
+  await expect(mobility).toHaveCount(1);
+  await expect(drift).toHaveCount(1);
+  await expect(mobility.getByTestId("row-kind")).toHaveText("Class");
+  await expect(drift.getByTestId("row-kind")).toHaveText("Paddle Board");
+  // One list in time order: the 1:15 pm class comes before the 3 pm paddle board, whichever kind each is.
+  const names = await list.locator('[data-testid="class-row"], [data-testid="booking-row"]').evaluateAll((els) => els.map((el) => el.getAttribute("data-class") ?? el.getAttribute("data-item")));
+  expect(names.indexOf("Lunchtime Mobility")).toBeGreaterThanOrEqual(0);
+  expect(names.indexOf("Lunchtime Mobility")).toBeLessThan(names.indexOf("Drift"));
+  // There is no second list of classes any more: one Upcoming heading and one Past heading.
+  await expect(page.getByRole("heading", { level: 2, name: "Upcoming" })).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 2, name: "Past" })).toHaveCount(1);
+  // The class row keeps its link to the class and its own buttons.
+  await expect(mobility.getByRole("link", { name: "Lunchtime Mobility" })).toHaveAttribute("href", /\/club\/classes\/[0-9a-f-]{36}$/);
+});
+
+test("the old My classes address forwards to My bookings, keeping only the notices it understood, and My account no longer lists it", async ({ page }) => {
+  await actAs(page, "Rafael Castellanos");
+  await page.goto("/club/my-classes");
+  await expect(page).toHaveURL(/\/club\/my-bookings$/);
+  await expect(page.getByRole("heading", { level: 1, name: "My bookings" })).toBeVisible();
+
+  await page.goto("/club/my-classes?notice=invalid&left=not-a-real-id&somethingelse=1");
+  await expect(page).toHaveURL(/\/club\/my-bookings\?(?=.*notice=invalid)(?=.*left=not-a-real-id)(?!.*somethingelse)/);
+  await expect(page.locator("p.club-alert")).toBeVisible();
+
+  // The menu has no My classes link: the page is part of My bookings.
+  await page.setViewportSize({ width: 1180, height: 800 });
+  await page.goto("/club");
+  await page.getByRole("navigation", { name: "Member area" }).getByRole("button", { name: "My account" }).click();
+  await expect(page.locator("#club-account-menu").getByRole("link", { name: "My classes" })).toHaveCount(0);
+  await expect(page.locator("#club-account-menu").getByRole("link", { name: "My bookings" })).toBeVisible();
+
+  // Staff are sent to the same place: All bookings.
+  await actAs(page, "Test staff");
+  await page.goto("/club/my-classes");
+  await expect(page).toHaveURL(/\/club\/my-bookings$/);
+  await expect(page.getByRole("heading", { level: 1, name: "All bookings" })).toBeVisible();
 });
 
 test("the calendar feed lists upcoming classes with no member names, and works without signing in", async ({ page, request }) => {
@@ -169,18 +216,18 @@ test("a full class: join the waiting list, and when someone leaves the first in 
   await open(declan);
   await declan.getByRole("button", { name: "Join the waiting list" }).click();
   await expect(declan.getByTestId("joined-note")).toContainText("On the waiting list, 2nd in line.");
-  await declan.goto("/club/my-classes");
+  await declan.goto("/club/my-bookings");
   await expect(upcomingRows(declan).filter({ hasText: name }).getByTestId("class-status")).toHaveText("On the waiting list");
   await expect(upcomingRows(declan).filter({ hasText: name })).toContainText("2nd in line");
 
   // Lars leaves; Britta now has the chair, with no action of her own, and Declan is first in line.
-  await lars.goto("/club/my-classes");
+  await lars.goto("/club/my-bookings");
   await upcomingRows(lars).filter({ hasText: name }).getByRole("button", { name: /^Leave / }).click();
   await expect(lars.getByTestId("left-note")).toBeVisible();
-  await britta.goto("/club/my-classes");
+  await britta.goto("/club/my-bookings");
   await expect(upcomingRows(britta).filter({ hasText: name }).getByTestId("class-status")).toHaveText("You have a place");
   await expect(upcomingRows(britta).filter({ hasText: name })).toContainText("moved up from the waiting list");
-  await declan.goto("/club/my-classes");
+  await declan.goto("/club/my-bookings");
   await expect(upcomingRows(declan).filter({ hasText: name })).toContainText("1st in line");
 
   // Staff see all the names; cancelling takes everyone off, emails them, and lists who was told.
@@ -198,8 +245,8 @@ test("a full class: join the waiting list, and when someone leaves the first in 
   await expect(page.getByTestId("outbox-message").filter({ hasText: "To britta.eriksen@example.com" }).filter({ hasText: "Class cancelled" })).toHaveCount(1);
   await expect(page.getByTestId("outbox-message").filter({ hasText: "To declan.halloran@example.com" }).filter({ hasText: "Class cancelled" })).toHaveCount(1);
   await expect(page.getByTestId("outbox-message").filter({ hasText: "Instructor is ill" }).first()).toBeVisible();
-  await britta.goto("/club/my-classes");
-  await expect(britta.getByRole("list", { name: "Past classes" }).getByTestId("class-row").filter({ hasText: name })).toContainText("Class cancelled");
+  await britta.goto("/club/my-bookings");
+  await expect(britta.getByRole("list", { name: "Past bookings" }).getByTestId("class-row").filter({ hasText: name })).toContainText("Class cancelled");
   await britta.context().close();
   await declan.context().close();
   await lars.context().close();
@@ -308,7 +355,7 @@ test.describe("on a phone", () => {
     expect(await noSidewaysScroll()).toBe(true);
     await page.getByTestId("class-session").first().getByTestId("session-signup").click();
     expect(await noSidewaysScroll()).toBe(true);
-    await page.goto("/club/my-classes");
+    await page.goto("/club/my-bookings");
     expect(await noSidewaysScroll()).toBe(true);
     await actAs(page, "Test staff");
     await page.goto("/club/classes/manage");

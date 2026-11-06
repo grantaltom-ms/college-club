@@ -28,8 +28,8 @@ export default async function MemberLayout({ children }: { children: React.React
     links.push({ href: "/club/my-bookings", label: actor.kind === "staff" ? "All bookings" : "My bookings", group: actor.kind === "staff" ? "desk" : "me" });
     links.push({ href: "/club/classes", label: "Classes", group: "go" });
     links.push({ href: "/club/events", label: "Events", group: "go" });
-    // A member's own pages are one dropdown, My account: My household (the home link, below), My bookings, My classes, My bill, My boats.
-    if (actor.kind === "member") links.push({ href: "/club/my-classes", label: "My classes", group: "me" });
+    // A member's own pages are one dropdown, My account: My household (the home link, below), My bookings (which holds their class
+    // sign-ups too: there is no separate My classes any more), My bill, My boats.
     if (actor.kind === "member") links.push({ href: "/club/my-bill", label: "My bill", group: "me" });
     if (hasBoats) links.push({ href: "/club/my-boats", label: "My boats", group: "me" });
     if (actor.kind === "staff" || (actor.kind === "member" && actor.member.isCoach === true)) {

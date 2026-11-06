@@ -24,7 +24,7 @@ import {
   weekdaySeries,
   yearOverYear,
 } from "./stats";
-import type { Member } from "./types";
+import type { ClubTotal, Member } from "./types";
 
 const data = sampleData();
 
@@ -227,11 +227,73 @@ describe("reservation views", () => {
     expect(bookingYears(data.totals)).toEqual([2026, 2025]);
   });
 
-  it("marks months complete only when every day is present", () => {
+  it("marks months complete when the data has run past their last day", () => {
     const m26 = bookingMonths(data.totals, 2026);
     expect(m26.filter((m) => m.complete).length).toBe(9);
     expect(m26[9].bookings).toBe(0);
     expect(bookingMonths(data.totals, 2025).every((m) => m.complete)).toBe(true);
+  });
+
+  describe("a quiet day with no row", () => {
+    /** One row per day with bookings, as the real series is: days with none are simply missing. */
+    const days = (from: string, to: string, skip: string[] = []): ClubTotal[] => {
+      const out: ClubTotal[] = [];
+      for (let t = Date.parse(`${from}T00:00:00Z`); t <= Date.parse(`${to}T00:00:00Z`); t += 86_400_000) {
+        const key = new Date(t).toISOString().slice(0, 10);
+        if (!skip.includes(key)) out.push({ measure: "icrew_bookings_by_day", key, allEntries: 10, memberEntries: null });
+      }
+      return out;
+    };
+
+    it("does not drop a month from the year-over-year", () => {
+      // 2025-03-12 and 2026-03-12 had no bookings, so neither has a row. Both Marches are still finished months.
+      const totals = days("2025-01-01", "2026-09-30", ["2025-03-12", "2026-03-12"]);
+      const m25 = bookingMonths(totals, 2025);
+      expect(m25[2]).toMatchObject({ month: 3, complete: true, bookings: 30 * 10 });
+      expect(bookingMonths(totals, 2026)[2]).toMatchObject({ month: 3, complete: true });
+      const yoy = bookingYearOverYear(totals)!;
+      expect(yoy.fromLabel).toBe("Jan");
+      expect(yoy.toLabel).toBe("Sep");
+      // Jan to Sep is 273 days a year, minus the one quiet day, at 10 bookings a day: the same in both years.
+      expect(yoy.thisYear).toBe(272 * 10);
+      expect(yoy.lastYear).toBe(272 * 10);
+    });
+
+    it("starts the comparison in January when the export's first row is Jan 2 (Jan 1 was quiet)", () => {
+      const totals = days("2025-01-02", "2026-09-30");
+      expect(bookingMonths(totals, 2025)[0]).toMatchObject({ month: 1, complete: true });
+      expect(bookingYearOverYear(totals)!.fromLabel).toBe("Jan");
+    });
+
+    it("keeps the month the data is still in, and every month after it, incomplete", () => {
+      // Data runs to Sep 29. September has 30 days, so it is not finished yet even though no row is "missing" in the middle.
+      const totals = days("2025-01-01", "2026-09-29");
+      const m26 = bookingMonths(totals, 2026);
+      expect(m26[7].complete).toBe(true); // August
+      expect(m26[8].complete).toBe(false); // September, so far
+      expect(m26[9].complete).toBe(false);
+      expect(bookingYearOverYear(totals)!.toLabel).toBe("Aug");
+    });
+
+    it("counts a month complete when the data's last day is its last day, even if that day is a quiet one", () => {
+      // Data has a row for Oct 1, so Sep 30 (no row) is behind the end of the data and September is finished.
+      const totals = days("2025-01-01", "2026-10-01", ["2026-09-30"]);
+      expect(bookingMonths(totals, 2026)[8].complete).toBe(true);
+      expect(bookingMonths(totals, 2026)[9].complete).toBe(false); // October has only its first day
+    });
+
+    it("does not count months before the data starts", () => {
+      const totals = days("2025-04-10", "2026-09-30");
+      const m25 = bookingMonths(totals, 2025);
+      expect(m25.slice(0, 3).every((m) => !m.complete)).toBe(true);
+      expect(m25[3].complete).toBe(true); // April, the month the data starts in
+      expect(bookingYearOverYear(totals)!.fromLabel).toBe("Apr");
+    });
+
+    it("has no complete months when there is no data at all", () => {
+      expect(bookingMonths([], 2026).every((m) => !m.complete)).toBe(true);
+      expect(bookingYearOverYear([])).toBeNull();
+    });
   });
 
   it("month totals add up to the daily totals", () => {

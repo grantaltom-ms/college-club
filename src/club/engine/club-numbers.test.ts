@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { RULE_BOOK } from "../settings/rulebook";
+import { RULE_BOOK, rulesFor } from "../settings/rulebook";
+import type { Item } from "../types";
 import { pacificWall } from "../time";
 import { lengthChoices } from "../web";
 import { describeRules } from "./describe";
@@ -7,7 +8,7 @@ import { STORE_KINDS, at, bookAs, fixtureFor, refusalMessages, refusedFor, ruleB
 
 /**
  * The club's own booking numbers, as the rules file ships them (copied from iCrew's Reservation Settings on Oct 30, 2026): 14 days
- * ahead, 90 minutes to start with and up to 4 hours, and no limit on how many bookings a member holds or makes in a day. The other
+ * ahead, 90 minutes to start with and up to 3 hours (work space up to 4: Grant, Nov 5, 2026), and no limit on how many bookings a member holds or makes in a day. The other
  * engine tests run on fixed test numbers (testkit.ts), so editing the file never breaks them; these tests hold the file itself.
  */
 
@@ -29,11 +30,27 @@ for (const kind of STORE_KINDS) {
       expect(await refusedFor(bookAs(f, "Ada", "Heron", at(15, 7), at(15, 8), [], undefined, opening))).toEqual([]);
     });
 
-    it("take 90 minutes and 4 hours, and refuse 4 hours and a half", async () => {
+    it("take 90 minutes and 3 hours, and refuse 3 hours and a half", async () => {
       const f = await club();
       expect(await refusedFor(bookAs(f, "Ada", "Heron", at(1, 7), at(1, 8, 30)))).toEqual([]);
-      expect(await refusedFor(bookAs(f, "Ben", "Osprey", at(1, 7), at(1, 11)))).toEqual([]);
-      expect(await refusalMessages(bookAs(f, "Dee", "Kingfisher", at(1, 7), at(1, 11, 30)))).toEqual(["The longest booking is 4 hours."]);
+      expect(await refusedFor(bookAs(f, "Ben", "Osprey", at(1, 7), at(1, 10)))).toEqual([]);
+      expect(await refusalMessages(bookAs(f, "Dee", "Kingfisher", at(1, 7), at(1, 10, 30)))).toEqual(["The longest booking is 3 hours."]);
+      // A boat that was fine for 4 hours before is refused now.
+      expect(await refusalMessages(bookAs(f, "Eli", "Loon", at(2, 7), at(2, 11)))).toEqual(["The longest booking is 3 hours."]);
+    });
+
+    it("keep 4 hours for work space: a 4-hour booking is taken, 4 and a half is refused, and the lengths run to 4 hours", async () => {
+      const f = await club();
+      await f.store.transaction(async (s, newId) => {
+        s.items.push({ id: newId(), name: "Quiet desk", classCode: "work-space", ruleOverrides: {} } satisfies Item);
+      });
+      const state = await f.store.read();
+      const desk = state.items.find((i) => i.name === "Quiet desk")!;
+      f.i["Quiet desk"] = desk.id;
+      expect(await refusedFor(bookAs(f, "Ada", "Quiet desk", at(1, 7), at(1, 11)))).toEqual([]);
+      expect(await refusalMessages(bookAs(f, "Ben", "Quiet desk", at(2, 7), at(2, 11, 30)))).toEqual(["The longest booking is 4 hours."]);
+      expect(describeRules(state, RULE_BOOK, desk).lines).toContain("The shortest booking is 30 minutes and the longest is 4 hours.");
+      expect(lengthChoices(rulesFor(RULE_BOOK, desk).rules)).toEqual([30, 60, 90, 120, 150, 180, 210, 240]);
     });
 
     it("put no limit on how many bookings one member holds at once or makes in a day", async () => {
@@ -53,15 +70,15 @@ for (const kind of STORE_KINDS) {
       expect(await refusedFor(bookAs(f, "Ada", "Osprey", at(2, 8), at(2, 9)))).toEqual(["person_busy"]);
     });
 
-    it("say in the rules that there is no limit, and offer lengths from 30 minutes to 4 hours", async () => {
+    it("say in the rules that there is no limit, and offer lengths from 30 minutes to 3 hours", async () => {
       const f = await club();
       const state = await f.store.read();
       const heron = state.items.find((i) => i.name === "Heron")!;
       const lines = describeRules(state, RULE_BOOK, heron).lines;
       expect(lines[0]).toBe("Book up to 14 days ahead. A new day opens at midnight Pacific time.");
-      expect(lines).toContain("The shortest booking is 30 minutes and the longest is 4 hours.");
+      expect(lines).toContain("The shortest booking is 30 minutes and the longest is 3 hours.");
       expect(lines).toContain("There is no limit on how many shell bookings you can hold or make in a day.");
-      expect(lengthChoices(RULE_BOOK.defaults)).toEqual([30, 60, 90, 120, 150, 180, 210, 240]);
+      expect(lengthChoices(RULE_BOOK.defaults)).toEqual([30, 60, 90, 120, 150, 180]);
       expect(lengthChoices(RULE_BOOK.defaults)).toContain(RULE_BOOK.defaults.defaultMinutes);
     });
   });

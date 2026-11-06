@@ -60,8 +60,6 @@ const SCREENS: Screen[] = [
   { name: "My bookings", who: "Nora Abernathy", path: "/club/my-bookings", h1: "My bookings" },
   { name: "All bookings (staff)", who: "Test staff", path: "/club/my-bookings", h1: "All bookings" },
   { name: "the booking form", who: "Nora Abernathy", path: "", h1: /^Book \S/, go: follow("/club/book?what=gym", 'main a[href^="/club/book/new"]', /\/club\/book\/new\?/) },
-  { name: "My classes", who: "Nora Abernathy", path: "/club/my-classes", h1: "My classes" },
-  { name: "My classes (staff)", who: "Test staff", path: "/club/my-classes", h1: "My classes" },
   { name: "Fitness classes", who: "Nora Abernathy", path: "/club/classes", h1: "Fitness classes" },
   { name: "Fitness classes by day", who: "Nora Abernathy", path: "/club/classes?view=day", h1: "Fitness classes" },
   { name: "Fitness classes (staff)", who: "Test staff", path: "/club/classes", h1: "Fitness classes" },
@@ -220,7 +218,7 @@ test.describe("the members' and staff look", () => {
           await expect(page.locator(".club-band h1")).toBeVisible();
           const small = await page.evaluate(() => {
             const out: string[] = [];
-            for (const el of document.querySelectorAll<HTMLElement>(".club-button, .club-menu-button, .club-nav a, .club-nav button, .club-chips a, .club-quiet-links a, .club-brand, .club-back a, .club-length-chip")) {
+            for (const el of document.querySelectorAll<HTMLElement>(".club-button, .club-menu-button, .club-nav a, .club-nav button, .club-chips a, .club-quiet-links a, .club-brand, .club-back a")) {
               const r = el.getBoundingClientRect();
               if (r.width === 0 || r.height === 0) continue; // not on screen (the phone menu while closed)
               if (r.height < 43.5) out.push(`${el.className || el.tagName} ${Math.round(r.height)}px tall: ${(el.textContent ?? "").trim().slice(0, 30)}`);

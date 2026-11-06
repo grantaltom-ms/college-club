@@ -114,7 +114,7 @@ export default async function ClassPage({ params, searchParams }: { params: Prom
               : `On the waiting list, ${ordinal(joinedPlace)} in line. If a place frees up, the first in line gets it at once.`}
           </p>
           <p className="club-quiet-links">
-            <Link href="/club/my-classes">My classes</Link>
+            <Link href="/club/my-bookings">My bookings</Link>
             {" · "}
             <Link href={`/club/classes/of/${template.id}`}>More dates</Link>
           </p>

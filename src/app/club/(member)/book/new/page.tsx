@@ -11,8 +11,8 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor, toEngineActor } from "@/club/identity";
 import { RULE_BOOK, rulesFor } from "@/club/settings/rulebook";
 import { getClubStore } from "@/club/store/instance";
-import { formatDayLong, formatRange, pacificDate } from "@/club/time";
-import { bookingFormHref, idParam, idsParam, intParam, lengthChoices, momentParam, NOTICES } from "@/club/web";
+import { formatDayLong, formatMinutes, formatRange, pacificDate } from "@/club/time";
+import { idParam, idsParam, intParam, lengthChoices, momentParam, NOTICES } from "@/club/web";
 import { blockedReason, viewerOf } from "@/club/web-actor";
 import { LiveChoicesForm } from "../../LiveChoicesForm";
 import { PlaceholderNote } from "../../PlaceholderNote";
@@ -21,8 +21,6 @@ import { PageBand } from "../../PageBand";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
-
-const lengthLabel = (m: number) => (m < 60 ? `${m} minutes` : m % 60 === 0 ? `${m / 60} hour${m === 60 ? "" : "s"}` : `${Math.floor(m / 60)} hour ${m % 60} minutes`);
 
 export default async function NewBooking({ searchParams }: { searchParams: Promise<Search> }) {
   await requireClub();
@@ -79,16 +77,6 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   const explained = describeRules(state, RULE_BOOK, item);
   const memberBlocked = blockedReason(actor);
   const notice = NOTICES[one(params.notice) ?? ""];
-  const choiceHref = (nextMinutes: number) =>
-    bookingFormHref({
-      itemId: item.id,
-      start: start.toISOString(),
-      minutes: nextMinutes,
-      crew: crewIds,
-      forId: staff ? forId : null,
-      override: wantsOverride,
-      reason,
-    });
 
   return (
     <section className="club-confirm">
@@ -131,29 +119,16 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
             </select>
           </p>
         )}
-        <div className="club-length">
-          <p className="club-length-label" id="length-label">
-            Length
-          </p>
-          <div className="club-length-chips">
-            {lengths.map((m) => (
-              <Link key={m} href={choiceHref(m)} className="club-length-chip" aria-current={m === minutes ? "page" : undefined}>
-                {lengthLabel(m)}
-              </Link>
-            ))}
-          </div>
-          {/* Kept for the browser tests and for no-JS length changes with Check my choices. */}
-          <label htmlFor="minutes" className="sr-only">
-            Length
-          </label>
-          <select id="minutes" name="minutes" className="club-length-select" defaultValue={String(minutes)}>
+        <p>
+          <label htmlFor="minutes">Length</label>
+          <select id="minutes" name="minutes" defaultValue={String(minutes)}>
             {lengths.map((m) => (
               <option key={m} value={m}>
-                {lengthLabel(m)}
+                {formatMinutes(m)}
               </option>
             ))}
           </select>
-        </div>
+        </p>
         {cls.seats > 1 && (
           <fieldset>
             <legend>
