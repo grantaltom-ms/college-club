@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RULE_BOOK, classOf } from "../settings/rulebook";
-import { SAMPLE_ITEMS } from "./equipment";
+import { INVENTED_ITEM_NAMES, SAMPLE_ITEMS } from "./equipment";
 import { ICREW_SHELL_FLEET, findIcrewShell, shellClassForSeats, skillForIcrewShell } from "./icrew-shell-fleet";
 import { weightRangeWords } from "../engine/equipment-edit";
 
@@ -71,5 +71,26 @@ describe("iCrew shell fleet (Nov 2, 2026)", () => {
     expect(heron.requiredQualification).toBeUndefined();
     expect(SAMPLE_ITEMS.find((i) => i.name === "Osprey")).toBeDefined();
     expect(SAMPLE_ITEMS.find((i) => i.name === "Kestrel")?.private).toEqual({ owners: ["Nora Abernathy"], invited: ["Tomas Vandermeer"] });
+  });
+});
+
+describe("the names that mark a sample item as invented (the switch-on checklist reads them)", () => {
+  it("are the invented boats and spaces only: none is a boat in the real iCrew fleet", () => {
+    const fleet = new Set(ICREW_SHELL_FLEET.map((s) => s.name.trim().toLowerCase()));
+    for (const name of INVENTED_ITEM_NAMES) expect(fleet.has(name.trim().toLowerCase()), `${name} is a real fleet name`).toBe(false);
+    // A name that is in both lists (Heron) is left out, so it is never taken for an invented boat.
+    expect(INVENTED_ITEM_NAMES).not.toContain("Heron");
+    expect(fleet.has("heron")).toBe(true);
+  });
+
+  it("hold the invented boats, the pools, the private boats and the retired boat, and every one of them is a sample item", () => {
+    for (const name of ["Cormorant", "Albatross", "Otter", "Dock slip A", "Dock berths", "Weight room", "Kestrel", "Starling", "Wren", "Gannet", "Boathouse gym", "Clubhouse room"]) {
+      expect(INVENTED_ITEM_NAMES, name).toContain(name);
+    }
+    const sample = new Set(SAMPLE_ITEMS.map((i) => i.name));
+    for (const name of INVENTED_ITEM_NAMES) expect(sample.has(name), `${name} is not a sample item`).toBe(true);
+    // The fleet is far bigger than the invented list, so the list is a small part of the sample.
+    expect(INVENTED_ITEM_NAMES.length).toBeLessThan(40);
+    expect(SAMPLE_ITEMS.length - INVENTED_ITEM_NAMES.length).toBeGreaterThan(90);
   });
 });

@@ -103,6 +103,17 @@ function buildSampleItems(): SampleItem[] {
 export const SAMPLE_ITEMS: SampleItem[] = buildSampleItems();
 
 /**
+ * The names that mark an item as invented, for the switch-on checklist: the invented boats and spaces only, never the iCrew fleet. The
+ * 103 fleet shells are the club's real boats (the sample loads them for their sizes and weights), so the real equipment list will hold
+ * the same names, and a real boat must never be taken for an invented one. A name that is in both lists (Heron) is left out for the
+ * same reason.
+ */
+export const INVENTED_ITEM_NAMES: string[] = (() => {
+  const fleet = new Set(ICREW_SHELL_FLEET.map((s) => s.name.trim().toLowerCase()));
+  return INVENTED_ITEMS.map((i) => i.name).filter((name) => !fleet.has(name.trim().toLowerCase()));
+})();
+
+/**
  * Adds the sample boats, a few bookings in the days ahead, and one boat out of service, through the same
  * engine real changes use. `now` is a parameter so tests are exact. The household sample must be seeded first.
  */

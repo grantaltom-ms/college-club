@@ -47,6 +47,9 @@ export function booking(isoDay: string, over: Partial<InventedBooking> & { id: s
   return { date: icrewDay(isoDay), start: "7:00am", end: "8:00am", type: "Shell", item: "Cormorant", by: "Pat Example", out: "7:02am", in: "7:58am", ...over };
 }
 
+/** The file name the sample archive is stored under. The switch-on checklist uses it to tell the invented archive from a real one. */
+export const SAMPLE_HISTORY_FILE = "sample-icrew-history.csv";
+
 /**
  * The sample club's old bookings: a few for people who are in the invented club (so a member can see their own), a double with a
  * crewmate, an event, a joint booking, and one name that is not a member. Days are counted back from `today`, so the sample always reads as past.

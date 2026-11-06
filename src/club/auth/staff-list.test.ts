@@ -28,6 +28,27 @@ describe("the staff list setting", () => {
     expect(() => parseStaffLogins("nope")).toThrow(StaffListError);
   });
 
+  it("tells each mistake apart by a fixed word that never holds an address, because the message quotes the entry", () => {
+    const problemOf = (raw: string) => {
+      try {
+        parseStaffLogins(raw);
+      } catch (e) {
+        if (e instanceof StaffListError) return { problem: e.problem, message: e.message };
+        throw e;
+      }
+      throw new Error(`"${raw}" was accepted`);
+    };
+    expect(problemOf("alex@example.org").problem).toBe("no_equals");
+    expect(problemOf("not-an-address=Alex").problem).toBe("bad_email");
+    expect(problemOf("alex@example.org=").problem).toBe("no_name");
+    expect(problemOf(`alex@example.org=${"x".repeat(81)}`).problem).toBe("name_too_long");
+    expect(problemOf("alex@example.org=A=B").problem).toBe("name_has_equals");
+    expect(problemOf("alex@example.org=A; ALEX@example.org=B").problem).toBe("duplicate");
+    expect(problemOf(Array.from({ length: 51 }, (_, i) => `p${i}@example.org=P${i}`).join(";")).problem).toBe("too_many");
+    // The message is for whoever edits the setting, so it does name the entry; the kind is what anyone else may show.
+    expect(problemOf("alex@example.org").message).toContain("alex@example.org");
+  });
+
   it("is read only where the member area exists", () => {
     const entry = "alex@example.org=Alex Staffer";
     expect(getStaffLogins({ NODE_ENV: "development", CLUB_STAFF_LOGINS: entry })).toEqual([{ email: "alex@example.org", name: "Alex Staffer" }]);

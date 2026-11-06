@@ -2,7 +2,7 @@ import { clubNow } from "../clock";
 import { runHistoryImport } from "../engine/history";
 import { clubEnabled } from "../enabled";
 import { ClubError } from "../errors";
-import { sampleHistoryCsv } from "../sample/icrew";
+import { SAMPLE_HISTORY_FILE, sampleHistoryCsv } from "../sample/icrew";
 import { pacificDate } from "../time";
 import { MemoryHistoryStore, type HistoryStore } from "./history";
 import { PgHistoryStore } from "./history-postgres";
@@ -15,7 +15,7 @@ async function seedSample(store: HistoryStore): Promise<void> {
   if ((await store.summary()).rows > 0) return;
   const now = clubNow();
   try {
-    await runHistoryImport(store, { actor: { kind: "staff", label: "Test staff" }, now }, { fileName: "sample-icrew-history.csv", text: sampleHistoryCsv(pacificDate(now)) });
+    await runHistoryImport(store, { actor: { kind: "staff", label: "Test staff" }, now }, { fileName: SAMPLE_HISTORY_FILE, text: sampleHistoryCsv(pacificDate(now)) });
   } catch (e) {
     if (!(e instanceof ClubError)) throw e;
   }

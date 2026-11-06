@@ -56,6 +56,7 @@ for (const [name, base] of Object.entries(HIDDEN)) {
         `/club/admin/households/${FIRST_HOUSEHOLD}/remove/${FIRST_HOUSEHOLD}`,
         `/club/admin/households/${FIRST_HOUSEHOLD}/members/${FIRST_HOUSEHOLD}/edit`,
         "/club/admin/ipad",
+        "/club/admin/switch-on",
         "/club/admin/import",
         "/api/club/import/template",
         "/club/admin/resignations",
