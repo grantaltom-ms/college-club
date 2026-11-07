@@ -24,6 +24,8 @@ interface Props {
   maxValue?: number;
   /** Formats y-axis ticks. */
   tick?: (n: number) => string;
+  /** With many columns, label only every few so the labels never overlap. The latest column is always labelled. */
+  thinLabels?: boolean;
 }
 
 const MARGIN = { top: 10, right: 8, bottom: 30, left: 44 };
@@ -39,6 +41,14 @@ export function niceScale(max: number): { top: number; ticks: number[] } {
   const ticks: number[] = [];
   for (let v = 0; v <= top + step / 2; v += step) ticks.push(v);
   return { top, ticks };
+}
+
+/**
+ * How many columns apart to draw labels so none overlap, given the width of one column's slot. A label such as "Oct ’26"
+ * needs about 46px. Never less than 1 (every column labelled).
+ */
+export function labelStep(slot: number, labelPx = 46): number {
+  return slot > 0 ? Math.max(1, Math.ceil(labelPx / slot)) : 1;
 }
 
 export const compact = (n: number) => (n >= 1000 ? `${+(n / 1000).toFixed(1)}K` : String(n));
@@ -57,6 +67,7 @@ export function ColumnChart({
   emphasisColor = "#2b3a42",
   maxValue = 0,
   tick = compact,
+  thinLabels = false,
 }: Props) {
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
@@ -68,6 +79,7 @@ export function ColumnChart({
   const barW = Math.max(2, Math.min(24, slot - 2));
   const yOf = (v: number) => MARGIN.top + innerH - (v / top) * innerH;
   const focusable = columns.length <= 31;
+  const step = thinLabels ? labelStep(slot) : 1;
 
   const activeColumn = active === null ? null : columns[active];
   const tipX = active === null ? 0 : Math.min(Math.max(MARGIN.left + slot * active + slot / 2, 70), width - 70);
@@ -104,7 +116,7 @@ export function ColumnChart({
                     opacity={active === null || active === i ? 1 : 0.55}
                   />
                 )}
-                {c.xLabel && (
+                {c.xLabel && (columns.length - 1 - i) % step === 0 && (
                   <text x={MARGIN.left + slot * i + slot / 2} y={height - 8} textAnchor="middle">
                     {c.xLabel}
                   </text>

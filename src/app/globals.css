@@ -1559,3 +1559,20 @@ main.frame {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Notes and summary lines under a chart (Membership page) ---------- */
+
+.chart-footer {
+  margin-top: 14px;
+}
+
+.chart-footer p {
+  margin: 0 0 8px;
+}
+
+.chart-footer ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--slate);
+  font-size: 15px;
+}
