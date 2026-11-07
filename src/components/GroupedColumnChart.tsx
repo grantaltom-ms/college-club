@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { barPath, compact, niceScale } from "./ColumnChart";
+import { barPath, compact, labelStep, niceScale } from "./ColumnChart";
 import { useElementWidth } from "./useElementWidth";
 
 export interface ColumnGroup {
@@ -29,6 +29,8 @@ interface Props {
   stacked?: boolean;
   /** Colors for `segments`, one list per bar, bottom to top. */
   segmentColors?: string[][];
+  /** With many groups, label only every few so the labels never overlap. The latest group is always labelled. */
+  thinLabels?: boolean;
 }
 
 const MARGIN = { top: 10, right: 8, bottom: 30, left: 44 };
@@ -37,7 +39,7 @@ const MARGIN = { top: 10, right: 8, bottom: 30, left: 44 };
  * Columns in groups (one group per month, one bar per year), so each month compares side by side.
  * With `stacked`, the series sit on top of each other in one column instead.
  */
-export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, tick = compact, stacked = false, segmentColors }: Props) {
+export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, tick = compact, stacked = false, segmentColors, thinLabels = false }: Props) {
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
 
@@ -52,6 +54,7 @@ export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, ti
   const groupW = barW * series + 2 * (series - 1);
   // When every column has a label and they are crowded (a phone), use one letter each.
   const narrow = slot < 36 && groups.every((g) => g.xLabel);
+  const step = thinLabels ? labelStep(slot) : 1;
   const yOf = (v: number) => MARGIN.top + innerH - (v / top) * innerH;
 
   const activeGroup = active === null ? null : groups[active];
@@ -103,7 +106,7 @@ export function GroupedColumnChart({ groups, colors, ariaLabel, height = 260, ti
                     />
                   ) : null;
                 })}
-                {label && (
+                {label && (groups.length - 1 - i) % step === 0 && (
                   <text x={MARGIN.left + slot * i + slot / 2} y={height - 8} textAnchor="middle">
                     {label}
                   </text>

@@ -5,15 +5,34 @@ import { ColumnChart } from "@/components/ColumnChart";
 import { GroupedColumnChart } from "@/components/GroupedColumnChart";
 import { useJson } from "@/components/useJson";
 import {
+  categoryParts,
   latestMonth,
   membershipFlags,
   monthLabel,
+  monthsWithout,
+  notesMatching,
   periodTotals,
+  reasonParts,
+  shortMonthLabel,
   sortMonths,
+  trailingReasons,
   type PeriodTotals,
 } from "@/lib/membership";
 import { fmtInt } from "@/lib/stats";
 import type { MembershipData, MembershipMonth } from "@/lib/types";
+
+/**
+ * Series colors for the two stacked charts: the dashboard's validated categorical order (blue, orange, aqua, yellow, magenta),
+ * in that fixed order, so a series keeps its color. They sit on the white card; the lighter ones fall under 3:1 against it, so
+ * every chart has a legend, a numbers-in-the-tooltip hover and a "View as table" view.
+ */
+const SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"];
+const REASON_LABELS = ["Moved", "Not using it / too busy", "Other / unknown"];
+const CATEGORY_LABELS = ["Resident", "Intermediate", "Non-Resident", "Suburban", "Honorary"];
+
+/** The two totals are different counts and are never one series: dues-paying is the sheet's own total, the other adds Suburban and Honorary. */
+const DUES_PAYING = "Dues-paying";
+const ALL_CATEGORIES = "All categories (incl. Suburban and Honorary)";
 
 /** The club year a month belongs to: July starts a new year, so Oct 2026 is 2026-27. */
 function clubYear(m: MembershipMonth): string {
@@ -31,6 +50,23 @@ function groupTotals(months: MembershipMonth[]): { label: string; totals: Period
     return totals ? [{ label, totals }] : [];
   });
 }
+
+/** The notes of the given months, each under its month, next to the chart they are about. Nothing when there are none. */
+function MonthNotes({ months, testId }: { months: MembershipMonth[]; testId: string }) {
+  if (months.length === 0) return null;
+  return (
+    <ul data-testid={testId}>
+      {months.map((m) => (
+        <li key={`${m.year}-${m.month}`}>
+          {monthLabel(m)}: {m.note}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A figure for a month that has none shows as a dash in a table, never as 0. */
+const cell = (n: number | null) => (n === null ? "—" : fmtInt(n));
 
 export default function MembershipPage() {
   const { state, retry } = useJson<MembershipData>("/api/membership", "The membership figures could not be loaded.");
@@ -65,7 +101,8 @@ function Membership({ data }: { data: MembershipData }) {
   return (
     <>
       <p className="page-sub">
-        Paying members month by month, from the Membership Committee&apos;s count workbooks. Counts only — no member names.
+        Dues-paying members month by month, from the Membership Committee&apos;s count workbooks, with the reasons members leave and the
+        membership mix from the committee&apos;s trend workbook. Counts only — no member names.
       </p>
       {data.source === "sample" && (
         <p className="sample-banner" role="note">
@@ -104,19 +141,20 @@ function Membership({ data }: { data: MembershipData }) {
 
         <ChartCard
           title="Paying members over time"
-          subtitle="The workbook's own total after each month's approvals."
+          subtitle={`${DUES_PAYING} members: the workbook's own total after each month's approvals. This is not the all-categories total in "Membership mix" below.`}
           table={{
-            headers: ["Month", "Paying members"],
+            headers: ["Month", `${DUES_PAYING} members`],
             rows: months.map((m) => [monthLabel(m), m.withApprovals]),
           }}
         >
           <ColumnChart
             ariaLabel="Paying members by month"
+            thinLabels
             columns={months.map((m) => ({
               key: `${m.year}-${m.month}`,
-              xLabel: `${monthLabel(m).slice(0, 3)} ’${String(m.year).slice(2)}`,
+              xLabel: shortMonthLabel(m),
               value: m.withApprovals,
-              tooltip: [`${fmtInt(m.withApprovals)} paying members`, monthLabel(m)],
+              tooltip: [`${fmtInt(m.withApprovals)} ${DUES_PAYING.toLowerCase()} members`, monthLabel(m)],
             }))}
           />
         </ChartCard>
@@ -136,14 +174,19 @@ function Membership({ data }: { data: MembershipData }) {
           <GroupedColumnChart
             ariaLabel="Resignations and applicants by month"
             colors={["#a7b3b9", "#2b3a42"]}
+            thinLabels
             groups={months.map((m) => ({
               key: `${m.year}-${m.month}`,
-              xLabel: `${monthLabel(m).slice(0, 3)} ’${String(m.year).slice(2)}`,
+              xLabel: shortMonthLabel(m),
               values: [m.resignations, m.applicants],
               tooltip: [`${fmtInt(m.resignations)} left, ${fmtInt(m.applicants)} applied`, monthLabel(m)],
             }))}
           />
         </ChartCard>
+
+        <WhyMembersLeave months={months} />
+        <MembershipMix months={months} />
+        <Waitlist months={months} />
 
         <section className="card" aria-labelledby="table-title">
           <div className="card-head">
@@ -163,7 +206,7 @@ function Membership({ data }: { data: MembershipData }) {
                   <th scope="col" className="right">Left</th>
                   <th scope="col" className="right">Applied</th>
                   <th scope="col" className="right">Transferred</th>
-                  <th scope="col" className="right">With approvals</th>
+                  <th scope="col" className="right">{DUES_PAYING}, with approvals</th>
                   <th scope="col" className="right">Waitlist</th>
                 </tr>
               </thead>
@@ -183,7 +226,7 @@ function Membership({ data }: { data: MembershipData }) {
             </table>
           </div>
           {notes.length > 0 && (
-            <ul>
+            <ul data-testid="membership-notes">
               {notes.map((m) => (
                 <li key={`${m.year}-${m.month}`}>
                   {monthLabel(m)}: {m.note}
@@ -212,5 +255,190 @@ function Membership({ data }: { data: MembershipData }) {
         </section>
       </div>
     </>
+  );
+}
+
+/** Why members leave: resignations split into moved, not using it and other, one stacked bar a month. */
+function WhyMembersLeave({ months }: { months: MembershipMonth[] }) {
+  if (!months.some((m) => reasonParts(m) !== null)) {
+    return (
+      <section className="card" aria-labelledby="reasons-title" data-testid="reasons-section">
+        <h2 className="card-title" id="reasons-title">
+          Why members leave
+        </h2>
+        <p data-testid="reasons-none">The reasons members left have not been loaded yet. See db/membership_monthly.sql.</p>
+      </section>
+    );
+  }
+  const summary = trailingReasons(months);
+  const gaps = monthsWithout(months, reasonParts);
+  return (
+    <div data-testid="reasons-section">
+      <ChartCard
+        title="Why members leave"
+        subtitle="Resignations by the reason given, from the committee's trend workbook. A month with no split is left blank, never shown as zero."
+        legend={REASON_LABELS.map((label, i) => ({ label, color: SERIES[i] }))}
+        table={{
+          headers: ["Month", ...REASON_LABELS, "Resignations on the monthly sheet"],
+          rows: months.map((m) => {
+            const parts = reasonParts(m);
+            return [monthLabel(m), parts ? fmtInt(parts[0]) : "—", parts ? fmtInt(parts[1]) : "—", parts ? fmtInt(parts[2]) : "—", fmtInt(m.resignations)];
+          }),
+        }}
+        footer={
+          <div className="chart-footer">
+            {summary && (
+              <p data-testid="reasons-summary">
+                Last {summary.monthsInWindow} months ({shortMonthLabel(summary.from)} to {shortMonthLabel(summary.to)}): {fmtInt(summary.moved)} moved,{" "}
+                {fmtInt(summary.notUsing)} not using it, {fmtInt(summary.other)} other.
+                {summary.monthsWithSplit < summary.monthsInWindow &&
+                  ` Counted over ${summary.monthsWithSplit} of ${summary.monthsInWindow} months: the rest have no split.`}{" "}
+                The reasons add up to {fmtInt(summary.moved + summary.notUsing + summary.other)}; the monthly sheets record{" "}
+                {fmtInt(summary.resignations)} resignations in the same months.
+              </p>
+            )}
+            {gaps.length > 0 && (
+              <p data-testid="reasons-gaps">No reason split for {gaps.map(monthLabel).join(", ")}: shown as a gap, not as zero.</p>
+            )}
+            <MonthNotes months={notesMatching(months, /reason|resignation/i)} testId="reasons-notes" />
+          </div>
+        }
+      >
+        <GroupedColumnChart
+          ariaLabel="Reasons members left, by month"
+          stacked
+          thinLabels
+          colors={SERIES.slice(0, 3)}
+          groups={months.map((m) => {
+            const parts = reasonParts(m);
+            return {
+              key: `${m.year}-${m.month}`,
+              xLabel: shortMonthLabel(m),
+              // A month with no split draws nothing (a gap); its tooltip says so instead of showing zeroes.
+              values: parts ?? [0, 0, 0],
+              tooltip: parts
+                ? [
+                    `${fmtInt(parts[0] + parts[1] + parts[2])} left, by reason`,
+                    monthLabel(m),
+                    `${fmtInt(parts[0])} moved, ${fmtInt(parts[1])} not using it, ${fmtInt(parts[2])} other`,
+                    `The monthly sheet shows ${fmtInt(m.resignations)} resignations`,
+                  ]
+                : ["No reason split", monthLabel(m), "Not in the committee workbook"],
+            };
+          })}
+        />
+      </ChartCard>
+    </div>
+  );
+}
+
+/** Membership mix: the five categories each month. The stack's height is the all-categories total, not the dues-paying total. */
+function MembershipMix({ months }: { months: MembershipMonth[] }) {
+  if (!months.some((m) => categoryParts(m) !== null)) {
+    return (
+      <section className="card" aria-labelledby="mix-title" data-testid="mix-section">
+        <h2 className="card-title" id="mix-title">
+          Membership mix
+        </h2>
+        <p data-testid="mix-none">The membership categories have not been loaded yet. See db/membership_monthly.sql.</p>
+      </section>
+    );
+  }
+  const gaps = monthsWithout(months, categoryParts);
+  return (
+    <div data-testid="mix-section">
+      <ChartCard
+        title="Membership mix"
+        subtitle={`Members in each category. The top of each bar is the ${ALL_CATEGORIES} total, a different count from the ${DUES_PAYING} total in "Paying members over time".`}
+        legend={CATEGORY_LABELS.map((label, i) => ({ label, color: SERIES[i] }))}
+        table={{
+          headers: ["Month", ...CATEGORY_LABELS, ALL_CATEGORIES],
+          rows: months.map((m) => {
+            const parts = categoryParts(m);
+            return [monthLabel(m), ...(parts ?? [null, null, null, null, null]).map(cell), cell(m.totalAllCategories)];
+          }),
+        }}
+        footer={
+          <div className="chart-footer">
+            {gaps.length > 0 && (
+              <p data-testid="mix-gaps">No category split for {gaps.map(monthLabel).join(", ")}: shown as a gap, not as zero.</p>
+            )}
+            <MonthNotes months={notesMatching(months, /suburban|categor/i)} testId="mix-notes" />
+          </div>
+        }
+      >
+        <GroupedColumnChart
+          ariaLabel="Members by category, by month"
+          stacked
+          thinLabels
+          colors={SERIES}
+          groups={months.map((m) => {
+            const parts = categoryParts(m);
+            return {
+              key: `${m.year}-${m.month}`,
+              xLabel: shortMonthLabel(m),
+              values: parts ?? [0, 0, 0, 0, 0],
+              tooltip: parts
+                ? [
+                    `${cell(m.totalAllCategories)} in ${ALL_CATEGORIES.toLowerCase()}`,
+                    monthLabel(m),
+                    `Resident ${fmtInt(parts[0])}, Intermediate ${fmtInt(parts[1])}, Non-Resident ${fmtInt(parts[2])}`,
+                    `Suburban ${fmtInt(parts[3])}, Honorary ${fmtInt(parts[4])}`,
+                  ]
+                : ["No category split", monthLabel(m), "Not in the committee workbook"],
+            };
+          })}
+        />
+      </ChartCard>
+    </div>
+  );
+}
+
+/** The waitlist at the end of each month. A month whose sheet shows no figure is a gap; flagged estimates have their notes listed. */
+function Waitlist({ months }: { months: MembershipMonth[] }) {
+  if (!months.some((m) => m.waitlist !== null)) {
+    return (
+      <section className="card" aria-labelledby="waitlist-title" data-testid="waitlist-section">
+        <h2 className="card-title" id="waitlist-title">
+          Waitlist over time
+        </h2>
+        <p data-testid="waitlist-none">No waitlist figures are loaded yet.</p>
+      </section>
+    );
+  }
+  const flagged = notesMatching(months, /waitlist/i);
+  return (
+    <div data-testid="waitlist-section">
+      <ChartCard
+        title="Waitlist over time"
+        subtitle="People on the waitlist each month. Where a value is a placeholder estimate from the committee workbook, its note is listed under the chart."
+        table={{
+          headers: ["Month", "Waitlist"],
+          rows: months.map((m) => [monthLabel(m), cell(m.waitlist)]),
+        }}
+        footer={
+          flagged.length > 0 ? (
+            <div className="chart-footer">
+              <MonthNotes months={flagged} testId="waitlist-notes" />
+            </div>
+          ) : undefined
+        }
+      >
+        <ColumnChart
+          ariaLabel="Waitlist by month"
+          thinLabels
+          columns={months.map((m) => ({
+            key: `${m.year}-${m.month}`,
+            xLabel: shortMonthLabel(m),
+            value: m.waitlist ?? 0,
+            tooltip: [
+              m.waitlist === null ? "No waitlist figure" : `${fmtInt(m.waitlist)} on the waitlist`,
+              monthLabel(m),
+              ...(m.note && /waitlist/i.test(m.note) ? ["See the note under the chart"] : []),
+            ],
+          }))}
+        />
+      </ChartCard>
+    </div>
   );
 }

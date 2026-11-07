@@ -321,20 +321,31 @@ describe("shell ownership load", () => {
 });
 
 describe("membership_monthly rows", () => {
+  const original = {
+    year: 2026,
+    month: 5,
+    previous_total: 501,
+    resignations: 3,
+    applicants_for_approval: 5,
+    transferred: null,
+    with_months_approvals: 502,
+    waitlist: 20,
+    note: "Total transferred cell blank in source.",
+  };
+  const noSplit = {
+    resignationsMoved: null,
+    resignationsNotUsing: null,
+    resignationsOther: null,
+    catResident: null,
+    catIntermediate: null,
+    catNonResident: null,
+    catSuburban: null,
+    catHonorary: null,
+    totalAllCategories: null,
+  };
+
   it("maps a row, keeping blank transferred and waitlist cells as null", () => {
-    expect(
-      toMembershipMonth({
-        year: 2026,
-        month: 5,
-        previous_total: 501,
-        resignations: 3,
-        applicants_for_approval: 5,
-        transferred: null,
-        with_months_approvals: 502,
-        waitlist: 20,
-        note: "Total transferred cell blank in source.",
-      }),
-    ).toEqual({
+    expect(toMembershipMonth({ ...original, ...{ resignations_moved: null } })).toEqual({
       year: 2026,
       month: 5,
       previousTotal: 501,
@@ -343,8 +354,60 @@ describe("membership_monthly rows", () => {
       transferred: null,
       withApprovals: 502,
       waitlist: 20,
+      ...noSplit,
       note: "Total transferred cell blank in source.",
     });
+  });
+
+  it("maps every reason and category column, and keeps the two totals apart", () => {
+    expect(
+      toMembershipMonth({
+        ...original,
+        resignations_moved: 0,
+        resignations_not_using: 3,
+        resignations_other: 0,
+        cat_resident: 440,
+        cat_intermediate: 26,
+        cat_nonresident: 35,
+        cat_suburban: 1,
+        cat_honorary: 10,
+        total_all_categories: 512,
+      }),
+    ).toMatchObject({
+      withApprovals: 502,
+      resignationsMoved: 0,
+      resignationsNotUsing: 3,
+      resignationsOther: 0,
+      catResident: 440,
+      catIntermediate: 26,
+      catNonResident: 35,
+      catSuburban: 1,
+      catHonorary: 10,
+      totalAllCategories: 512,
+    });
+  });
+
+  it("keeps a real zero as 0 and a blank cell as null: a missing split is a gap, not zero", () => {
+    const zero = toMembershipMonth({ ...original, resignations_moved: 0, resignations_not_using: 0, resignations_other: 0 });
+    expect([zero.resignationsMoved, zero.resignationsNotUsing, zero.resignationsOther]).toEqual([0, 0, 0]);
+    const blank = toMembershipMonth({ ...original, resignations_moved: null, resignations_not_using: null, resignations_other: null });
+    expect([blank.resignationsMoved, blank.resignationsNotUsing, blank.resignationsOther]).toEqual([null, null, null]);
+  });
+
+  it("maps a row from a table that has not been extended yet (the new columns are not sent at all) to nulls, never to zero or undefined", () => {
+    expect(toMembershipMonth(original)).toMatchObject(noSplit);
+    expect(Object.values(toMembershipMonth(original)).includes(undefined as never)).toBe(false);
+  });
+
+  it("names every field it passes on, so a column added to the table later never reaches the browser", () => {
+    const mapped = toMembershipMonth({ ...original, member_email: "someone@example.org", id: 9 } as never);
+    expect(Object.keys(mapped).sort()).toEqual(
+      [
+        "year", "month", "previousTotal", "resignations", "applicants", "transferred", "withApprovals", "waitlist",
+        ...Object.keys(noSplit), "note",
+      ].sort(),
+    );
+    expect(JSON.stringify(mapped)).not.toMatch(/someone@example\.org/);
   });
 });
 

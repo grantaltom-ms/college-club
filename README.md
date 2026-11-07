@@ -35,15 +35,23 @@ The prepare step runs on your own computer: shell rower names are swapped for sc
 
 ## Loading the Membership tab
 
-The Membership tab reads its own table, filled from the Membership Committee's "Membership Count" workbooks in the Board Shared File (OneDrive). The table holds counts only — one row per month, Total Dues Paying row — never member names.
+The Membership tab reads its own table, filled from the Membership Committee's "Membership Count" workbooks in the Board Shared File (OneDrive) and the committee's trend workbook. The table holds counts only — one row per month, 28 months from Jul 2024 — never member names.
 
 | Tab | Table | Source | Load it with |
 |---|---|---|---|
-| Membership | `membership_monthly` | Membership Count 2025-26 and 2026-27 workbooks | `db/membership_monthly.csv` |
+| Membership | `membership_monthly` | Membership Count 2024-25, 2025-26 and 2026-27 workbooks (Total Dues Paying row), plus the trend workbook for the reason and category columns | `db/membership_monthly.csv` |
 
-First time: run `db/membership_monthly.sql` in the Supabase SQL editor. To load or refresh: `truncate` the table, then import `db/membership_monthly.csv` with the Supabase Table Editor (an empty transferred or waitlist cell loads as null). Until the table is loaded, the Membership tab shows a plain "could not be loaded" message, the home page shows the same in its Membership card, and the rest of the site is unaffected.
+The table has 18 columns: the original eight figures and a note, then nine added in Nov 2026 — why members left (`resignations_moved`, `resignations_not_using`, `resignations_other`), the members in each category (`cat_resident`, `cat_intermediate`, `cat_nonresident`, `cat_suburban`, `cat_honorary`) and `total_all_categories`. **Two different totals:** `with_months_approvals` is the dues-paying count (about 500 to 508); `total_all_categories` is the five categories added together, which includes the Suburban and Honorary members (510 to 518). The page labels them "Dues-paying" and "All categories (incl. Suburban and Honorary)" and never charts them as one series. There is deliberately no applications or sign-ups column.
 
-The figures are copied exactly as shown in the workbooks, even where a sheet does not add up. The Membership page lists those flags (for example, May and June 2025-26 and Oct 2026-27) instead of correcting them. To fix a figure, fix the workbook and reload the table.
+First time: run `db/membership_monthly.sql` in the Supabase SQL editor. If the table was made before Nov 2026, running the same file adds the nine new columns to it (`add column if not exists`), so it is safe to run again. To load or refresh: `truncate` the table, then import `db/membership_monthly.csv` with the Supabase Table Editor, matching columns by name (an empty cell loads as null). Until the table is loaded, the Membership tab shows a plain "could not be loaded" message, the home page shows the same in its Membership card, and the rest of the site is unaffected. If the table is loaded but the nine new columns are still empty, the "Why members leave" and "Membership mix" sections say they have not been loaded yet and the rest of the page works.
+
+Three things in the data are shown as they are, not smoothed over:
+
+- **Jun 2025 has no reason or category split** (the cells are empty). It is a gap in those charts and a dash in their tables, never a zero and never an invented split.
+- **The reasons can add up to one more or one less than that month's resignations** (six months; Mar 2026 is one over). They are shown as stored, with the month's note.
+- **Some waitlist values are placeholder estimates** (Dec 2024, Jan 2025, Aug 2025 and Feb 2026). The note column says which, and the page lists those notes under the waitlist chart.
+
+The figures are copied exactly as shown in the workbooks, even where a sheet does not add up. The Membership page lists those flags (for example, Aug and Sep 2024, May and Jun 2026 and Oct 2026) instead of correcting them. To fix a figure, fix the workbook and reload the table.
 
 ## Loading the Financials tab
 

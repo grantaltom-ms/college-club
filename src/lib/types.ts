@@ -105,6 +105,25 @@ export interface MembershipMonth {
   withApprovals: number;
   /** Null when the workbook sheet shows no waitlist count. */
   waitlist: number | null;
+  /**
+   * Why the members who left, left, from the Membership Committee's trend workbook. All three are null together for a
+   * month the workbook does not cover: that is a gap, never zero. They can add up to one more or one less than
+   * `resignations`; render them as stored.
+   */
+  resignationsMoved: number | null;
+  resignationsNotUsing: number | null;
+  resignationsOther: number | null;
+  /** Members in each category that month, null together for a month with no split. */
+  catResident: number | null;
+  catIntermediate: number | null;
+  catNonResident: number | null;
+  catSuburban: number | null;
+  catHonorary: number | null;
+  /**
+   * The five categories added together. This is NOT `withApprovals` (the dues-paying total): it includes the Suburban and
+   * Honorary members. The two are never one series.
+   */
+  totalAllCategories: number | null;
   note: string | null;
 }
 

@@ -13,10 +13,12 @@ interface Props {
   legend?: LegendItem[];
   /** Same numbers as the chart, so every value is reachable without hovering. */
   table: { headers: string[]; rows: (string | number)[][] };
+  /** Shown under the chart or the table, whichever is open: a summary line, or notes that belong to this chart. */
+  footer?: ReactNode;
   children: ReactNode;
 }
 
-export function ChartCard({ title, subtitle, legend, table, children }: Props) {
+export function ChartCard({ title, subtitle, legend, table, footer, children }: Props) {
   const [view, setView] = useState<"chart" | "table">("chart");
   const id = useId();
 
@@ -76,6 +78,7 @@ export function ChartCard({ title, subtitle, legend, table, children }: Props) {
           </table>
         </div>
       )}
+      {footer}
     </section>
   );
 }

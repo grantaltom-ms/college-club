@@ -1,17 +1,29 @@
-year,month,previous_total,resignations,applicants_for_approval,transferred,with_months_approvals,waitlist,note
-2025,7,502,4,7,0,505,42,
-2025,8,506,3,3,0,506,,
-2025,9,506,8,8,0,506,47,
-2025,10,506,13,14,0,507,34,
-2025,11,507,8,9,0,508,38,
-2025,12,506,8,5,0,503,39,
-2026,1,503,7,7,0,503,33,
-2026,2,503,6,6,0,503,,
-2026,3,503,6,6,0,503,33,
-2026,4,499,4,6,0,501,29,
-2026,5,501,3,5,,502,20,"Total transferred cell blank in source; category transfers: 2 Resident, 2 Non-Res. Not counted in the total."
-2026,6,502,4,5,0,502,23,
-2026,7,502,2,4,0,504,23,
-2026,8,504,3,4,0,505,37,
-2026,9,505,10,12,0,507,27,
-2026,10,506,10,11,1,506,16,
+year,month,previous_total,resignations,applicants_for_approval,transferred,with_months_approvals,waitlist,resignations_moved,resignations_not_using,resignations_other,cat_resident,cat_intermediate,cat_nonresident,cat_suburban,cat_honorary,total_all_categories,note
+2024,7,497,5,9,0,501,49,3,2,0,417,56,27,1,10,511,
+2024,8,501,5,9,0,507,46,0,2,3,420,58,28,1,10,517,
+2024,9,507,4,5,0,506,50,1,3,0,420,58,27,1,10,516,
+2024,10,506,8,8,0,506,50,0,7,0,421,56,28,1,10,516,Resignation-reason split (Berg workbook) covers 7 of the 8 resignations on the monthly sheet.
+2024,11,506,11,10,0,505,46,2,8,1,423,53,28,1,10,515,
+2024,12,505,8,7,0,504,45,1,6,0,424,51,28,1,10,514,"Waitlist 45 is a placeholder estimate in the Berg workbook; the club's Dec 2024 sheet shows no waitlist figure. Resignation reasons sum to 7 of 8. Suburban count flagged as estimate in source (1, same as every month)."
+2025,1,503,4,4,0,503,44,0,3,0,421,52,29,1,10,513,Waitlist 44 is a placeholder estimate in the Berg workbook; the club's Jan 2025 sheet shows no waitlist figure. Resignation reasons sum to 3 of 4.
+2025,2,501,5,4,0,500,43,0,2,2,420,51,29,1,10,511,"Resignation reasons sum to 4 of 5. Suburban count flagged as estimate in source (1, same as every month)."
+2025,3,500,1,1,0,500,45,0,1,0,423,48,29,1,10,511,"Suburban count flagged as estimate in source (1, same as every month)."
+2025,4,500,6,6,0,500,40,1,1,4,424,47,29,1,10,511,"Suburban count flagged as estimate in source (1, same as every month)."
+2025,5,500,3,3,0,500,46,0,3,0,425,46,28,1,10,510,
+2025,6,500,3,6,0,503,45,,,,,,,,,,Not in the Berg workbook; totals from the club's 2024-25 workbook. No resignation-reason or category split available for this month.
+2025,7,502,4,7,0,505,42,3,1,0,432,43,30,1,10,516,"Suburban count flagged as estimate in source workbook (1, same as every month)."
+2025,8,506,3,3,0,506,45,3,0,0,437,38,30,1,10,516,Waitlist 45 is a placeholder estimate in the Berg workbook; the club's Aug 2025 sheet shows no waitlist figure.
+2025,9,506,8,8,0,506,47,4,0,4,439,35,31,1,10,516,
+2025,10,506,13,14,0,507,34,1,8,4,438,34,34,1,10,517,
+2025,11,507,8,9,0,508,38,2,2,4,438,34,35,1,10,518,
+2025,12,506,8,5,0,503,39,3,2,3,438,34,30,1,10,513,
+2026,1,503,7,7,0,503,33,2,2,3,440,32,30,1,10,513,
+2026,2,503,6,6,0,503,33,2,3,1,439,32,31,1,10,513,Waitlist 33 is a placeholder estimate in the Berg workbook; the club's Feb 2026 sheet shows no waitlist figure.
+2026,3,503,6,6,0,503,33,0,4,3,439,32,31,1,10,513,Resignation-reason split in the Berg workbook sums to 7; the monthly sheet records 6 resignations.
+2026,4,499,4,6,0,501,29,1,0,3,440,28,32,1,10,511,
+2026,5,501,3,5,,502,20,0,3,0,440,26,35,1,10,512,"Total transferred cell blank in source; category transfers: 2 Resident, 2 Non-Res. Not counted in the total."
+2026,6,502,4,5,0,502,23,0,2,1,440,26,35,1,10,512,"Berg workbook figures for this month differ from the monthly sheet (3 resignations, 4 joins, waitlist 21 vs sheet's 4, 5, 23); dashboard keeps the monthly-sheet values. Its reason split sums to 3."
+2026,7,502,2,4,0,504,23,0,1,1,442,25,36,1,10,514,
+2026,8,504,3,4,0,505,37,3,0,0,442,25,37,1,10,515,
+2026,9,505,10,12,0,507,27,1,9,0,440,27,39,1,10,517,
+2026,10,506,10,11,1,506,16,2,3,5,437,29,39,1,10,516,
