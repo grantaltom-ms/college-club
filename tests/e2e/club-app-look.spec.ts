@@ -417,3 +417,100 @@ test.describe("the members' and staff look", () => {
     await expect(page.locator(".club-app")).toHaveCount(0);
   });
 });
+
+/**
+ * Part 4 (Nov 7): hierarchy and clickability. A UX review of the members' and staff screens found two things: every page looked the
+ * same weight (headings, card titles, body and small print all close in size), and nothing that could be pressed looked pressable.
+ * These measure the fix as the browser draws it: the sizes step down, links are underlined Waterloo and darken on hover, a card that
+ * opens a page carries an arrow that is itself part of the link, and the Staff office's tool links are rows with an arrow.
+ */
+test.describe("hierarchy and clickability (part 4)", () => {
+  const size = (page: Page, selector: string) => page.locator(selector).first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+
+  test("on a member's screen the sizes step down: band H1 > section heading > card title > body > small print", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 900 });
+    await actAs(page, "Nora Abernathy");
+    await page.goto("/club/my-bookings");
+    const [h1, h2, h3, body, meta] = await Promise.all([
+      size(page, ".club-band h1"),
+      size(page, "main h2"),
+      size(page, "main .club-card h3"),
+      size(page, ".club-app"),
+      size(page, "main .club-meta"),
+    ]);
+    expect(h1).toBeGreaterThan(h2);
+    expect(h2).toBeGreaterThanOrEqual(h3 + 4);
+    expect(h3).toBeGreaterThanOrEqual(body + 2);
+    expect(meta).toBeLessThan(body);
+    // The section heading carries its short Waterloo rule.
+    const rule = await page.locator("main h2").first().evaluate((el) => {
+      const s = getComputedStyle(el, "::after");
+      return { background: s.backgroundColor, height: s.height, width: s.width };
+    });
+    expect(rule).toEqual({ background: rgb("#536872"), height: "2px", width: "40px" });
+    // And the gap above a second section heading is larger than the gap below it.
+    const margins = await page.locator("main h2").nth(1).evaluate((el) => ({ top: parseFloat(getComputedStyle(el).marginTop), bottom: parseFloat(getComputedStyle(el).marginBottom) }));
+    expect(margins.top).toBeGreaterThan(margins.bottom * 2);
+  });
+
+  test("links in the content are underlined Waterloo, and turn Ink with a thicker line when the mouse is over them", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 900 });
+    await actAs(page, "Test staff");
+    await page.goto("/club/admin");
+    const link = page.locator("main .club-meta a").first();
+    const before = await link.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { color: s.color, line: s.textDecorationLine, lineColor: s.textDecorationColor };
+    });
+    expect(before).toEqual({ color: rgb("#536872"), line: "underline", lineColor: rgb("#536872") });
+    await link.hover();
+    await expect.poll(() => link.evaluate((el) => getComputedStyle(el).color)).toBe(rgb("#33363a"));
+    expect(await link.evaluate((el) => getComputedStyle(el).textDecorationThickness)).toBe("2px");
+  });
+
+  test("a card that opens a page (a household on the staff list) carries an arrow that is part of the link, and lifts when the link is hovered", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 900 });
+    await actAs(page, "Test staff");
+    await page.goto("/club");
+    const card = page.locator('[data-testid="household-row"]').first();
+    const title = card.locator("h3 a");
+    const arrow = await title.evaluate((el) => {
+      const s = getComputedStyle(el, "::after");
+      return { glyph: s.content, border: s.borderTopColor, color: s.color, background: s.backgroundColor, width: s.width, height: s.height };
+    });
+    expect(arrow).toEqual({ glyph: expect.stringMatching(/^"→"/), border: rgb("#536872"), color: rgb("#536872"), background: rgb("#ffffff"), width: "36px", height: "36px" });
+    expect(await card.evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(rgb("#c3cbce"));
+    // The arrow sits in the card's top-right corner, inside the card.
+    const [c, a] = await Promise.all([card.boundingBox(), title.evaluate((el) => { const r = el.getBoundingClientRect(); return { top: r.top, right: r.right }; })]);
+    expect(a.right).toBeLessThanOrEqual(c!.x + c!.width);
+    await title.hover();
+    await expect.poll(() => card.evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(rgb("#536872"));
+    expect(await title.evaluate((el) => getComputedStyle(el, "::after").backgroundColor)).toBe(rgb("#536872"));
+    expect(await title.evaluate((el) => getComputedStyle(el, "::after").color)).toBe(rgb("#ffffff"));
+    // Pressing the arrow's corner of the card opens the household, because the arrow is the link's own.
+    const box = (await card.boundingBox())!;
+    await page.mouse.click(box.x + box.width - 16 - 18, box.y + 16 + 18);
+    await page.waitForURL(/\/club\/household\/[^/?]+$/);
+  });
+
+  test("the Staff office groups what needs attention into cards, and its tool links are rows with an arrow that fill on hover", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 900 });
+    await actAs(page, "Test staff");
+    await page.goto("/club/admin");
+    const blocks = page.locator('[data-testid="attention"] > .club-card');
+    expect(await blocks.count()).toBeGreaterThanOrEqual(4);
+    for (const block of await blocks.all()) await expect(block.locator("h3")).toBeVisible();
+    // Two across on a desktop: the first two blocks share a top edge.
+    const [first, second] = await Promise.all([blocks.nth(0).boundingBox(), blocks.nth(1).boundingBox()]);
+    expect(Math.abs(first!.y - second!.y)).toBeLessThan(2);
+    const tool = page.locator('[data-testid="tools"] .club-tool-links a', { hasText: "Add a household" });
+    expect(await tool.evaluate((el) => getComputedStyle(el, "::after").content)).toMatch(/^"→"/);
+    expect(await tool.evaluate((el) => getComputedStyle(el).color)).toBe(rgb("#536872"));
+    await tool.hover();
+    await expect.poll(() => tool.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(rgb("#e6ebed"));
+    // On a phone the attention blocks stack.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const [p1, p2] = await Promise.all([blocks.nth(0).boundingBox(), blocks.nth(1).boundingBox()]);
+    expect(p2!.y).toBeGreaterThan(p1!.y + p1!.height - 1);
+  });
+});

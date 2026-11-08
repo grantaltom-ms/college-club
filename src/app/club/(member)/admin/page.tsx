@@ -91,97 +91,103 @@ export default async function StaffOffice({ searchParams }: { searchParams: Prom
         <Link href="/club/admin/reservations">Reservation attendance</Link> only if you need to correct a record.
       </p>
 
-      <h3>Damage reports</h3>
-      {summary.damage.open === 0 ? (
-        <p data-testid="damage-board">
-          Nothing is waiting to be fixed. <Link href="/club/admin/damage">Damage reports</Link>
-        </p>
-      ) : (
-        <>
-          <p data-testid="damage-board">
-            {summary.damage.open} waiting to be fixed{summary.damage.major > 0 ? `, ${summary.damage.major} marked major` : ""}
-            {summary.damage.majorInService > 0 ? `, ${summary.damage.majorInService} of those on a boat still in service` : ""}.{" "}
-            <Link href="/club/admin/damage">Damage reports</Link>
-          </p>
-          <ul className="club-list" data-testid="damage-top">
-            {summary.damage.top.map((r) => (
-              <li key={r.reportId}>
-                <Link href={`/club/admin/damage/${r.reportId}`}>{r.itemName}</Link>
-                {r.major ? " (major)" : ""}: {r.description} &middot; priority {r.priority}
-                {r.outOfService ? " · out of service" : ""}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      <h3>Incident reports</h3>
-      {summary.incidents.open === 0 ? (
-        <p data-testid="incident-board">
-          No incident reports are open. <Link href="/club/admin/incidents">Incident reports</Link>
-        </p>
-      ) : (
-        <>
-          <p data-testid="incident-board">
-            {summary.incidents.open} open{summary.incidents.hurt > 0 ? `, ${summary.incidents.hurt} with someone hurt` : ""}
-            {summary.incidents.emergency > 0 ? `, ${summary.incidents.emergency} where emergency services were called` : ""}.{" "}
-            <Link href="/club/admin/incidents">Incident reports</Link>
-          </p>
-          <ul className="club-list" data-testid="incident-top">
-            {summary.incidents.top.map((r) => (
-              <li key={r.incidentId}>
-                <Link href={`/club/admin/incidents/${r.incidentId}`}>{shorten(r.whatHappened, 90)}</Link>
-                {r.hurtCount > 0 ? ` · ${r.hurtCount === 1 ? "1 person hurt" : `${r.hurtCount} people hurt`}` : ""}
-                {r.emergencyCalled ? " · emergency services called" : ""} &middot; filed by {r.reporter}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      <h3>Out of service</h3>
-      {summary.outOfService.length === 0 ? (
-        <p data-testid="out-of-service-empty">Everything is in service.</p>
-      ) : (
-        <ul className="club-list" data-testid="out-of-service">
-          {summary.outOfService.map((o) => (
-            <li key={o.itemId}>
-              <strong>{o.name}</strong>: {o.reason}
-              {o.expectedReturn ? ` · expected back ${formatDay(o.expectedReturn)}` : ""} · <Link href="/club/equipment">Equipment</Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {summary.lockedBoats.length > 0 && (
-        <>
-          <h3>Private boats with no owner</h3>
-          <ul className="club-list" data-testid="locked-boats">
-            {summary.lockedBoats.map((b) => (
-              <li key={b.itemId}>
-                <strong>{b.name}</strong>: nobody can book it until an owner is added
-                {b.upcoming > 0 ? ` · ${b.upcoming} upcoming booking${b.upcoming === 1 ? "" : "s"} stay` : ""} ·{" "}
-                <Link href="/club/admin/boats">Private boats</Link>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      <h3>Full, with people waiting (next 7 days)</h3>
-      {summary.waiting.length === 0 ? (
-        <p data-testid="waiting-empty">Nobody is waiting for anything.</p>
-      ) : (
-        <ul className="club-list" data-testid="waiting">
-          {summary.waiting.map((w) => (
-            <li key={`${w.kind}-${w.id}`}>
-              <Link href={w.kind === "class" ? `/club/classes/${w.id}` : `/club/events/${w.id}`}>{w.title}</Link>,{" "}
-              {formatDayLong(pacificDate(new Date(w.startsAt)))}, {formatClock(w.startsAt)} &middot; {w.fullness} &middot; {w.waiting}{" "}
-              waiting
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="club-attention" data-testid="attention">
+        <section className="club-card" data-testid="attention-damage">
+          <h3>Damage reports</h3>
+          {summary.damage.open === 0 ? (
+            <p data-testid="damage-board">
+              Nothing is waiting to be fixed. <Link href="/club/admin/damage">Damage reports</Link>
+            </p>
+          ) : (
+            <>
+              <p data-testid="damage-board">
+                {summary.damage.open} waiting to be fixed{summary.damage.major > 0 ? `, ${summary.damage.major} marked major` : ""}
+                {summary.damage.majorInService > 0 ? `, ${summary.damage.majorInService} of those on a boat still in service` : ""}.{" "}
+                <Link href="/club/admin/damage">Damage reports</Link>
+              </p>
+              <ul className="club-list" data-testid="damage-top">
+                {summary.damage.top.map((r) => (
+                  <li key={r.reportId}>
+                    <Link href={`/club/admin/damage/${r.reportId}`}>{r.itemName}</Link>
+                    {r.major ? " (major)" : ""}: {r.description} &middot; priority {r.priority}
+                    {r.outOfService ? " · out of service" : ""}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+        <section className="club-card" data-testid="attention-incidents">
+          <h3>Incident reports</h3>
+          {summary.incidents.open === 0 ? (
+            <p data-testid="incident-board">
+              No incident reports are open. <Link href="/club/admin/incidents">Incident reports</Link>
+            </p>
+          ) : (
+            <>
+              <p data-testid="incident-board">
+                {summary.incidents.open} open{summary.incidents.hurt > 0 ? `, ${summary.incidents.hurt} with someone hurt` : ""}
+                {summary.incidents.emergency > 0 ? `, ${summary.incidents.emergency} where emergency services were called` : ""}.{" "}
+                <Link href="/club/admin/incidents">Incident reports</Link>
+              </p>
+              <ul className="club-list" data-testid="incident-top">
+                {summary.incidents.top.map((r) => (
+                  <li key={r.incidentId}>
+                    <Link href={`/club/admin/incidents/${r.incidentId}`}>{shorten(r.whatHappened, 90)}</Link>
+                    {r.hurtCount > 0 ? ` · ${r.hurtCount === 1 ? "1 person hurt" : `${r.hurtCount} people hurt`}` : ""}
+                    {r.emergencyCalled ? " · emergency services called" : ""} &middot; filed by {r.reporter}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+        <section className="club-card" data-testid="attention-out-of-service">
+          <h3>Out of service</h3>
+          {summary.outOfService.length === 0 ? (
+            <p data-testid="out-of-service-empty">Everything is in service.</p>
+          ) : (
+            <ul className="club-list" data-testid="out-of-service">
+              {summary.outOfService.map((o) => (
+                <li key={o.itemId}>
+                  <strong>{o.name}</strong>: {o.reason}
+                  {o.expectedReturn ? ` · expected back ${formatDay(o.expectedReturn)}` : ""} · <Link href="/club/equipment">Equipment</Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        {summary.lockedBoats.length > 0 && (
+          <section className="club-card" data-testid="attention-locked">
+            <h3>Private boats with no owner</h3>
+            <ul className="club-list" data-testid="locked-boats">
+              {summary.lockedBoats.map((b) => (
+                <li key={b.itemId}>
+                  <strong>{b.name}</strong>: nobody can book it until an owner is added
+                  {b.upcoming > 0 ? ` · ${b.upcoming} upcoming booking${b.upcoming === 1 ? "" : "s"} stay` : ""} ·{" "}
+                  <Link href="/club/admin/boats">Private boats</Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <section className="club-card" data-testid="attention-waiting">
+          <h3>Full, with people waiting (next 7 days)</h3>
+          {summary.waiting.length === 0 ? (
+            <p data-testid="waiting-empty">Nobody is waiting for anything.</p>
+          ) : (
+            <ul className="club-list" data-testid="waiting">
+              {summary.waiting.map((w) => (
+                <li key={`${w.kind}-${w.id}`}>
+                  <Link href={w.kind === "class" ? `/club/classes/${w.id}` : `/club/events/${w.id}`}>{w.title}</Link>,{" "}
+                  {formatDayLong(pacificDate(new Date(w.startsAt)))}, {formatClock(w.startsAt)} &middot; {w.fullness} &middot; {w.waiting}{" "}
+                  waiting
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
 
       <h2>Tools</h2>
       <div className="club-tool-board" data-testid="tools">

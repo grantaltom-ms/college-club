@@ -184,3 +184,66 @@ describe("the contrast the package relies on (WCAG)", () => {
     expect(contrast("#e2ddd0", "#536872")).toBeLessThan(4.5);
   });
 });
+
+/**
+ * Part 4 (Nov 7): hierarchy and clickability. A UX review found every screen the same weight and nothing that looked pressable.
+ * These hold the type ladder and the link cues in the stylesheet; tests/e2e/club-app-look.spec.ts measures them in a browser.
+ */
+describe("the type ladder and the link cues (part 4)", () => {
+  const rule = (selector: string) => {
+    const m = new RegExp(`(?:^|\\})\\s*${selector.replace(/[.[\]()*+?^$|\\]/g, "\\$&")}\\s*\\{([^{}]*)\\}`, "m").exec(css);
+    if (!m) throw new Error(`no rule for ${selector}`);
+    return m[1];
+  };
+  const px = (declarations: string, prop: string) => {
+    const m = new RegExp(`${prop}:\\s*([\\d.]+)px`).exec(declarations);
+    if (!m) throw new Error(`no ${prop} in px`);
+    return parseFloat(m[1]);
+  };
+
+  it("steps the sizes: band H1 36 > section H2 > card title H3 > body 17 > small print", () => {
+    const h1 = px(rule(".club-app .club-band h1"), "font-size");
+    const h2 = px(rule(".club-app main h2"), "font-size");
+    const h3 = px(rule(".club-app main h3"), "font-size");
+    const body = px(rule(".club-app"), "font-size");
+    const meta = px(rule(".club-app .club-meta"), "font-size");
+    expect(h1).toBeGreaterThan(h2);
+    expect(h2).toBeGreaterThanOrEqual(h3 + 4);
+    expect(h3).toBeGreaterThanOrEqual(body + 2);
+    expect(body).toBe(17);
+    expect(meta).toBeLessThan(body);
+    expect(meta).toBeGreaterThanOrEqual(15); // small print, but still readable on a phone
+  });
+
+  it("gives a section heading a short Waterloo rule and more room above it than below it", () => {
+    expect(rule(".club-app main h2::after")).toMatch(/background:\s*var\(--app-waterloo\)/);
+    const margin = /margin:\s*(\d+)px 0 (\d+)px/.exec(rule(".club-app main h2"));
+    expect(margin).not.toBeNull();
+    expect(parseInt(margin![1], 10)).toBeGreaterThan(parseInt(margin![2], 10) * 2);
+  });
+
+  it("underlines every link in the content in Waterloo, and thickens it to Ink on hover", () => {
+    const link = rule(".club-app main a:not([class]),\n.club-app main .club-card h3 a");
+    expect(link).toMatch(/color:\s*var\(--app-waterloo\)/);
+    expect(link).toMatch(/text-decoration:\s*underline/);
+    const hover = rule(".club-app main a:not([class]):hover,\n.club-app main .club-card h3 a:hover");
+    expect(hover).toMatch(/color:\s*var\(--app-ink\)/);
+    expect(hover).toMatch(/text-decoration-thickness:\s*2px/);
+  });
+
+  it("marks a card that opens a page with an arrow that is part of the link, and lifts the card when the link is hovered", () => {
+    const arrow = rule(".club-app .club-card > h3 > a::after");
+    expect(arrow).toMatch(/content:\s*"\\2192" \/ ""/);
+    expect(arrow).toMatch(/border:\s*1px solid var\(--app-waterloo\)/);
+    expect(arrow).not.toMatch(/pointer-events:\s*none/);
+    const hovered = rule(".club-app .club-card:has(> h3 > a:hover),\n.club-app .club-card:has(> h3 > a:focus-visible)");
+    expect(hovered).toMatch(/border-color:\s*var\(--app-waterloo\)/);
+    expect(hovered).toMatch(/transform:\s*translateY\(-2px\)/);
+  });
+
+  it("draws the Staff office's tool links and Today counts as rows with an arrow and a hover fill", () => {
+    expect(rule(".club-app main .club-tool-links a::after")).toMatch(/content:\s*"\\2192" \/ ""/);
+    expect(rule(".club-app main .club-tool-links a:hover,\n.club-app main .club-tool-links a:focus-visible")).toMatch(/background:\s*var\(--app-selected\)/);
+    expect(rule(".club-app main .club-today a::after")).toMatch(/content:\s*"\\2192" \/ ""/);
+  });
+});

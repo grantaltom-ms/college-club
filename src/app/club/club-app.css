@@ -1209,3 +1209,262 @@
 .club-app .club-start-pick-compact .club-button {
   padding: 0 16px;
 }
+
+/* ---------- Part 4 (Nov 7): hierarchy and clickability ----------
+ *
+ * Two notes from a UX review of the members' and staff screens: (1) every page looked the same weight, with section headings,
+ * card titles, body text and small print all close in size, so the eye had nowhere to land; (2) what could be pressed did not
+ * look pressable, because a link in this palette (Waterloo on white) is only a shade away from the body text (Cyberspace).
+ *
+ * The fix stays inside the package's palette, so the cues are shape, size and spacing, not new colours:
+ *  - A type ladder with real steps: band H1 36 > section H2 26 > card title H3 20 > body 17 > small print 15. A section heading
+ *    carries a short Waterloo rule and stands well clear of the section above it, so a page reads as groups.
+ *  - Every link in the content is underlined (Waterloo line, 1px, set below the text), and the underline turns to Ink and thickens
+ *    on hover, so a link never has to be told apart from body text by its colour alone.
+ *  - A card whose title is a link ("this opens a page") gets an arrow in a Waterloo-outlined square at its right, lifts on hover and
+ *    turns its edge Waterloo; the arrow fills Waterloo with a white glyph. The Staff office's tool links and Today counts get the
+ *    same arrow and the same row hover, so a list of places to go looks like one.
+ *  - Notes (placeholder, success) and small print step down, so they stop competing with the content.
+ */
+
+/* --- The type ladder --- */
+
+.club-app main h2 {
+  font-size: 26px;
+  line-height: 1.2;
+  margin: 48px 0 16px;
+}
+
+.club-app main h2::after {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 2px;
+  margin-top: 10px;
+  background: var(--app-waterloo);
+}
+
+/* The first section heading under a band or an intro needs less room above it than the second one does. */
+.club-app main h2:first-child,
+.club-app main .club-band + h2,
+.club-app main .club-band-facts + h2,
+.club-app main .club-lead + h2,
+.club-app main .club-meta + h2,
+.club-app main .club-placeholder + h2 {
+  margin-top: 28px;
+}
+
+.club-app main h2 .club-count {
+  font-family: var(--body);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--app-slate);
+}
+
+.club-app main h3 {
+  font-size: 20px;
+  line-height: 1.25;
+  margin: 0 0 6px;
+}
+
+.club-app .club-card > h3:first-child {
+  margin-top: 0;
+}
+
+.club-app .club-meta {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.club-app .club-card .club-meta {
+  margin-top: 4px;
+}
+
+.club-app .club-lead {
+  font-size: 19px;
+  margin-bottom: 20px;
+}
+
+.club-app .club-cards {
+  gap: 10px;
+}
+
+.club-app .club-card {
+  padding: 18px 22px;
+}
+
+/* A section's one-line intro (the meta line under its heading) keeps a little room before the content. */
+.club-app main h2 + .club-meta {
+  margin-bottom: 14px;
+}
+
+/* Small print steps down so the content stands out. */
+.club-app .club-placeholder,
+.club-app .club-success {
+  font-size: 15px;
+  line-height: 1.45;
+  padding: 10px 14px;
+}
+
+.club-app .club-alert {
+  padding: 12px 14px;
+}
+
+/* --- Links look like links --- */
+
+.club-app main a:not([class]),
+.club-app main .club-card h3 a {
+  color: var(--app-waterloo);
+  text-decoration: underline;
+  text-decoration-color: var(--app-waterloo);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  transition: color 220ms var(--ease), text-decoration-color 220ms var(--ease);
+}
+
+.club-app main a:not([class]):hover,
+.club-app main .club-card h3 a:hover {
+  color: var(--app-ink);
+  text-decoration-color: var(--app-ink);
+  text-decoration-thickness: 2px;
+}
+
+/* --- A card that opens a page --- */
+
+.club-app .club-card:has(> h3 > a) {
+  position: relative;
+  padding-right: 72px;
+  transition: border-color 220ms var(--ease), box-shadow 220ms var(--ease), transform 220ms var(--ease);
+}
+
+/* The arrow belongs to the link itself (its pseudo-element, placed against the card's corner), so pressing the arrow opens the page. */
+.club-app .club-card > h3 > a::after {
+  content: "\2192" / ""; /* a right arrow; the empty alternative text keeps it out of the link's spoken name */
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--app-waterloo);
+  border-radius: 2px;
+  background: #ffffff;
+  color: var(--app-waterloo);
+  font-family: var(--body);
+  font-size: 20px;
+  line-height: 34px;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 220ms var(--ease), color 220ms var(--ease);
+}
+
+.club-app .club-card:has(> h3 > a:hover),
+.club-app .club-card:has(> h3 > a:focus-visible) {
+  border-color: var(--app-waterloo);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.club-app .club-card > h3 > a:hover::after,
+.club-app .club-card > h3 > a:focus-visible::after {
+  background: var(--app-waterloo);
+  color: #ffffff;
+}
+
+/* --- The Staff office: places to go look like rows you can press --- */
+
+.club-app main .club-tool-links a {
+  position: relative;
+  padding: 0 40px 0 12px;
+  margin: 0 -12px;
+  color: var(--app-waterloo);
+  text-decoration: none;
+  border-radius: 2px;
+  transition: background-color 220ms var(--ease), color 220ms var(--ease);
+}
+
+.club-app main .club-tool-links a::after {
+  content: "\2192" / "";
+  position: absolute;
+  right: 12px;
+  color: var(--app-waterloo);
+  font-size: 18px;
+  transition: transform 220ms var(--ease);
+}
+
+.club-app main .club-tool-links a:hover,
+.club-app main .club-tool-links a:focus-visible {
+  background: var(--app-selected);
+  color: var(--app-ink);
+  text-decoration: none;
+}
+
+.club-app main .club-tool-links a:hover::after {
+  transform: translateX(3px);
+}
+
+.club-app .club-tool-links li + li {
+  border-top-color: var(--app-line);
+}
+
+.club-app main .club-today a {
+  position: relative;
+  padding-right: 56px;
+  color: var(--app-waterloo);
+  text-decoration: none;
+  transition: border-color 220ms var(--ease), box-shadow 220ms var(--ease), transform 220ms var(--ease);
+}
+
+.club-app main .club-today a::after {
+  content: "\2192" / "";
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  color: var(--app-waterloo);
+  font-size: 20px;
+}
+
+.club-app main .club-today a:hover {
+  border-color: var(--app-waterloo);
+  color: var(--app-ink);
+  text-decoration: none;
+}
+
+.club-app .club-today-count {
+  font-family: var(--display);
+  font-size: 2.25rem;
+  color: var(--app-ink);
+}
+
+/* The "Needs attention" blocks on the Staff office sit in cards of their own, two across on a desktop. */
+.club-app .club-attention {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+@media (min-width: 900px) {
+  .club-app .club-attention {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.club-app .club-attention > .club-card > h3 {
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--app-line);
+}
+
+.club-app .club-attention .club-list li {
+  padding: 6px 0;
+}
+
+.club-app .club-attention .club-list li + li {
+  border-top: 1px solid var(--app-line);
+}
+
+/* Lists in general: a little air between items so each line is its own thing. */
+.club-app .club-list li {
+  padding: 4px 0;
+}
