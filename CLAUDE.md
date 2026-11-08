@@ -1589,3 +1589,10 @@ Numbers 2, 5 and 8 keep the numbering from the lost Oct 20 file.
 - **The old Oct 27 builds are not deleted yet, checked on Vercel (Nov 7, 00:56 UTC, read-only):** all ten deployment IDs in the Nov 4 entry still come back READY. They are still locked: each one's `/api/financials` answers 302 to Vercel's sign-in with no login (status only, no figures read), and the live site's answers 401. Either the delete did not go through or a different set was deleted; deleting is still Grant's, in Vercel's dashboard.
 - **Next:** Grant merges PR 79 when CI is green, runs the extension SQL, and sends the iCrew report for future bookings (BJ).
 - **Blocked / needs Grant:** PR 79 to merge (his ask, not implied by the review tick); running `membership_monthly_extension.sql` in Supabase; deleting the ten old builds; the iCrew future-reservations report (BJ); everything already listed as blocked above.
+
+### Nov 7, 2026 (late night): start times become dropdowns
+- **Grant's words:** with a phone screenshot of the gym's time boxes: replace displays of time like this, everywhere in the app, with dropdown menu selections.
+- **Built:** see "Start times are a dropdown, not a wall of boxes". Branch `book/start-time-dropdown`, its own pull request after PR 80.
+- **Found on the way:** Playwright never counts an `<option>` as visible, so twelve specs' "the slot is visible" checks became "the time is listed" (`toHaveCount(1)`); the booked word for staff had drifted to "Taken" in the new component and was put back to "Booked" so the staff test's label still matched; the coaches-only placeholder read "Coaches only", the same words as the tag beside the boat's name, and one test matching that text exactly found two; it now reads "Only coaches can book".
+- **Checks at the end:** lint 0 errors (the old warning), type check clean, unit tests pass, build passes, the twelve Reservations specs 112 of 112, and the full chromium suite (recorded in the pull request).
+- **Blocked / needs Grant:** PR 80 and this pull request to merge; everything already listed as blocked above.

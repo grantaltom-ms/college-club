@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { pickSlot, slotHref } from "./helpers";
 
 /**
  * The unit list: staff upload the sheet of the club's boats, kayaks, paddle boards and work rooms, check it, and add it. Every
@@ -30,7 +31,6 @@ const openUpload = async (page: Page) => {
   await expect(page.getByRole("heading", { level: 1, name: "Load the equipment list" })).toBeVisible();
 };
 const equipmentRow = (page: Page, name: string) => page.locator(`[data-testid="equipment-row"][data-item="${name}"]`);
-const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
 
 test.describe("who can load equipment", () => {
   test("only staff: a member finds neither the page nor the template, and the staff office links to it", async ({ page }) => {
@@ -127,12 +127,12 @@ test.describe("checking and adding", () => {
     await actAs(page, "Ines Castellanos");
     const day = "/club/book?day=2026-11-03&what=shell&kind=single&hour=7";
     await page.goto(day);
-    const singleHref = (await slot(page, single, "7:00 to 7:30 am", "free").getAttribute("href"))!;
+    const singleHref = await slotHref(page, single, "7:00 to 7:30 am", "free");
     await page.goto(singleHref);
     await expect(page.getByTestId("refusal-reasons").getByRole("listitem")).toHaveText([`You need Sculling level 1 (placeholder) to use ${single}.`]);
     await expect(page.getByRole("button", { name: `Book ${single}` })).toHaveCount(0);
     await page.goto(day);
-    await slot(page, anyone, "7:00 to 7:30 am", "free").click();
+    await pickSlot(page, anyone, "7:00 to 7:30 am", "free");
     await expect(page.getByTestId("check-ok")).toBeVisible();
     await page.getByRole("button", { name: `Book ${anyone}`, exact: true }).click();
     await expect(page.getByTestId("booked-note")).toBeVisible();

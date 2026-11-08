@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { pickSlot } from "./helpers";
 
 /**
  * The emails the club sends when something changes (Nov 5, 2026), in the browser: a spot opened for you, an event cancelled or
@@ -70,7 +71,7 @@ async function uploadBoat(page: Page, name: string) {
 /** The member books the 30-minute slot at the given hour from the dense list and ends on My bookings. */
 async function bookBoat(page: Page, boat: string, day: string, hour: number, range: string) {
   await page.goto(`/club/book?day=${day}&what=shell&kind=single&hour=${hour}`);
-  await page.locator(`[aria-label="${boat}, ${range}, free"]`).click();
+  await pickSlot(page, boat, range);
   await expect(page.getByRole("heading", { level: 1, name: `Book ${boat}` })).toBeVisible();
   await expect(page.getByTestId("check-ok")).toBeVisible();
   await page.getByRole("button", { name: `Book ${boat}`, exact: true }).click();

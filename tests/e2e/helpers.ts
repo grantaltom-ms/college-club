@@ -48,3 +48,32 @@ export async function unlockFinancials(page: Page) {
   await page.getByRole("button", { name: "Unlock" }).click();
   await page.waitForURL("**/financials");
 }
+
+/* ---------- The Reservations screen's start-time dropdowns (Nov 7) ---------- */
+
+/**
+ * One start time in an item's dropdown, found by the words a screen reader gives it: "Heron, 9:00 to 9:30 am, free",
+ * "Dock slip A, 8:00 to 8:30 am, 4 of 4 places left", "Boathouse gym, 7:00 to 7:30 pm, Core class". It is an <option>, so a
+ * free one is enabled and anything else is disabled; its text carries what holds it ("7:00 am · Sasha Bellweather" for staff).
+ */
+export const slot = (page: Page, item: string, range: string, words: string) => page.locator(`option[aria-label="${item}, ${range}, ${words}"]`);
+
+/** The dropdown form for one item on the Reservations screen. */
+export const startPick = (page: Page, item: string) => page.locator(`[data-testid="start-pick"][data-item="${item}"]`);
+
+/** Choose that start time in the item's dropdown and press Book, as a member would. Ends on the booking form. */
+export async function pickSlot(page: Page, item: string, range: string, words = "free") {
+  const value = await slot(page, item, range, words).getAttribute("value");
+  if (!value) throw new Error(`no start time "${item}, ${range}, ${words}" to choose`);
+  const form = startPick(page, item);
+  await form.locator("select").selectOption(value);
+  await form.getByRole("button", { name: `Book ${item} at the chosen time` }).click();
+}
+
+/** The booking form's own address for that start time: exactly where pressing Book would go. */
+export async function slotHref(page: Page, item: string, range: string, words = "free"): Promise<string> {
+  const value = await slot(page, item, range, words).getAttribute("value");
+  const itemId = await startPick(page, item).locator('input[name="item"]').getAttribute("value");
+  if (!value || !itemId) throw new Error(`no start time "${item}, ${range}, ${words}" to open`);
+  return `/club/book/new?${new URLSearchParams({ item: itemId, start: value }).toString()}`;
+}

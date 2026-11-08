@@ -8,8 +8,8 @@ import { getCurrentActor } from "@/club/identity";
 import { clubNow } from "@/club/clock";
 import { RULE_BOOK, classOf } from "@/club/settings/rulebook";
 import { readClubOnce } from "@/club/store/read-once";
-import { formatClock, formatDayLong, formatRange, pacificDate, pacificMinutes } from "@/club/time";
-import { bookingFormHref, pickDay, typeParam } from "@/club/web";
+import { formatDayLong, pacificDate, pacificMinutes } from "@/club/time";
+import { pickDay, typeParam } from "@/club/web";
 import {
   browseById,
   browseFromType,
@@ -25,17 +25,8 @@ import { PlaceholderNote } from "../PlaceholderNote";
 import { SignedOut } from "../SignedOut";
 import { DaySelect } from "./DaySelect";
 import { HourSelect } from "./HourSelect";
+import { StartTimePicker } from "./StartTimePicker";
 
-const SLOT_WORDS: Record<SlotView["state"], string> = {
-  free: "Free",
-  booked: "Booked",
-  yours: "Yours",
-  class: "Class",
-  practice: "Practice",
-  out_of_service: "Out of service",
-  past: "Past",
-  not_open: "Not open yet",
-};
 
 /** Members never see a boat that is entirely out of commission for the day; staff still can. */
 function showItemToViewer(row: ItemDayView, staff: boolean): boolean {
@@ -153,58 +144,16 @@ function ShellDenseList({
                 </div>
               )}
 
-              <div className="club-shell-row-times">
-                {free.map((slot) => {
-                  const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, free`;
-                  if (!bookable) {
-                    return (
-                      <span key={slot.startsAt} className="club-shell-chip club-shell-chip-muted" aria-label={label}>
-                        {formatClock(slot.startsAt)}
-                      </span>
-                    );
-                  }
-                  return (
-                    <Link
-                      key={slot.startsAt}
-                      className="club-shell-chip club-shell-chip-free"
-                      href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })}
-                      aria-label={label}
-                    >
-                      {formatClock(slot.startsAt)}
-                    </Link>
-                  );
-                })}
-                {yours.map((slot) => (
-                  <span
-                    key={slot.startsAt}
-                    className="club-shell-chip club-shell-chip-yours"
-                    aria-label={`${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, yours`}
-                    data-state="yours"
-                  >
-                    {formatClock(slot.startsAt)}
-                    <small>Yours</small>
-                  </span>
-                ))}
-                {staff &&
-                  free.length === 0 &&
-                  yours.length === 0 &&
-                  taken.map((slot) => {
-                    const short =
-                      slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" ? "Booked" : SLOT_WORDS[slot.state]);
-                    return (
-                      <span
-                        key={slot.startsAt}
-                        className="club-shell-chip club-shell-chip-taken"
-                        aria-label={`${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${SLOT_WORDS[slot.state].toLowerCase()}`}
-                        data-state={slot.state}
-                        title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}
-                      >
-                        {formatClock(slot.startsAt)}
-                        <small>{short}</small>
-                      </span>
-                    );
-                  })}
-              </div>
+              <StartTimePicker
+                itemId={item.item.id}
+                itemName={item.item.name}
+                slots={[...free, ...yours, ...(staff && free.length === 0 && yours.length === 0 ? taken : [])].sort((x, y) => x.startsAt.localeCompare(y.startsAt))}
+                places={item.places}
+                bookable={bookable}
+                coachBlocked={item.coachBlocked}
+                unavailableWords={item.coachBlocked ? "Only coaches can book" : item.locked ? "Locked: no owner" : yours.length > 0 ? "Yours this hour" : "Nothing free this hour"}
+                compact
+              />
 
               <p className="club-shell-row-foot">
                 <Link href={`/club/damage?item=${item.item.id}`} data-testid="report-damage-link" aria-label={`Report damage on ${item.item.name}`}>
@@ -303,8 +252,8 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
       ? "Which size of shell?"
       : "What would you like to reserve?"
     : denseShells
-      ? "Pick a day and hour, then tap a free shell."
-      : "Pick a day and hour, then tap a free time.";
+      ? "Pick a day and hour, then choose a start time on a free shell."
+      : "Pick a day and hour, then choose a start time.";
 
   return (
     <section className="club-book">
@@ -418,21 +367,6 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
           {!denseShells && (
             <>
-              <ul className="club-legend club-book-legend" aria-label="Legend">
-                <li>
-                  <span className="slot slot-free" aria-hidden="true" /> Free
-                </li>
-                <li>
-                  <span className="slot slot-yours" aria-hidden="true" /> Yours
-                </li>
-                <li>
-                  <span className="slot slot-booked" aria-hidden="true" /> Taken
-                </li>
-                <li>
-                  <span className="slot slot-practice" aria-hidden="true" /> Practice
-                </li>
-              </ul>
-
               {items.length === 0 && <p className="club-empty-inline">Nothing of that type is free to show yet.</p>}
               <div className="club-book-list">
                 {items.map((item) => {
@@ -481,44 +415,15 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                           Coaches only: this boat can only be booked by coaches and club staff. Ask a coach or club staff to book it.
                         </p>
                       )}
-                      <ol className="slots club-slots-compact">
-                        {openSlots.map((slot) => {
-                          const counted = slot.placesLeft !== null && !slot.heldFor && (slot.state === "free" || slot.state === "booked" || slot.state === "yours");
-                          // A free slot on a coaches-only boat is not offered to a member who is not a coach: it says so instead.
-                          const coachesOnlySlot = slot.state === "free" && item.coachBlocked;
-                          const words = slot.heldFor
-                            ? `${slot.heldFor} class`
-                            : coachesOnlySlot
-                              ? "coaches only"
-                              : counted && slot.state !== "yours"
-                                ? `${slot.placesLeft} of ${item.places} places left`
-                                : SLOT_WORDS[slot.state].toLowerCase();
-                          const label = `${item.item.name}, ${formatRange(slot.startsAt, slot.endsAt)}, ${words}`;
-                          const taken = slot.state === "booked" || slot.state === "class" || slot.state === "practice" || slot.state === "out_of_service" || slot.state === "not_open";
-                          const shortTaken =
-                            slot.bookedBy ?? slot.heldFor ?? (slot.state === "booked" && slot.placesLeft !== null ? "Full" : SLOT_WORDS[slot.state]);
-                          return (
-                            <li key={slot.startsAt}>
-                              {slot.state === "free" && !item.locked && !item.coachBlocked ? (
-                                <Link className="slot slot-free" href={bookingFormHref({ itemId: item.item.id, start: slot.startsAt })} aria-label={label}>
-                                  {formatClock(slot.startsAt)}
-                                  {slot.placesLeft !== null && <small>{slot.placesLeft} left</small>}
-                                </Link>
-                              ) : (
-                                <span
-                                  className={`slot slot-${coachesOnlySlot ? "coaches" : slot.state}${taken ? " slot-taken" : ""}`}
-                                  aria-label={label}
-                                  data-state={coachesOnlySlot ? "coaches_only" : slot.state}
-                                  title={slot.holders.length > 0 ? slot.holders.join(", ") : undefined}
-                                >
-                                  {formatClock(slot.startsAt)}
-                                  <small>{coachesOnlySlot ? "Coaches only" : shortTaken}</small>
-                                </span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ol>
+                      <StartTimePicker
+                        itemId={item.item.id}
+                        itemName={item.item.name}
+                        slots={openSlots}
+                        places={item.places}
+                        bookable={!item.locked && !item.coachBlocked}
+                        coachBlocked={item.coachBlocked}
+                        unavailableWords={item.coachBlocked ? "Only coaches can book" : item.locked ? "Locked: no owner" : "Nothing free"}
+                      />
                       <p className="club-book-item-foot">
                         <Link href={`/club/damage?item=${item.item.id}`} data-testid="report-damage-link" aria-label={`Report damage on ${item.item.name}`}>
                           Report damage
