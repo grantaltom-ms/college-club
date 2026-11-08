@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { slot, pickSlot, slotHref, startPick } from "./helpers";
 
 /**
  * The test server's clock stands still at 1 pm Pacific on Wednesday Oct 28, 2026 (see playwright.config.ts).
@@ -50,8 +51,6 @@ const openDay = (page: Page, day: string, type?: string, kind?: ShellKind, hour?
 const openShellHour = (page: Page, day: string, range: string, kind?: ShellKind) =>
   openDay(page, day, "Shell", kind, hourFromRange(range));
 
-/** The slot link/cell for an item, such as slot(page, "Kingfisher", "9:00 to 9:30 am", "free"). */
-const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
 const shellRow = (page: Page, item: string) => page.locator(`[data-testid="shell-row"][data-item="${item}"]`);
 
 /** From the day view: click a free slot, optionally change the length, and book it. Ends on My bookings. */
@@ -62,7 +61,7 @@ async function book(page: Page, opts: { item: string; day: string; range: string
   } else {
     await openDay(page, opts.day, opts.type, kind);
   }
-  await slot(page, opts.item, opts.range, "free").click();
+  await pickSlot(page, opts.item, opts.range, "free");
   await expect(page.getByRole("heading", { level: 1, name: `Book ${opts.item}` })).toBeVisible();
   if (opts.minutes) {
     await page.getByLabel("Length").selectOption(String(opts.minutes));
@@ -93,7 +92,7 @@ test("the length is one dropdown of 30-minute steps up to 3 hours, starting at 1
   // Look only: nothing is booked, and no other test uses this boat at this hour.
   await actAs(page, "Nora Abernathy");
   await openShellHour(page, "2026-11-06", "5:00 to 5:30 am", "single");
-  await slot(page, "Kingfisher", "5:00 to 5:30 am", "free").click();
+  await pickSlot(page, "Kingfisher", "5:00 to 5:30 am", "free");
   await expect(page.getByRole("heading", { level: 1, name: "Book Kingfisher" })).toBeVisible();
 
   const length = page.getByLabel("Length");
@@ -117,7 +116,7 @@ test("the length is one dropdown of 30-minute steps up to 3 hours, starting at 1
 test("a length longer than 3 hours cannot be chosen: asking for 4 hours in the address falls back to the 90-minute start", async ({ page }) => {
   await actAs(page, "Nora Abernathy");
   await openShellHour(page, "2026-11-06", "5:00 to 5:30 am", "single");
-  const href = await slot(page, "Kingfisher", "5:00 to 5:30 am", "free").getAttribute("href");
+  const href = await slotHref(page, "Kingfisher", "5:00 to 5:30 am", "free");
   await page.goto(`${href}&minutes=240`);
   await expect(page.getByLabel("Length")).toHaveValue("90");
   await expect(page.getByTestId("booking-when")).toContainText("5:00 to 6:30 am");
@@ -133,7 +132,7 @@ test("core flow: pick a member, find a free single, book it, see it in My bookin
   await expect(page.getByTestId("placeholder-note")).toBeVisible();
   await expect(page.getByTestId("shell-window")).toBeVisible();
   // Pick Kingfisher's 9:00 am half hour, the free single.
-  await slot(page, "Kingfisher", "9:00 to 9:30 am", "free").click();
+  await pickSlot(page, "Kingfisher", "9:00 to 9:30 am", "free");
   await expect(page.getByRole("heading", { level: 1, name: "Book Kingfisher" })).toBeVisible();
   await expect(page.getByTestId("booking-when")).toContainText("Saturday, Oct 31, 9:00 to 10:30 am");
   await expect(page.getByTestId("check-ok")).toHaveText("This booking meets the rules.");
@@ -153,11 +152,11 @@ test("core flow: pick a member, find a free single, book it, see it in My bookin
 
   // Dense list: own slots in that hour read "yours"; another member no longer sees a fully taken boat (free-only).
   await openDay(page, "2026-10-31", "Shell", "single", 9);
-  await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "yours")).toBeVisible();
-  await expect(slot(page, "Kingfisher", "9:30 to 10:00 am", "yours")).toBeVisible();
+  await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "yours")).toHaveCount(1);
+  await expect(slot(page, "Kingfisher", "9:30 to 10:00 am", "yours")).toHaveCount(1);
   await openDay(page, "2026-10-31", "Shell", "single", 10);
-  await expect(slot(page, "Kingfisher", "10:00 to 10:30 am", "yours")).toBeVisible();
-  await expect(slot(page, "Kingfisher", "10:30 to 11:00 am", "free")).toBeVisible();
+  await expect(slot(page, "Kingfisher", "10:00 to 10:30 am", "yours")).toHaveCount(1);
+  await expect(slot(page, "Kingfisher", "10:30 to 11:00 am", "free")).toHaveCount(1);
   await actAs(page, "Tomas Vandermeer");
   await openDay(page, "2026-10-31", "Shell", "single", 9);
   await expect(shellRow(page, "Kingfisher")).toHaveCount(0);
@@ -172,10 +171,10 @@ test("core flow: pick a member, find a free single, book it, see it in My bookin
   await expect(row(page, "Kingfisher")).toHaveCount(0);
   await expect(pastRow(page, "Kingfisher").first().getByTestId("booking-status")).toHaveText("Cancelled");
   await openShellHour(page, "2026-10-31", "9:00 to 9:30 am", "single");
-  await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "free")).toBeVisible();
+  await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "free")).toHaveCount(1);
   await actAs(page, "Tomas Vandermeer");
   await openShellHour(page, "2026-10-31", "9:00 to 9:30 am", "single");
-  await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "free")).toBeVisible();
+  await expect(slot(page, "Kingfisher", "9:00 to 9:30 am", "free")).toHaveCount(1);
 });
 
 test("second flow: book a double with a qualified crewmate, who then sees it as theirs", async ({ page }) => {
@@ -183,7 +182,7 @@ test("second flow: book a double with a qualified crewmate, who then sees it as 
   await cancelAll(page);
 
   await openShellHour(page, "2026-10-31", "7:00 to 7:30 am", "double");
-  await slot(page, "Pelican", "7:00 to 7:30 am", "free").click();
+  await pickSlot(page, "Pelican", "7:00 to 7:30 am", "free");
   await expect(page.getByRole("heading", { level: 1, name: "Book Pelican" })).toBeVisible();
   // Only members who hold the qualification a double needs can be chosen as crew.
   const crew = page.getByRole("group", { name: /Crew/ });
@@ -204,9 +203,9 @@ test("second flow: book a double with a qualified crewmate, who then sees it as 
   await expect(row(page, "Pelican")).toContainText("booked by Hollis Whitcombe");
   await expect(row(page, "Pelican").getByRole("button")).toHaveCount(0);
   await openShellHour(page, "2026-10-31", "7:00 to 7:30 am", "double");
-  await expect(slot(page, "Pelican", "7:00 to 7:30 am", "yours")).toBeVisible();
+  await expect(slot(page, "Pelican", "7:00 to 7:30 am", "yours")).toHaveCount(1);
   await openShellHour(page, "2026-10-31", "7:00 to 7:30 am", "single");
-  await slot(page, "Osprey", "7:00 to 7:30 am", "free").click();
+  await pickSlot(page, "Osprey", "7:00 to 7:30 am", "free");
   await expect(page.getByTestId("refusal-reasons")).toContainText("You are already on another boat from 7:00 to 8:30 am.");
   await expect(page.getByRole("button", { name: "Book Osprey" })).toHaveCount(0);
 
@@ -215,13 +214,13 @@ test("second flow: book a double with a qualified crewmate, who then sees it as 
   await cancelAll(page);
   await actAs(page, "Maren Lindqvist");
   await openShellHour(page, "2026-10-31", "7:00 to 7:30 am", "double");
-  await expect(slot(page, "Pelican", "7:00 to 7:30 am", "free")).toBeVisible();
+  await expect(slot(page, "Pelican", "7:00 to 7:30 am", "free")).toHaveCount(1);
 });
 
 test("a crew member who is not qualified cannot slip in through the address bar", async ({ page }) => {
   await actAs(page, "Kenji Tanaka");
   await openShellHour(page, "2026-10-30", "6:00 to 6:30 am", "double");
-  const href = await slot(page, "Tern", "6:00 to 6:30 am", "free").getAttribute("href");
+  const href = await slotHref(page, "Tern", "6:00 to 6:30 am", "free");
   await page.goto(`${href}&crew=${await crewId(page, "Ines Castellanos")}`);
   await expect(page.getByTestId("refusal-reasons")).toContainText("Ines Castellanos needs Sculling level 2 (placeholder) to crew Tern.");
   await expect(page.getByRole("button", { name: "Book Tern" })).toHaveCount(0);
@@ -237,7 +236,7 @@ test("a refusal is always explained in plain words and never offers a Book butto
   await actAs(page, "Ines Castellanos"); // holds no qualification
   await openShellHour(page, "2026-10-30", "9:00 to 9:30 am", "single");
   await expect(page.getByText("You do not hold that qualification yet").first()).toBeVisible();
-  const href = (await slot(page, "Heron", "9:00 to 9:30 am", "free").getAttribute("href"))!;
+  const href = await slotHref(page, "Heron", "9:00 to 9:30 am", "free");
   await page.goto(href);
   await expect(page.getByTestId("refusal-reasons").getByRole("listitem")).toHaveText(["You need Sculling level 1 (placeholder) to use Heron."]);
   await expect(page.getByRole("button", { name: "Book Heron" })).toHaveCount(0);
@@ -261,7 +260,7 @@ test("a refusal is always explained in plain words and never offers a Book butto
 test("a booking that goes stale between the form and the button is refused by the server, with the same explanation", async ({ page }) => {
   await actAs(page, "Walter Pemberton");
   await openShellHour(page, "2026-10-30", "6:00 to 6:30 am", "single");
-  const href = (await slot(page, "Grebe", "6:00 to 6:30 am", "free").getAttribute("href"))!;
+  const href = await slotHref(page, "Grebe", "6:00 to 6:30 am", "free");
   const itemId = new URL(href, "http://x").searchParams.get("item")!;
   // Someone else takes Grebe at 6 while Walter's form is open.
   await actAs(page, "Lars Eriksen");
@@ -299,9 +298,9 @@ test("book, cancel and rebook again and again: nothing limits how many a member 
     await expect(page.getByTestId("cancelled-note")).toBeVisible();
     await expect(upcomingRows(page)).toHaveCount(3);
     await openDay(page, "2026-10-31", "Shell", "single", 6);
-    await expect(slot(page, "Osprey", "6:00 to 6:30 am", "free")).toBeVisible();
+    await expect(slot(page, "Osprey", "6:00 to 6:30 am", "free")).toHaveCount(1);
     await openDay(page, "2026-10-31", "Shell", "single", 9);
-    await expect(slot(page, "Osprey", "9:00 to 9:30 am", "yours")).toBeVisible();
+    await expect(slot(page, "Osprey", "9:00 to 9:30 am", "yours")).toHaveCount(1);
     await cancelAll(page);
   }
   await page.goto("/club/my-bookings");
@@ -315,21 +314,21 @@ test("the clocks go back on Sunday Nov 1: bookable hours still run 5 am to 7 pm 
     const hourOpts = page.getByTestId("hour-select").locator("option");
     await expect(hourOpts, day).toHaveCount(16); // "Choose an hour" + 15 hours
     await openDay(page, day, "Shell", "single", 5);
-    await expect(slot(page, "Heron", "5:00 to 5:30 am", "free"), day).toBeVisible();
-    await expect(slot(page, "Heron", "5:30 to 6:00 am", "free"), day).toBeVisible();
+    await expect(slot(page, "Heron", "5:00 to 5:30 am", "free"), day).toHaveCount(1);
+    await expect(slot(page, "Heron", "5:30 to 6:00 am", "free"), day).toHaveCount(1);
     await openDay(page, day, "Shell", "single", 19);
-    await expect(slot(page, "Heron", "7:00 to 7:30 pm", "free"), day).toBeVisible();
-    await expect(slot(page, "Heron", "7:30 to 8:00 pm", "free"), day).toBeVisible();
+    await expect(slot(page, "Heron", "7:00 to 7:30 pm", "free"), day).toHaveCount(1);
+    await expect(slot(page, "Heron", "7:30 to 8:00 pm", "free"), day).toHaveCount(1);
   }
   await cancelAllFor(page);
   await book(page, { item: "Heron", day: "2026-11-01", range: "5:00 to 5:30 am", minutes: 120 });
   await expect(page.getByTestId("booked-note")).toHaveText("Booked: Heron, Sunday, Nov 1, 5:00 to 7:00 am.");
   await openDay(page, "2026-11-01", "Shell", "single", 5);
-  for (const r of ["5:00 to 5:30 am", "5:30 to 6:00 am"]) await expect(slot(page, "Heron", r, "yours")).toBeVisible();
+  for (const r of ["5:00 to 5:30 am", "5:30 to 6:00 am"]) await expect(slot(page, "Heron", r, "yours")).toHaveCount(1);
   await openDay(page, "2026-11-01", "Shell", "single", 6);
-  for (const r of ["6:00 to 6:30 am", "6:30 to 7:00 am"]) await expect(slot(page, "Heron", r, "yours")).toBeVisible();
+  for (const r of ["6:00 to 6:30 am", "6:30 to 7:00 am"]) await expect(slot(page, "Heron", r, "yours")).toHaveCount(1);
   await openDay(page, "2026-11-01", "Shell", "single", 7);
-  await expect(slot(page, "Heron", "7:00 to 7:30 am", "free")).toBeVisible();
+  await expect(slot(page, "Heron", "7:00 to 7:30 am", "free")).toHaveCount(1);
   await cancelAllFor(page);
 });
 
@@ -353,6 +352,9 @@ test("members see only free shells this hour; staff also see who holds a taken b
   await actAs(page, "Test staff");
   await openShellHour(page, "2026-10-29", "7:00 to 7:30 am", "single");
   await expect(slot(page, "Heron", "7:00 to 7:30 am", "booked")).toContainText("Sasha Bellweather");
+  // A fully taken boat's dropdown can still be opened and read (that is where the names are); only Book is switched off.
+  await expect(startPick(page, "Heron").locator("select")).toBeEnabled();
+  await expect(startPick(page, "Heron").getByRole("button")).toBeDisabled();
   await openShellHour(page, "2026-10-29", "6:00 to 6:30 am", "double");
   await expect(slot(page, "Loon", "6:00 to 6:30 am", "booked")).toContainText("Erik Lindqvist");
 });
@@ -361,7 +363,7 @@ test("staff take a boat out of service: new bookings stop, existing ones stay, a
   // Keep Cormorant's booking address from before it goes out of service, to try it afterwards.
   await actAs(page, "Nora Abernathy");
   await openShellHour(page, "2026-11-03", "8:00 to 8:30 am", "single");
-  const cormorantHref = (await slot(page, "Cormorant", "8:00 to 8:30 am", "free").getAttribute("href"))!;
+  const cormorantHref = await slotHref(page, "Cormorant", "8:00 to 8:30 am", "free");
   await actAs(page, "Tomas Vandermeer");
   await book(page, { item: "Cormorant", day: "2026-11-02", range: "8:00 to 8:30 am", minutes: 60 });
 
@@ -400,7 +402,7 @@ test("staff take a boat out of service: new bookings stop, existing ones stay, a
   await expect(page.getByText("Back in service. New bookings are allowed again.")).toBeVisible();
   await actAs(page, "Nora Abernathy");
   await openShellHour(page, "2026-11-03", "8:00 to 8:30 am", "single");
-  await expect(slot(page, "Cormorant", "8:00 to 8:30 am", "free")).toBeVisible();
+  await expect(slot(page, "Cormorant", "8:00 to 8:30 am", "free")).toHaveCount(1);
 
   await actAs(page, "Tomas Vandermeer");
   await page.goto("/club/my-bookings");
@@ -417,7 +419,7 @@ test("staff can book past the rules with a reason, and the record says so", asyn
     await expect(page.getByTestId("cancelled-note")).toBeVisible();
   }
   await openShellHour(page, "2026-11-04", "5:00 to 5:30 am", "single");
-  await slot(page, "Heron", "5:00 to 5:30 am", "free").click();
+  await pickSlot(page, "Heron", "5:00 to 5:30 am", "free");
   await expect(page.getByTestId("check")).toContainText("Choose who this booking is for");
   await page.getByLabel("Booking for").selectOption({ label: "Ines Castellanos (The Castellanos household)" });
   await page.getByRole("button", { name: "Check my choices" }).click();
@@ -454,7 +456,7 @@ test("a member whose household has ended is told so and cannot book", async ({ p
   await actAs(page, "Colm Fitzgerald");
   await openShellHour(page, "2026-10-30", "11:00 to 11:30 am", "single");
   await expect(page.getByTestId("blocked-note")).toContainText("This household's membership ended on Oct 7, 2026, so new bookings are closed.");
-  await slot(page, "Osprey", "11:00 to 11:30 am", "free").click();
+  await pickSlot(page, "Osprey", "11:00 to 11:30 am", "free");
   await expect(page.getByTestId("refusal-reasons")).toHaveText("This household's membership ended on Oct 7, 2026, so new bookings are closed.");
   await expect(page.getByRole("button", { name: "Book Osprey" })).toHaveCount(0);
 });
@@ -486,11 +488,15 @@ test.describe("on a phone", () => {
     await actAs(page, "Hollis Whitcombe");
     await openShellHour(page, "2026-10-30", "9:00 to 9:30 am", "single");
     expect(await fits()).toBe(true);
-    const box = await slot(page, "Heron", "9:00 to 9:30 am", "free").boundingBox();
-    expect(box!.height).toBeGreaterThanOrEqual(36);
-    expect(box!.width).toBeGreaterThan(40);
+    // The start-time dropdown and its Book button are big enough to tap.
+    await expect(slot(page, "Heron", "9:00 to 9:30 am", "free")).toBeEnabled();
+    for (const control of [startPick(page, "Heron").locator("select"), startPick(page, "Heron").getByRole("button")]) {
+      const box = (await control.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(43.5);
+      expect(box.width).toBeGreaterThan(40);
+    }
     await openShellHour(page, "2026-10-30", "9:00 to 9:30 am", "double");
-    await slot(page, "Pelican", "9:00 to 9:30 am", "free").click();
+    await pickSlot(page, "Pelican", "9:00 to 9:30 am", "free");
     expect(await fits()).toBe(true);
     await page.goto("/club/my-bookings");
     expect(await fits()).toBe(true);

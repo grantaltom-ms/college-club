@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { pickSlot } from "./helpers";
 
 /**
  * Fitness classes in the browser. The test server's clock stands still at 1 pm Pacific on Wednesday Oct 28, 2026.
@@ -267,7 +268,7 @@ test("one place at a time: a class is refused when a boat is booked then, and a 
 
   // A single booked over the Stretch class hour (dense list needs the hour).
   await page.goto("/club/book?day=2026-10-30&what=shell&kind=single&hour=12");
-  await page.locator('[aria-label="Heron, 12:00 to 12:30 pm, free"]').click();
+  await pickSlot(page, "Heron", "12:00 to 12:30 pm");
   await page.getByRole("button", { name: "Book Heron", exact: true }).click();
   await expect(page.getByTestId("booked-note")).toBeVisible();
 
@@ -282,7 +283,7 @@ test("one place at a time: a class is refused when a boat is booked then, and a 
   await page.getByRole("button", { name: "Sign up", exact: true }).click();
   await expect(page.getByTestId("joined-note")).toBeVisible();
   await page.goto("/club/book?day=2026-10-30&what=shell&kind=single&hour=12");
-  await page.locator('[aria-label="Heron, 12:00 to 12:30 pm, free"]').click();
+  await pickSlot(page, "Heron", "12:00 to 12:30 pm");
   await expect(page.getByTestId("refusal-reasons")).toContainText("You are signed up for Stretch & Mobility from 12:00 to 12:30 pm.");
   await leaveAll(page);
 });
@@ -312,9 +313,9 @@ test("staff: a class that would clash with another in the gym is explained in wo
   // Members see the gym held for the class and cannot book it then.
   await actAs(page, "Tomas Vandermeer");
   await page.goto("/club/book?day=2026-10-29&type=Gym%20Space");
-  await expect(page.locator(`[aria-label="Boathouse gym, 7:00 to 7:30 pm, ${name} class"]`)).toBeVisible();
-  await expect(page.locator(`[aria-label="Boathouse gym, 7:30 to 8:00 pm, ${name} class"]`)).toBeVisible();
-  await expect(page.locator('[aria-label="Boathouse gym, 6:30 to 7:00 pm, free"]')).toBeVisible();
+  await expect(page.locator(`option[aria-label="Boathouse gym, 7:00 to 7:30 pm, ${name} class"]`)).toHaveCount(1);
+  await expect(page.locator(`option[aria-label="Boathouse gym, 7:30 to 8:00 pm, ${name} class"]`)).toHaveCount(1);
+  await expect(page.locator('option[aria-label=\"Boathouse gym, 6:30 to 7:00 pm, free\"]')).toHaveCount(1);
 
   // Cancelling the class gives the room back.
   await actAs(page, "Test staff");
@@ -324,7 +325,7 @@ test("staff: a class that would clash with another in the gym is explained in wo
   await expect(page.getByTestId("class-cancelled")).toBeVisible();
   await actAs(page, "Tomas Vandermeer");
   await page.goto("/club/book?day=2026-10-29&type=Gym%20Space");
-  await expect(page.locator('[aria-label="Boathouse gym, 7:00 to 7:30 pm, free"]')).toBeVisible();
+  await expect(page.locator('option[aria-label=\"Boathouse gym, 7:00 to 7:30 pm, free\"]')).toHaveCount(1);
 });
 
 test("a full class shows its waiting list to staff but only counts to members", async ({ page }) => {

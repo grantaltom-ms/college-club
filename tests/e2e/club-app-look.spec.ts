@@ -38,6 +38,16 @@ const follow = (from: string, link: string, arrives: RegExp) => async (page: Pag
   await page.waitForURL(arrives);
 };
 
+/** Go to a Reservations screen, choose the first free start time in the first item's dropdown and press Book: the booking form. */
+const viaStartTime = (from: string) => async (page: Page) => {
+  await page.goto(from);
+  const form = page.locator('[data-testid="start-pick"]').first();
+  const value = await form.locator("option:not([disabled])").first().getAttribute("value");
+  await form.locator("select").selectOption(value!);
+  await form.getByRole("button").click();
+  await page.waitForURL(/\/club\/book\/new\?/);
+};
+
 /** From the staff Households list into one household, then by one of its links to a desk step (end, change details, remove). */
 const viaHousehold = (family: string, link: string, arrives: RegExp) => async (page: Page) => {
   await page.goto("/club");
@@ -59,7 +69,7 @@ const SCREENS: Screen[] = [
   // Part 2: every other member screen
   { name: "My bookings", who: "Nora Abernathy", path: "/club/my-bookings", h1: "My bookings" },
   { name: "All bookings (staff)", who: "Test staff", path: "/club/my-bookings", h1: "All bookings" },
-  { name: "the booking form", who: "Nora Abernathy", path: "", h1: /^Book \S/, go: follow("/club/book?what=gym", 'main a[href^="/club/book/new"]', /\/club\/book\/new\?/) },
+  { name: "the booking form", who: "Nora Abernathy", path: "", h1: /^Book \S/, go: viaStartTime("/club/book?what=gym") },
   { name: "Fitness classes", who: "Nora Abernathy", path: "/club/classes", h1: "Fitness classes" },
   { name: "Fitness classes by day", who: "Nora Abernathy", path: "/club/classes?view=day", h1: "Fitness classes" },
   { name: "Fitness classes (staff)", who: "Test staff", path: "/club/classes", h1: "Fitness classes" },

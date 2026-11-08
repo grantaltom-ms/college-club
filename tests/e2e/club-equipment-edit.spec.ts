@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { slot, pickSlot } from "./helpers";
 
 /**
  * Fixing and retiring equipment that is already in the club, as staff do it: find an item, open it, fix its name, size, skill level or
@@ -42,7 +43,6 @@ const editForm = (page: Page) => page.getByTestId("edit-item-form");
 const save = async (page: Page) => {
   await editForm(page).getByRole("button", { name: "Save changes" }).click();
 };
-const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
 
 test.describe("who can open an item", () => {
   test("only staff: a member gets page not found, and someone signed out is asked to sign in", async ({ page, browser, baseURL }) => {
@@ -116,7 +116,7 @@ test.describe("fixing an item", () => {
     await expect(line).toHaveCount(1);
     await expect(line).toContainText(`Changed by Test staff: name from "${name}" to "Pw renamed ${t}".`);
     await page.goto("/club/book?day=2026-11-04&what=shell&kind=single&hour=7");
-    await expect(slot(page, `Pw renamed ${t}`, "7:00 to 7:30 am", "free")).toBeVisible();
+    await expect(slot(page, `Pw renamed ${t}`, "7:00 to 7:30 am", "free")).toHaveCount(1);
     await expect(page.locator(`[aria-label^="${name}, "]`)).toHaveCount(0);
   });
 
@@ -192,7 +192,7 @@ test.describe("retiring an item", () => {
     await actAs(page, "Rafael Castellanos");
     const day = "/club/book?day=2026-11-10&what=shell&kind=single&hour=6";
     await page.goto(day);
-    await slot(page, name, "6:00 to 6:30 am", "free").click();
+    await pickSlot(page, name, "6:00 to 6:30 am", "free");
     await expect(page.getByTestId("check-ok")).toBeVisible();
     await page.getByRole("button", { name: `Book ${name}`, exact: true }).click();
     await expect(page.getByTestId("booked-note")).toBeVisible();
@@ -315,7 +315,7 @@ test.describe("bringing an item back", () => {
     await expect(page.getByTestId("item-file-line").nth(1)).toContainText("Retired by Test staff. Reason: Sold. Nothing was booked on it.");
     await expect(page.getByRole("button", { name: `Retire ${name}` })).toBeVisible();
     await page.goto("/club/book?day=2026-11-04&what=shell&kind=single&hour=7");
-    await expect(slot(page, name, "7:00 to 7:30 am", "free")).toBeVisible();
+    await expect(slot(page, name, "7:00 to 7:30 am", "free")).toHaveCount(1);
   });
 });
 

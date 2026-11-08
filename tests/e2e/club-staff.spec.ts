@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { pickSlot } from "./helpers";
 
 /**
  * The staff office. The test server's clock stands still at 1 pm Pacific on Wednesday Oct 28, 2026. The invented club has
@@ -323,7 +324,7 @@ test.describe("the household desk", () => {
     // Rue books Dock slip C tomorrow evening.
     await actAs(page, "Rue Quartz");
     await page.goto("/club/book?day=2026-10-29&type=Dock%20Space");
-    await page.locator('[aria-label="Dock slip C, 5:00 to 5:30 pm, free"]').click();
+    await pickSlot(page, "Dock slip C", "5:00 to 5:30 pm");
     await page.getByRole("button", { name: "Book Dock slip C", exact: true }).click();
     await expect(page.getByTestId("booked-note")).toBeVisible();
 
