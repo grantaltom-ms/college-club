@@ -82,6 +82,7 @@ export function StartTimePicker({
     };
   });
   const anyFree = choices.some((c) => c.free);
+  // A dropdown with nothing to list at all (no open slots) is switched off; one with only taken times stays readable.
   const selectId = `start-${itemId}`;
 
   return (
@@ -91,11 +92,13 @@ export function StartTimePicker({
         Start time
       </label>
       <div className="club-start-pick-row">
+        {/* The dropdown stays open to read even when nothing is free: staff still see who holds each time, and a member
+            still sees "Yours" or "Class". Only the Book button is switched off then (and the browser refuses an empty start). */}
         <select
           id={selectId}
           name="start"
           required
-          disabled={!anyFree}
+          disabled={choices.length === 0}
           defaultValue=""
           aria-label={`Start time for ${itemName}`}
           data-testid="start-select"

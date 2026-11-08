@@ -352,6 +352,9 @@ test("members see only free shells this hour; staff also see who holds a taken b
   await actAs(page, "Test staff");
   await openShellHour(page, "2026-10-29", "7:00 to 7:30 am", "single");
   await expect(slot(page, "Heron", "7:00 to 7:30 am", "booked")).toContainText("Sasha Bellweather");
+  // A fully taken boat's dropdown can still be opened and read (that is where the names are); only Book is switched off.
+  await expect(startPick(page, "Heron").locator("select")).toBeEnabled();
+  await expect(startPick(page, "Heron").getByRole("button")).toBeDisabled();
   await openShellHour(page, "2026-10-29", "6:00 to 6:30 am", "double");
   await expect(slot(page, "Loon", "6:00 to 6:30 am", "booked")).toContainText("Erik Lindqvist");
 });

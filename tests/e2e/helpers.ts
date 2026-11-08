@@ -68,6 +68,8 @@ export async function pickSlot(page: Page, item: string, range: string, words = 
   const form = startPick(page, item);
   await form.locator("select").selectOption(value);
   await form.getByRole("button", { name: `Book ${item} at the chosen time` }).click();
+  // The form is a plain GET, a full page load rather than a client-side hop, so wait until the booking form is really there.
+  await page.waitForURL(/\/club\/book\/new\?/);
 }
 
 /** The booking form's own address for that start time: exactly where pressing Book would go. */
