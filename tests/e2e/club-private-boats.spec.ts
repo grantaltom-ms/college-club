@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { slot, pickSlot, slotHref } from "./helpers";
 
 /**
  * Private boats: a boat that belongs to members. Only its owners (named by staff) and the people an owner invites can see or book
@@ -29,7 +30,6 @@ async function upload(page: Page, ...rows: string[]) {
   await expect(page.getByTestId("equip-done")).toContainText(/Added \d+ items?/);
 }
 
-const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
 const shellRow = (page: Page, item: string) => page.locator(`[data-testid="shell-row"][data-item="${item}"]`);
 const boatCard = (page: Page, item: string) => page.locator(`[data-testid="private-boat"][aria-label="${item}"]`);
 const myBoat = (page: Page, item: string) => page.locator(`[data-testid="my-boat"][aria-label="${item}"]`);
@@ -59,7 +59,7 @@ test.describe("what members see", () => {
     // Staff see it in the dense hour list, marked Private. They also copy its booking address from a free slot.
     await page.goto(dayOf(3));
     await expect(shellRow(page, boat).locator(".club-tag")).toHaveText("Private");
-    const href = (await slot(page, boat, "7:00 to 7:30 am", "free").getAttribute("href"))!;
+    const href = await slotHref(page, boat, "7:00 to 7:30 am", "free");
     expect(href).toContain("/club/book/new?item=");
     // Staff's "Booking for" list on a private boat is only the people on its list.
     await page.goto(href);
@@ -104,7 +104,7 @@ test.describe("what members see", () => {
     await upload(page, privateRow(boat, "4", "Britta Eriksen"));
     await actAs(page, "Britta Eriksen");
     await page.goto(dayOf(3, "quad", 8));
-    await slot(page, boat, "8:00 to 8:30 am", "free").click();
+    await pickSlot(page, boat, "8:00 to 8:30 am", "free");
     await expect(page.getByTestId("check-ok")).toHaveText("This booking meets the rules.");
     await expect(page.getByRole("region", { name: "Rules" })).toContainText("This is a private boat. Its owners and the people an owner has invited can use it, and its skill level is not checked");
     await expect(page.getByRole("region", { name: "Rules" })).not.toContainText("You need");
@@ -119,7 +119,7 @@ test.describe("what members see", () => {
     await upload(page, privateRow(boat, "2", "Lars Eriksen; Britta Eriksen"));
     await actAs(page, "Lars Eriksen");
     await page.goto(dayOf(4, "double", 9));
-    await slot(page, boat, "9:00 to 9:30 am", "free").click();
+    await pickSlot(page, boat, "9:00 to 9:30 am", "free");
     const crew = page.locator("fieldset", { hasText: "Crew" });
     await expect(crew.getByLabel("Britta Eriksen")).toBeVisible();
     // Rafael Castellanos holds no qualification either, but the point is he is simply not on the list; Alex Brooks holds one and is not offered.
@@ -159,7 +159,7 @@ test.describe("an owner invites and takes off", () => {
     await expect(page.getByTestId("invited-boats")).toContainText(boat);
     await expect(myBoat(page, boat)).toHaveCount(0);
     await page.goto(dayOf(4));
-    await slot(page, boat, "7:00 to 7:30 am", "free").click();
+    await pickSlot(page, boat, "7:00 to 7:30 am", "free");
     await page.getByRole("button", { name: `Book ${boat}`, exact: true }).click();
     await expect(page.getByTestId("booked-note")).toBeVisible();
     await expect(page.getByTestId("booking-row").filter({ hasText: boat })).toHaveCount(1);
@@ -212,7 +212,7 @@ test.describe("staff", () => {
     await expect(boatCard(page, boat).getByTestId("boat-no-owners")).toBeVisible();
     await page.goto(dayOf(3));
     await expect(shellRow(page, boat).getByTestId("boat-locked-note")).toBeVisible();
-    await expect(slot(page, boat, "7:00 to 7:30 am", "free")).not.toHaveAttribute("href", /.+/);
+    await expect(slot(page, boat, "7:00 to 7:30 am", "free")).toBeDisabled();
 
     // Staff find a member by name and make them an owner.
     await page.goto("/club/admin/boats");
@@ -230,7 +230,7 @@ test.describe("staff", () => {
     // The new owner can book it at once.
     await actAs(page, "Alex Brooks");
     await page.goto(dayOf(4));
-    await slot(page, boat, "7:00 to 7:30 am", "free").click();
+    await pickSlot(page, boat, "7:00 to 7:30 am", "free");
     await page.getByRole("button", { name: `Book ${boat}`, exact: true }).click();
     await expect(page.getByTestId("booked-note")).toBeVisible();
     await page.getByRole("button", { name: /^Cancel / }).first().click();

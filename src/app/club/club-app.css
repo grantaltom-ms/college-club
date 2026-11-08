@@ -1147,6 +1147,69 @@
   font-size: 1.6rem;
 }
 
+/* --- The start-time dropdown (Nov 7): one dropdown and a Book button per item, instead of a wall of time boxes --- */
+
+.club-app .club-start-pick {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 4px;
+}
+
+.club-app .club-start-pick-label {
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--app-ink);
+}
+
+.club-app .club-start-pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.club-app .club-start-pick select {
+  flex: 1 1 200px;
+  max-width: 22rem;
+  box-sizing: border-box;
+  min-height: var(--tap-min);
+  padding: 8px 40px 8px 12px;
+  border: 1px solid var(--app-waterloo);
+  border-radius: 4px;
+  background: #ffffff;
+  font-family: var(--body);
+  font-size: 17px;
+  color: var(--app-cyberspace);
+}
+
+.club-app .club-start-pick select:disabled {
+  border-color: var(--app-line);
+  color: var(--app-slate);
+  background: #ffffff;
+}
+
+.club-app .club-start-pick .club-button {
+  flex: 0 0 auto;
+}
+
+/* In the dense shell list the picker sits tight under the boat's name, with its label read out but not drawn. */
+.club-app .club-start-pick-compact {
+  margin: 6px 0 0;
+}
+
+.club-app .club-start-pick-compact select {
+  flex-basis: 170px;
+  max-width: 16rem;
+  font-size: 16px;
+}
+
+.club-app .club-start-pick-compact .club-button {
+  padding: 0 16px;
+}
+
 /* ---------- Part 4 (Nov 7): hierarchy and clickability ----------
  *
  * Two notes from a UX review of the members' and staff screens: (1) every page looked the same weight, with section headings,

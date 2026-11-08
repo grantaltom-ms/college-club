@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { slot, pickSlot, slotHref, startPick } from "./helpers";
 
 /**
  * Pools: a dock, the club room or the gym is one item with a number of places. Members book a time and see how many places
@@ -15,14 +16,13 @@ const actAs = async (page: Page, who: string) => {
   await page.getByRole("button", { name: `Act as ${who}`, exact: true }).click();
   await expect(page.getByTestId("acting-as")).toHaveText(`Acting as ${who}.`);
 };
-const slot = (page: Page, item: string, range: string, words: string) => page.locator(`[aria-label="${item}, ${range}, ${words}"]`);
 const bookPage = (page: Page, type: string) => page.goto(`/club/book?day=${DAY}&type=${encodeURIComponent(type)}`);
 
 /** The member books the half hour from 8:00 in a pool, from the day view, and ends on My bookings. */
 async function bookEight(page: Page, who: string, item: string, placesLeft: number, places: number) {
   await actAs(page, who);
   await bookPage(page, item === DOCK ? "Dock Space" : "Gym Space");
-  await slot(page, item, "8:00 to 8:30 am", `${placesLeft} of ${places} places left`).click();
+  await pickSlot(page, item, "8:00 to 8:30 am", `${placesLeft} of ${places} places left`);
   await expect(page.getByTestId("check-ok")).toBeVisible();
   await page.getByRole("button", { name: `Book ${item}`, exact: true }).click();
   await expect(page.getByTestId("booked-note")).toBeVisible();
@@ -55,19 +55,19 @@ test.describe("a pool of places", () => {
       for (const [i, name] of who.entries()) await bookEight(page, name, DOCK, 4 - i, 4);
       await actAs(page, who[0]);
       await bookPage(page, "Dock Space");
-      await expect(slot(page, DOCK, "8:00 to 8:30 am", "yours")).toBeVisible();
+      await expect(slot(page, DOCK, "8:00 to 8:30 am", "yours")).toHaveCount(1);
 
       // A fifth member finds the slot full: it is not a link, and the form says so in words and offers no Book button.
       await actAs(page, "Julien Moreau");
       await bookPage(page, "Dock Space");
-      const full = page.locator(`[aria-label="${DOCK}, 8:00 to 8:30 am, 0 of 4 places left"]`);
+      const full = page.locator(`option[aria-label="${DOCK}, 8:00 to 8:30 am, 0 of 4 places left"]`);
       await expect(full).toHaveAttribute("data-state", "booked");
       await expect(full).toContainText("Full");
       // A booking is 90 minutes by default, so the next hour is full too, and the half hour after it is free.
       await expect(slot(page, DOCK, "8:30 to 9:00 am", "0 of 4 places left")).toHaveAttribute("data-state", "booked");
       await expect(slot(page, DOCK, "9:00 to 9:30 am", "0 of 4 places left")).toHaveAttribute("data-state", "booked");
       // The form for the full slot, reached by its address (the day view offers no link to it), says why.
-      const nextHref = (await slot(page, DOCK, "9:30 to 10:00 am", "4 of 4 places left").getAttribute("href"))!;
+      const nextHref = await slotHref(page, DOCK, "9:30 to 10:00 am", "4 of 4 places left");
       const form = new URL(nextHref, page.url());
       form.searchParams.set("start", new Date("2026-11-02T08:00:00-08:00").toISOString());
       await page.goto(form.toString());
@@ -78,8 +78,8 @@ test.describe("a pool of places", () => {
       await cancelAll(page, who[1], DOCK);
       await actAs(page, "Julien Moreau");
       await bookPage(page, "Dock Space");
-      await expect(slot(page, DOCK, "8:00 to 8:30 am", "1 of 4 places left")).toBeVisible();
-      await slot(page, DOCK, "8:00 to 8:30 am", "1 of 4 places left").click();
+      await expect(slot(page, DOCK, "8:00 to 8:30 am", "1 of 4 places left")).toHaveCount(1);
+      await pickSlot(page, DOCK, "8:00 to 8:30 am", "1 of 4 places left");
       await expect(page.getByTestId("check-ok")).toBeVisible();
       await page.getByRole("button", { name: `Book ${DOCK}`, exact: true }).click();
       await expect(page.getByTestId("booked-note")).toBeVisible();
@@ -94,13 +94,13 @@ test.describe("a pool of places", () => {
       for (const [i, name] of people.entries()) await bookEight(page, name, GYM, 3 - i, 3);
       await actAs(page, "Walter Pemberton");
       await bookPage(page, "Gym Space");
-      const full = page.locator(`[aria-label="${GYM}, 8:00 to 8:30 am, 0 of 3 places left"]`);
+      const full = page.locator(`option[aria-label="${GYM}, 8:00 to 8:30 am, 0 of 3 places left"]`);
       await expect(full).toContainText("Full");
       await expect(full).not.toHaveAttribute("title", /./);
       for (const name of people) await expect(page.locator(`[data-testid="item-card"][data-item="${GYM}"]`)).not.toContainText(name);
       await actAs(page, "Test staff");
       await bookPage(page, "Gym Space");
-      const staffFull = page.locator(`[aria-label="${GYM}, 8:00 to 8:30 am, 0 of 3 places left"]`);
+      const staffFull = page.locator(`option[aria-label="${GYM}, 8:00 to 8:30 am, 0 of 3 places left"]`);
       for (const name of people) await expect(staffFull).toHaveAttribute("title", new RegExp(name));
     } finally {
       for (const name of people) await cancelAll(page, name, GYM);
@@ -111,7 +111,7 @@ test.describe("a pool of places", () => {
     await actAs(page, "Alex Brooks");
     await bookPage(page, "Dock Space");
     // 2 pm: no other test in this file books it. (A booking now starts at 90 minutes, so the 8:00 bookings next door also hold 9:00.)
-    await slot(page, DOCK, "2:00 to 2:30 pm", "4 of 4 places left").click();
+    await pickSlot(page, DOCK, "2:00 to 2:30 pm", "4 of 4 places left");
     await expect(page.getByText(`${DOCK} has 4 places, shared by everyone. You book a time and the club counts how many places are left; you are not given a place number. You can hold one place at a time.`)).toBeVisible();
   });
 
@@ -119,10 +119,9 @@ test.describe("a pool of places", () => {
     await page.setViewportSize({ width: 375, height: 800 });
     await actAs(page, "Alex Brooks");
     await bookPage(page, "Dock Space");
-    const target = slot(page, DOCK, "10:00 to 10:30 am", "4 of 4 places left");
-    await expect(target).toBeVisible();
-    const box = (await target.boundingBox())!;
-    expect(box.height).toBeGreaterThanOrEqual(36);
+    await expect(slot(page, DOCK, "10:00 to 10:30 am", "4 of 4 places left")).toBeEnabled();
+    const box = (await startPick(page, DOCK).locator("select").boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(43.5);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });

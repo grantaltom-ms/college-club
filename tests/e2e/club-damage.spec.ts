@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { slot, pickSlot } from "./helpers";
 
 /**
  * Damage reports: anyone signed in files one (what is wrong, where, how it happened, major or minor); everyone who books the boat reads
@@ -31,7 +32,6 @@ async function uploadBoat(page: Page, name: string) {
 /** Waits for the page's scripts to have started, so a button pressed next is handled by the page and not sent as a plain form. */
 const settled = (page: Page) => page.waitForLoadState("networkidle");
 
-const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
 const shellRow = (page: Page, boat: string) => page.locator(`[data-testid="shell-row"][data-item="${boat}"]`);
 
 /** Pacific hour (0–23) from a slot range like "9:00 to 9:30 am". Shells need ?hour= for the dense free list. */
@@ -63,7 +63,7 @@ async function file(page: Page, boat: string, what: string, opts: { where?: stri
 /** The member books the 30-minute slot at the given time, from the dense hour list, and ends on My bookings. */
 async function book(page: Page, boat: string, day: string, range: string) {
   await page.goto(shellDay(day, hourFromRange(range)));
-  await slot(page, boat, range, "free").click();
+  await pickSlot(page, boat, range, "free");
   await expect(page.getByRole("heading", { level: 1, name: `Book ${boat}` })).toBeVisible();
   await expect(page.getByTestId("check-ok")).toBeVisible();
   await page.getByRole("button", { name: `Book ${boat}`, exact: true }).click();
@@ -259,7 +259,7 @@ test.describe("staff work a report", () => {
     await expect(page.getByTestId("damage-log")).toContainText(`${boat} returned to service by Test staff.`);
     await expect(page.getByTestId("boat-out-of-service")).toHaveCount(0);
     await page.goto(shellDay("2026-11-02", 7));
-    await expect(slot(page, boat, "7:00 to 7:30 am", "free")).toBeVisible();
+    await expect(slot(page, boat, "7:00 to 7:30 am", "free")).toHaveCount(1);
     await expect(shellRow(page, boat).getByTestId("damage-notice")).toHaveCount(0);
 
     // The filer sees that it is repaired and when, and none of what it cost.

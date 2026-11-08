@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { pickSlot, slot, slotHref, startPick } from "./helpers";
 
 /**
  * The 8x is booked only by coaches and club staff (Grant, Nov 5, 2026). A member who is not a coach still sees it on Reservations, marked
@@ -23,7 +24,8 @@ const actAs = async (page: Page, who: string) => {
 /** Reservations for the 8x size on the day above, at the hour of the given eight, with the dense list of eights. */
 const openEights = (page: Page, e: Eight) => page.goto(`/club/book?day=${DAY}&what=shell&kind=eight&hour=${e.hour}`);
 const eightRow = (page: Page, e: Eight) => page.locator(`[data-testid="shell-row"][data-item="${e.name}"]`);
-const freeLink = (page: Page, e: Eight) => page.locator(`a[aria-label="${e.name}, ${e.range}, free"]`);
+/** The free start time in the eight's dropdown (an option: enabled for a coach or staff, disabled for anyone else). */
+const freeTime = (page: Page, e: Eight) => slot(page, e.name, e.range, "free");
 
 async function cancelAll(page: Page) {
   await page.goto("/club/my-bookings");
@@ -42,9 +44,10 @@ test.describe("the 8x is for coaches and staff", () => {
     await expect(row).toBeVisible();
     await expect(row.getByText("Coaches only", { exact: true })).toBeVisible();
     await expect(row.getByTestId("coaches-only-note")).toHaveText("Coaches only: this boat can only be booked by coaches and club staff. Ask a coach or club staff to book it.");
-    // The times are shown but are not links, so there is nothing to click.
-    await expect(row.locator(`span[aria-label="${LOOKING.name}, ${LOOKING.range}, free"]`)).toBeVisible();
-    await expect(freeLink(page, LOOKING)).toHaveCount(0);
+    // The time is listed as "coaches only", cannot be chosen, and the Book button is switched off.
+    await expect(freeTime(page, LOOKING)).toHaveCount(0);
+    await expect(slot(page, LOOKING.name, LOOKING.range, "coaches only")).toBeDisabled();
+    await expect(startPick(page, LOOKING.name).getByRole("button")).toBeDisabled();
     await expect(page.getByTestId("shell-dense-count")).toHaveText("No shells free in this hour.");
   });
 
@@ -54,14 +57,14 @@ test.describe("the 8x is for coaches and staff", () => {
       await openEights(page, LOOKING);
       await expect(eightRow(page, LOOKING).getByText("Coaches only", { exact: true })).toBeVisible();
       await expect(eightRow(page, LOOKING).getByTestId("coaches-only-note")).toHaveCount(0);
-      await expect(freeLink(page, LOOKING)).toBeVisible();
+      await expect(freeTime(page, LOOKING)).toBeEnabled();
     }
   });
 
   test("a member who is not a coach who opens the booking form by its address is refused in words, and nothing is booked", async ({ page }) => {
     await actAs(page, "Kenji Tanaka");
     await openEights(page, LOOKING);
-    const href = await freeLink(page, LOOKING).getAttribute("href");
+    const href = await slotHref(page, LOOKING.name, LOOKING.range);
     expect(href).toMatch(/^\/club\/book\/new\?/);
 
     await actAs(page, "Nora Abernathy");
@@ -79,7 +82,7 @@ test.describe("the 8x is for coaches and staff", () => {
   test("the crew list for an eight offers every other active member, including one with no qualification, even though the boat carries a skill level", async ({ page }) => {
     await actAs(page, "Kenji Tanaka");
     await openEights(page, LOOKING);
-    await freeLink(page, LOOKING).click();
+    await pickSlot(page, LOOKING.name, LOOKING.range);
     await expect(page.getByRole("heading", { level: 1, name: `Book ${LOOKING.name}` })).toBeVisible();
     // The sample's eight carries iCrew's own skill level (Advanced), which is not checked for an eight. Ines Castellanos holds no
     // qualification at all, and a coach can still seat her.
@@ -98,7 +101,7 @@ test.describe("the 8x is for coaches and staff", () => {
     await actAs(page, "Kenji Tanaka");
     await cancelAll(page);
     await openEights(page, COACH_BOOKS);
-    await freeLink(page, COACH_BOOKS).click();
+    await pickSlot(page, COACH_BOOKS.name, COACH_BOOKS.range);
     await expect(page.getByRole("heading", { level: 1, name: `Book ${COACH_BOOKS.name}` })).toBeVisible();
     await expect(page.getByTestId("check-ok")).toBeVisible();
     await page.getByRole("button", { name: `Book ${COACH_BOOKS.name}`, exact: true }).click();
@@ -115,7 +118,7 @@ test.describe("the 8x is for coaches and staff", () => {
   test("staff book an eight for a member who is not a coach, with no reason to give", async ({ page }) => {
     await actAs(page, "Test staff");
     await openEights(page, STAFF_BOOKS);
-    await freeLink(page, STAFF_BOOKS).click();
+    await pickSlot(page, STAFF_BOOKS.name, STAFF_BOOKS.range);
     await expect(page.getByRole("heading", { level: 1, name: `Book ${STAFF_BOOKS.name}` })).toBeVisible();
     await page.getByLabel("Booking for").selectOption({ label: "Nora Abernathy (The Abernathy household)" });
     await page.getByRole("button", { name: "Check my choices" }).click();

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { slot, pickSlot } from "./helpers";
 
 /**
  * Practices and lineups: staff mark a member as a coach; a coach (or staff) sets up a practice that reserves boats and seats people by
@@ -32,7 +33,6 @@ async function uploadBoats(page: Page, ...names: string[]) {
 /** Waits for the page's scripts to have started, so a button pressed next is handled by the page and not sent as a plain form. */
 const settled = (page: Page) => page.waitForLoadState("networkidle");
 
-const slot = (page: Page, item: string, range: string, state: string) => page.locator(`[aria-label="${item}, ${range}, ${state}"]`);
 const shellRow = (page: Page, item: string) => page.locator(`[data-testid="shell-row"][data-item="${item}"]`);
 
 /** Pacific hour from a slot range. Shells need ?hour= for the dense free list. */
@@ -80,7 +80,7 @@ async function seat(page: Page, name: string, side: "port" | "starboard" | "" = 
 /** The member books the free slot at the given time from the dense hour list, and ends on My bookings. */
 async function book(page: Page, boat: string, day: string, range: string) {
   await page.goto(shellDay(day, hourFromRange(range)));
-  await slot(page, boat, range, "free").click();
+  await pickSlot(page, boat, range, "free");
   await expect(page.getByRole("heading", { level: 1, name: `Book ${boat}` })).toBeVisible();
   await expect(page.getByTestId("check-ok")).toBeVisible();
   await page.getByRole("button", { name: `Book ${boat}`, exact: true }).click();
@@ -170,15 +170,15 @@ test.describe("setting a practice up and seating people", () => {
     await page.goto(shellDay("2026-11-04", 8));
     await expect(shellRow(page, boat)).toHaveCount(0);
     await page.goto(shellDay("2026-11-04", 6));
-    await expect(slot(page, boat, "6:30 to 7:00 am", "free")).toBeVisible();
+    await expect(slot(page, boat, "6:30 to 7:00 am", "free")).toHaveCount(1);
     await page.goto(shellDay("2026-11-04", 9));
-    await expect(slot(page, boat, "9:00 to 9:30 am", "free")).toBeVisible();
+    await expect(slot(page, boat, "9:00 to 9:30 am", "free")).toHaveCount(1);
     // Staff still see the practice hold on a taken boat.
     await actAs(page, "Test staff");
     await page.goto(shellDay("2026-11-04", 7));
-    await expect(slot(page, boat, "7:00 to 7:30 am", "practice")).toBeVisible();
+    await expect(slot(page, boat, "7:00 to 7:30 am", "practice")).toHaveCount(1);
     await page.goto(shellDay("2026-11-04", 8));
-    await expect(slot(page, boat, "8:30 to 9:00 am", "practice")).toBeVisible();
+    await expect(slot(page, boat, "8:30 to 9:00 am", "practice")).toHaveCount(1);
   });
 
   test("seating someone who is booked on another boat, or in a class, then is refused in the engine's own words; a person cannot be in two seats", async ({ page }) => {
@@ -238,7 +238,7 @@ test.describe("setting a practice up and seating people", () => {
 
     await actAs(page, "Hollis Whitcombe");
     await page.goto(shellDay("2026-11-10", 7));
-    await expect(slot(page, boat, "7:00 to 7:30 am", "free")).toBeVisible();
+    await expect(slot(page, boat, "7:00 to 7:30 am", "free")).toHaveCount(1);
   });
 });
 
