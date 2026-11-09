@@ -23,7 +23,7 @@ const row = (page: Page, id: string) => page.getByTestId(`check-${id}`);
 const statusOf = (page: Page, id: string) => row(page, id).getByTestId("check-status");
 const detailOf = (page: Page, id: string) => row(page, id).getByTestId("check-detail");
 
-const PEOPLE = ["domain_records", "tracking_off", "mail_test", "sales_tax", "quickbooks_names", "equipment_confirmed", "future_bookings", "icrew_freeze", "switch_date"];
+const PEOPLE = ["domain_records", "tracking_off", "mail_test", "sales_tax", "quickbooks_names", "equipment_confirmed", "future_bookings", "hello_start", "icrew_freeze", "switch_date"];
 
 /** How many rules files still mark their numbers as placeholders, read from the files themselves. */
 const placeholderCount = () => {
@@ -43,12 +43,12 @@ test.describe("the switch-on checklist", () => {
     await expect(page.getByTestId("switch-on-scope")).toContainText("You are looking at a test version");
     const verdict = page.getByTestId("switch-on-verdict");
     await expect(verdict).toHaveAttribute("role", "status");
-    await expect(verdict).toHaveText(/^\d+ things? to fix before switch-on, and 9 things only a person can confirm\.$/);
+    await expect(verdict).toHaveText(/^\d+ things? to fix before switch-on, and 10 things only a person can confirm\.$/);
     // The counts line adds up to every row.
     const counts = (await page.getByTestId("switch-on-counts").textContent())!.match(/^(\d+) ready, (\d+) not ready, (\d+) for a person\.$/);
     expect(counts).not.toBeNull();
     const [ready, notReady, person] = [Number(counts![1]), Number(counts![2]), Number(counts![3])];
-    expect(person).toBe(9);
+    expect(person).toBe(10);
     expect(notReady).toBeGreaterThan(0);
     await expect(page.locator("[data-testid^='check-'][data-status]")).toHaveCount(ready + notReady + person);
     await expect(page.locator("[data-status='ready']")).toHaveCount(ready);

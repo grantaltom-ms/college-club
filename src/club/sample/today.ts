@@ -1,7 +1,9 @@
 import { recordAttendance } from "../engine/attendance";
 import { createBooking } from "../engine/bookings";
+import { createEvent, rsvp } from "../engine/events";
 import { fullName } from "../engine/queries";
 import { ATTENDANCE_RULES } from "../settings/attendance-rules";
+import { EVENT_RULES } from "../settings/event-rules";
 import { RULE_BOOK } from "../settings/rulebook";
 import type { ClubStore } from "../store/memory";
 import { addDays, pacificDate, pacificWall } from "../time";
@@ -13,12 +15,13 @@ import { SAMPLE_STAFF } from "./club";
  * The other sample bookings (see equipment.ts and classes.ts) already give today a member under way, a few still to come and three
  * that are over. At 1 pm Pacific, on the frozen test clock, the page then reads:
  *
- * - Here now: Amara Okonkwo (kayak, never been in: "say hello"), Britta Eriksen (dock slip), Chidi Okonkwo (paddle board),
- *   Declan Halloran (weight room, checked in), Priya Rao (kayak) and Walter Pemberton (club room, one visit in the last
- *   75 days: "say hello").
- * - Upcoming: Dev Rao (kayak), Camille Moreau (class), Julien Moreau (class and paddle board) and Yuki Nakamura (dock slip), who
- *   joined this month: "new member, say hello".
+ * - Here now: Amara Okonkwo (kayak, never been in: "say hello"), Britta Eriksen (dock slip, and the Coffee Hour), Chidi Okonkwo
+ *   (paddle board), Declan Halloran (weight room, checked in, and the Coffee Hour), Dev Rao (the Coffee Hour), Priya Rao (kayak)
+ *   and Walter Pemberton (club room, one visit in the last 75 days: "say hello").
+ * - Upcoming: Camille Moreau (class, then the Evening Talk), Julien Moreau (class and paddle board), Dev Rao (kayak, then the
+ *   Evening Talk), Yuki Nakamura (dock slip), who joined this month: "new member, say hello", and Priya Rao (the Evening Talk).
  * - In neither list: Alex Brooks, Kenji Tanaka and Yuki Nakamura's morning booking, which are over.
+ * - The Coffee Hour (12:30 to 2 pm, under way at 1 pm) and the Evening Talk (5:30 to 7 pm) are events: six RSVPs between them.
  *
  * Visit history is real bookings through the engine, made in advance and checked in by staff, the way a year of the club's own
  * records would be. Nothing here is a real person: every name is invented, like the rest of the sample club.
@@ -89,4 +92,13 @@ export async function seedSampleToday(store: ClubStore, now: Date): Promise<void
   await bookToday("Dock slip B", "Britta Eriksen", 12 * 60, 13 * 60 + 30);
   // Yuki Nakamura joined this month and has a dock slip this afternoon.
   await bookToday("Dock slip C", "Yuki Nakamura", 15 * 60, 16 * 60);
+
+  // Two events today. Made yesterday, since an event cannot be made after it has started. Guests are not members and are not listed.
+  const makeEvent = (title: string, location: string, from: number, to: number) =>
+    createEvent(store, { actor: SAMPLE_STAFF, now: yesterday.now }, { title, description: "", location, startsAt: at(0, from), endsAt: at(0, to), capacity: 30, priceCents: 0 });
+  const coffee = await makeEvent("Coffee Hour", "The clubhouse deck", 12 * 60 + 30, 14 * 60);
+  const talk = await makeEvent("Evening Talk", "The boathouse", 17 * 60 + 30, 19 * 60);
+  const go = (eventId: string, who: string) => rsvp(store, EVENT_RULES, yesterday, { eventId, memberId: member(who), guests: who === "Declan Halloran" ? 1 : 0 });
+  for (const who of ["Declan Halloran", "Britta Eriksen", "Dev Rao"]) await go(coffee.id, who);
+  for (const who of ["Camille Moreau", "Dev Rao", "Priya Rao"]) await go(talk.id, who);
 }

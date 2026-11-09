@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
-import { refreshWords, todayAtTheClub } from "@/club/engine/today";
+import { sampleDataAllowed } from "@/club/enabled";
+import { helloNotesOn, helloOffWords, refreshWords, todayAtTheClub } from "@/club/engine/today";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { ATTENDANCE_RULES } from "@/club/settings/attendance-rules";
 import { TODAY_RULES } from "@/club/settings/today-rules";
 import { readClubOnce } from "@/club/store/read-once";
+import { pacificDate } from "@/club/time";
 import { PageBand } from "../PageBand";
 import { SignedOut } from "../SignedOut";
 import { TodaySections } from "./TodaySections";
@@ -23,7 +25,9 @@ export default async function TodayAtTheClub() {
   if (!actor) return <SignedOut />;
   if (actor.kind !== "staff") notFound();
 
-  const view = todayAtTheClub(await readClubOnce(), clubNow(), TODAY_RULES, ATTENDANCE_RULES);
+  const now = clubNow();
+  const hello = helloNotesOn(TODAY_RULES, pacificDate(now), sampleDataAllowed());
+  const view = todayAtTheClub(await readClubOnce(), now, TODAY_RULES, ATTENDANCE_RULES, { hello });
   const every = refreshWords(TODAY_RULES.defaults.refreshSeconds);
 
   return (
@@ -42,9 +46,14 @@ export default async function TodayAtTheClub() {
         </time>
         . This page updates itself every {every}.
       </p>
-      {TODAY_RULES.placeholder && (
+      {view.helloOn && TODAY_RULES.placeholder && (
         <p className="club-placeholder" data-testid="today-placeholder">
           The numbers behind the &ldquo;say hello&rdquo; notes are placeholders until club staff confirm them.
+        </p>
+      )}
+      {!view.helloOn && (
+        <p className="club-meta" data-testid="today-hello-off">
+          {helloOffWords(TODAY_RULES)}
         </p>
       )}
       <TodaySections here={view.here} upcoming={view.upcoming} refreshSeconds={TODAY_RULES.defaults.refreshSeconds} />

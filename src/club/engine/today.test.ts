@@ -7,7 +7,9 @@ import type { Booking, BookingStatus, ClassSession, ClassTemplate, ClubEvent, Cl
 import { memberCheckIn } from "./attendance";
 import { cancelBooking } from "./bookings";
 import { createClass, scheduleSessions, signUp } from "./classes";
-import { HELLO_WORDS, TODAY_CATEGORIES, helloFor, memberCount, refreshWords, summaryWords, todayAtTheClub, type TodayView } from "./today";
+import { EVENT_RULES } from "../settings/event-rules";
+import { createEvent, rsvp } from "./events";
+import { HELLO_WORDS, TODAY_CATEGORIES, helloFor, helloNotesOn, helloOffWords, memberCount, refreshWords, summaryWords, todayAtTheClub, type TodayView } from "./today";
 import { NOW, STORE_KINDS, TODAY, at, bookAs, buildFixture, buildFixtureSettling, mark, memberCtx, staff, staffCtx, type Fixture } from "./testkit";
 
 /** Today at the front desk, on both stores for the real flows and on hand-built records for the edges. Today is Wed Oct 28, 1 pm Pacific. */
@@ -74,6 +76,16 @@ function addEventRsvp(c: Club, who: string, start: Date, status: Rsvp["status"])
   c.state.rsvps.push({ id: newId(), eventId: event.id, memberId: c.f.m[who], guests: 0, status, priceCents: null, via: "page", createdAt: iso(at(-60, 12)), createdBy: staff, statusChangedAt: iso(at(-60, 12)), promotedAt: null, holdUntil: null, cancelledBy: null, cancelReason: null });
 }
 
+/** One event with a list of people on it, each in the state given: going, attended, waitlisted and so on. */
+function addEvent(c: Club, title: string, start: Date, end: Date, people: [string, Rsvp["status"]][], status: ClubEvent["status"] = "scheduled"): ClubEvent {
+  const event: ClubEvent = { id: newId(), title, description: "", location: "", startsAt: iso(start), endsAt: iso(end), capacity: null, priceCents: null, replyBy: null, status, createdAt: iso(at(-60, 12)), createdBy: staff, statusChangedAt: iso(at(-60, 12)), cancelledBy: null, cancelReason: null };
+  c.state.events.push(event);
+  for (const [name, rsvpStatus] of people) {
+    c.state.rsvps.push({ id: newId(), eventId: event.id, memberId: c.f.m[name], guests: 0, status: rsvpStatus, priceCents: null, via: "page", createdAt: iso(at(-60, 12)), createdBy: staff, statusChangedAt: iso(at(-60, 12)), promotedAt: null, holdUntil: null, cancelledBy: null, cancelReason: null });
+  }
+  return event;
+}
+
 const view = (c: Club, now: Date = NOW, rules: TodayRules = TODAY_RULES): TodayView => todayAtTheClub(c.state, now, rules, ATTENDANCE_RULES);
 const who = (rows: { name: string }[]) => rows.map((r) => r.name);
 
@@ -118,7 +130,7 @@ describe("the one-line summary", () => {
   });
 
   it("uses only the categories the app already has, in a fixed order for ties", () => {
-    expect(TODAY_CATEGORIES.map((x) => x.key)).toEqual(["boat", "gym", "dock", "class", "room", "work"]);
+    expect(TODAY_CATEGORIES.map((x) => x.key)).toEqual(["boat", "gym", "dock", "class", "event", "room", "work"]);
     // Every booking type belongs to exactly one category, so a type cannot be forgotten or counted twice.
     const types = TODAY_CATEGORIES.flatMap((x) => x.types);
     expect(types.sort()).toEqual(["Dock Space", "Gym Space", "Kayak", "Paddle Board", "Room Space", "Shell", "Work Space"]);
@@ -141,7 +153,7 @@ describe("the one-line summary", () => {
     expect(v.summary.parts.map((p) => [p.key, p.count])).toEqual([["boat", 4], ["class", 3], ["gym", 1], ["dock", 1], ["room", 1], ["work", 1]]);
   });
 
-  it("does not count cancelled things, waiting-list places, other days, cancelled classes, or events", async () => {
+  it("does not count cancelled things, waiting-list places, other days or cancelled classes", async () => {
     const c = await club();
     addBooking(c, "Ada", "Heron", at(0, 9), at(0, 10), "cancelled");
     addBooking(c, "Ada", "Osprey", at(0, 9), at(0, 10), "late_cancelled");
@@ -149,7 +161,6 @@ describe("the one-line summary", () => {
     addBooking(c, "Ben", "Osprey", at(-1, 9), at(-1, 10), "completed"); // yesterday
     addClass(c, "Yoga", at(0, 12), at(0, 13), [["Ada", "waitlisted"], ["Ben", "cancelled"], ["Cy", "late_cancelled"]]);
     addClass(c, "Spin", at(0, 14), at(0, 15), [["Dee", "enrolled"]], "cancelled");
-    addEventRsvp(c, "Eli", at(0, 18), "going");
     expect(view(c).summary).toEqual({ total: 0, parts: [], words: "No reservations today." });
   });
 
@@ -302,12 +313,13 @@ describe("who is here now, and who is still to come", () => {
     expect(who(view(c).here)).toEqual([]);
   });
 
-  it("does not list events or practices, which are not reservations here", async () => {
+  it("does not list a practice, which has its own lineup", async () => {
     const c = await club();
-    addEventRsvp(c, "Ada", at(0, 12), "going");
-    addEventRsvp(c, "Ben", at(0, 12), "attended");
+    expect(c.state.practices).toEqual([]);
+    c.state.practices.push({ id: newId(), name: "Morning session", notes: "", startsAt: iso(at(0, 12)), endsAt: iso(at(0, 14)), status: "scheduled", coachId: null, createdAt: iso(at(-30, 12)), createdBy: staff, statusChangedAt: iso(at(-30, 12)), cancelledBy: null, cancelReason: null });
     expect(view(c).here).toEqual([]);
     expect(view(c).upcoming).toEqual([]);
+    expect(view(c).summary.total).toBe(0);
   });
 
   it("shows no reservation time anywhere in what it returns, only the one time the figures were worked out", async () => {
@@ -333,6 +345,171 @@ describe("who is here now, and who is still to come", () => {
     const first = view(c);
     expect(view(c)).toEqual(first);
     expect(JSON.stringify(c.state)).toBe(before);
+  });
+});
+
+describe("events on the page", () => {
+  it("counts one RSVP for each member going, attended or marked a no-show, on events that start today and are still on", async () => {
+    const c = await club();
+    addEvent(c, "Coffee Hour", at(0, 12), at(0, 14), [["Ada", "going"], ["Ben", "attended"], ["Cy", "no_show"], ["Dee", "waitlisted"], ["Eli", "cancelled"]]);
+    addEvent(c, "Evening Talk", at(0, 18), at(0, 19), [["Ada", "late_cancelled"]]);
+    addEvent(c, "Called off", at(0, 15), at(0, 16), [["Dee", "going"]], "cancelled");
+    addEvent(c, "Tomorrow's lunch", at(1, 12), at(1, 14), [["Eli", "going"]]);
+    addEvent(c, "Yesterday's lunch", at(-1, 12), at(-1, 14), [["Eli", "attended"]]);
+    expect(view(c).summary).toEqual({ total: 3, parts: [{ key: "event", count: 3, words: "3 event RSVPs" }], words: "3 reservations today — 3 event RSVPs" });
+  });
+
+  it("says one event RSVP in the singular", async () => {
+    const c = await club();
+    addEvent(c, "Coffee Hour", at(0, 12), at(0, 14), [["Ada", "going"]]);
+    expect(view(c).summary.words).toBe("1 reservation today — 1 event RSVP");
+  });
+
+  it("keeps events after class places and before rooms when the counts tie", async () => {
+    const c = await club();
+    addClass(c, "Yoga", at(0, 15), at(0, 16), [["Ada", "enrolled"]]);
+    addEvent(c, "Coffee Hour", at(0, 16), at(0, 17), [["Ben", "going"]]);
+    addBooking(c, "Cy", "Clubhouse room", at(0, 17), at(0, 18));
+    expect(view(c).summary.words).toBe("3 reservations today — 1 class place, 1 event RSVP, 1 room");
+  });
+
+  it("lists a member going to an event under way as here, and one going to a later event as upcoming, with the event's name and the Event tag", async () => {
+    const c = await club();
+    addEvent(c, "Coffee Hour", at(0, 12), at(0, 14), [["Ada", "going"], ["Ben", "attended"], ["Cy", "no_show"], ["Dee", "waitlisted"]]);
+    addEvent(c, "Evening Talk", at(0, 18), at(0, 19), [["Eli", "going"]]);
+    const v = view(c);
+    expect(v.here.map((r) => [r.name, r.what])).toEqual([
+      ["Ada Quill", [{ title: "Coffee Hour", category: "Event" }]],
+      ["Ben Quill", [{ title: "Coffee Hour", category: "Event" }]],
+    ]);
+    expect(v.upcoming.map((r) => [r.name, r.what])).toEqual([["Eli Reed", [{ title: "Evening Talk", category: "Event" }]]]);
+  });
+
+  it("counts someone staff marked attended as here before the event has started, since staff mark events", async () => {
+    const c = await club();
+    addEvent(c, "Evening Talk", at(0, 18), at(0, 19), [["Ada", "attended"], ["Ben", "going"]]);
+    const v = view(c);
+    expect(who(v.here)).toEqual(["Ada Quill"]);
+    expect(who(v.upcoming)).toEqual(["Ben Quill"]);
+  });
+
+  it("counts the exact start as here, the exact end as over, and a moment before the start as still to come", async () => {
+    const c = await club();
+    addEvent(c, "Starts now", NOW, new Date(NOW.getTime() + 3600000), [["Ada", "going"]]);
+    addEvent(c, "Ends now", new Date(NOW.getTime() - 3600000), NOW, [["Ben", "going"]]);
+    addEvent(c, "Starts in a minute", new Date(NOW.getTime() + 60000), new Date(NOW.getTime() + 3600000), [["Cy", "going"]]);
+    const v = view(c);
+    expect(who(v.here)).toEqual(["Ada Quill"]);
+    expect(who(v.upcoming)).toEqual(["Cy Quill"]);
+  });
+
+  it("leaves out an event that ended, a cancelled one, one on another day and a waiting-list place", async () => {
+    const c = await club();
+    addEvent(c, "Over", at(0, 9), at(0, 11), [["Ada", "going"], ["Ben", "attended"]]);
+    addEvent(c, "Called off", at(0, 12), at(0, 14), [["Cy", "going"]], "cancelled");
+    addEvent(c, "Tomorrow", at(1, 12), at(1, 14), [["Dee", "going"]]);
+    addEvent(c, "Full", at(0, 18), at(0, 19), [["Eli", "waitlisted"]]);
+    expect(view(c).here).toEqual([]);
+    expect(view(c).upcoming).toEqual([]);
+  });
+
+  it("puts a member with a class and an event on one row, soonest first, with each kind of thing tagged", async () => {
+    const c = await club();
+    addEvent(c, "Evening Talk", at(0, 18), at(0, 19), [["Ada", "going"]]);
+    addClass(c, "Yoga", at(0, 15), at(0, 16), [["Ada", "enrolled"]]);
+    const row = view(c).upcoming[0];
+    expect(row.what).toEqual([{ title: "Yoga", category: "Class" }, { title: "Evening Talk", category: "Event" }]);
+  });
+
+  it("lists only members: the guests someone brings are not members and are not listed or counted", async () => {
+    const c = await club();
+    const e = addEvent(c, "Coffee Hour", at(0, 12), at(0, 14), [["Ada", "going"]]);
+    c.state.rsvps.find((r) => r.eventId === e.id)!.guests = 4;
+    const v = view(c);
+    expect(who(v.here)).toEqual(["Ada Quill"]);
+    expect(v.summary.total).toBe(1);
+  });
+
+  it("does not list someone who has left or whose household ended, though the RSVP is still on the event", async () => {
+    const c = await club();
+    addEvent(c, "Coffee Hour", at(0, 12), at(0, 14), [["Ada", "going"], ["Dee", "going"]]);
+    c.state.members.find((m) => m.id === c.f.m.Ada)!.status = "removed";
+    c.state.households.find((h) => h.id === c.f.h.Reed)!.status = "ended";
+    c.state.members.filter((m) => m.householdId === c.f.h.Reed).forEach((m) => (m.status = "household_ended"));
+    expect(view(c).here).toEqual([]);
+  });
+
+  it("shows no event time either, only the day and the time the figures were worked out", async () => {
+    const c = await club();
+    addEvent(c, "Coffee Hour", at(0, 12, 15), at(0, 14, 45), [["Ada", "going"]]);
+    addEvent(c, "Evening Talk", at(0, 17, 30), at(0, 19), [["Ben", "going"]]);
+    const { asOf, asOfClock, ...rest } = view(c);
+    void asOf;
+    void asOfClock;
+    const text = JSON.stringify(rest);
+    expect(text).not.toMatch(/\d{1,2}:\d{2}/);
+    expect(text).not.toMatch(/T\d{2}:/);
+  });
+});
+
+describe("when the say-hello notes are on", () => {
+  const start = "2026-07-01";
+
+  it("is on for a test version whatever the rules say, because the invented club has its own history", () => {
+    expect(helloNotesOn({ ...TODAY_RULES, historyStartsOn: null }, TODAY, true)).toBe(true);
+    expect(helloNotesOn({ ...TODAY_RULES, historyStartsOn: TODAY }, TODAY, true)).toBe(true);
+  });
+
+  it("is off on a real server while the day the records began is not set", () => {
+    expect(helloNotesOn({ ...TODAY_RULES, historyStartsOn: null }, TODAY, false)).toBe(false);
+    expect(helloNotesOn({ ...TODAY_RULES, historyStartsOn: null }, "2030-01-01", false)).toBe(false);
+  });
+
+  it("turns on exactly 90 days after the records began, and not a day before", () => {
+    const rules: TodayRules = { ...TODAY_RULES, historyStartsOn: start };
+    expect(rules.defaults.helloAfterHistoryDays).toBe(90);
+    expect(helloNotesOn(rules, addDays(start, 89), false)).toBe(false);
+    expect(helloNotesOn(rules, addDays(start, 90), false)).toBe(true);
+    expect(helloNotesOn(rules, addDays(start, 400), false)).toBe(true);
+  });
+
+  it("is off before the records began, and on the day itself", () => {
+    const rules: TodayRules = { ...TODAY_RULES, historyStartsOn: start };
+    expect(helloNotesOn(rules, addDays(start, -1), false)).toBe(false);
+    expect(helloNotesOn(rules, start, false)).toBe(false);
+  });
+
+  it("follows the number of days in the rules file, not a number written in the code", () => {
+    const rules: TodayRules = { ...TODAY_RULES, historyStartsOn: start, defaults: { ...TODAY_RULES.defaults, helloAfterHistoryDays: 30 } };
+    expect(helloNotesOn(rules, addDays(start, 29), false)).toBe(false);
+    expect(helloNotesOn(rules, addDays(start, 30), false)).toBe(true);
+  });
+
+  it("tells staff in one line why the notes are off, with the day they switch on once the start is set", () => {
+    expect(helloOffWords({ ...TODAY_RULES, historyStartsOn: null })).toBe("The say-hello notes are switched off until the club's own records cover 90 days. The day the records began has not been set yet.");
+    expect(helloOffWords({ ...TODAY_RULES, historyStartsOn: "2026-12-01" })).toBe("The say-hello notes are switched off until the club's own records cover 90 days. They switch on Mar 1, 2027.");
+  });
+
+  it("with the notes off, no row carries one, even for a rare visitor and a new member, and the lists are otherwise the same", async () => {
+    const c = await club();
+    c.state.households.find((h) => h.id === c.f.h.Reed)!.joinedOn = addDays(TODAY, -3);
+    addBooking(c, "Ada", "Heron", at(0, 12), at(0, 14));
+    addBooking(c, "Dee", "Osprey", at(0, 15), at(0, 16));
+    const on = todayAtTheClub(c.state, NOW, TODAY_RULES, ATTENDANCE_RULES);
+    const off = todayAtTheClub(c.state, NOW, TODAY_RULES, ATTENDANCE_RULES, { hello: false });
+    expect(on.helloOn).toBe(true);
+    expect(on.here[0].hello?.kind).toBe("rare");
+    expect(on.upcoming[0].hello?.kind).toBe("new");
+    expect(off.helloOn).toBe(false);
+    expect([...off.here, ...off.upcoming].map((r) => r.hello)).toEqual([null, null]);
+    expect(off.summary).toEqual(on.summary);
+    expect(off.here.map((r) => [r.name, r.what])).toEqual(on.here.map((r) => [r.name, r.what]));
+    expect(off.upcoming.map((r) => [r.name, r.what])).toEqual(on.upcoming.map((r) => [r.name, r.what]));
+  });
+
+  it("is on unless told otherwise", async () => {
+    const c = await club();
+    expect(view(c).helloOn).toBe(true);
   });
 });
 
@@ -396,7 +573,7 @@ describe("the warm hello note", () => {
     });
 
     it("follows the numbers in the rules file, not numbers written in the code", () => {
-      const strict: TodayRules = { placeholder: true, defaults: { ...rules.defaults, noVisitDays: 10, fewVisitsBelow: 3, newMemberDays: 5, fewVisitsDays: 30 } };
+      const strict: TodayRules = { placeholder: true, historyStartsOn: null, defaults: { ...rules.defaults, noVisitDays: 10, fewVisitsBelow: 3, newMemberDays: 5, fewVisitsDays: 30 } };
       expect(helloFor(longAgo, visits(10, 11, 12), TODAY, strict)?.kind).toBe("rare");
       expect(helloFor(longAgo, visits(9, 10, 11), TODAY, strict)).toBeNull();
       expect(helloFor(longAgo, visits(1, 2), TODAY, strict)?.kind).toBe("rare"); // two is fewer than three
@@ -533,6 +710,19 @@ describe.each(STORE_KINDS)("today at the club from the real records on the %s st
       ["Ben Quill", ["Osprey (Boat)"], "rare"],
       ["Ada Quill", ["Morning Yoga (Class)"], "rare"],
     ]);
+  });
+
+  it("lists a member going to an event made through the real engine: under way is here, a later one is upcoming, and both are counted", async () => {
+    const f = await buildFixtureSettling(kind, () => NOW);
+    const yesterday = at(-1, 12);
+    const coffee = await createEvent(f.store, staffCtx(yesterday), { title: "Coffee Hour", startsAt: at(0, 12, 30), endsAt: at(0, 14), capacity: 20 });
+    const talk = await createEvent(f.store, staffCtx(yesterday), { title: "Evening Talk", startsAt: at(0, 17, 30), endsAt: at(0, 19), capacity: 20 });
+    await rsvp(f.store, EVENT_RULES, staffCtx(yesterday), { eventId: coffee.id, memberId: f.m.Cy, guests: 2 });
+    await rsvp(f.store, EVENT_RULES, staffCtx(yesterday), { eventId: talk.id, memberId: f.m.Ada, guests: 0 });
+    const v = todayAtTheClub(await f.store.read(), NOW, TODAY_RULES, ATTENDANCE_RULES);
+    expect(v.summary.words).toBe("2 reservations today — 2 event RSVPs");
+    expect(v.here.map((r) => [r.name, r.what])).toEqual([["Cy Quill", [{ title: "Coffee Hour", category: "Event" }]]]);
+    expect(v.upcoming.map((r) => [r.name, r.what])).toEqual([["Ada Quill", [{ title: "Evening Talk", category: "Event" }]]]);
   });
 
   it("changes nothing in the club's records by looking", async () => {

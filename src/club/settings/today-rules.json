@@ -1,11 +1,13 @@
 {
   "placeholder": true,
-  "about": "The staff landing page, Today at the Club. These numbers are PLACEHOLDERS until club staff confirm them (see CLAUDE.md). A member's name gets a warm 'say hello' note on that page when they are NEW (their household joined within newMemberDays, or this is their first booking ever) or when they have not been in much: no completed visit for noVisitDays days (or ever), or fewer than fewVisitsBelow completed visits in the last fewVisitsDays days. Only visits before today count, so a regular who arrives is not flagged and a rare visitor who has just checked in still is. fewVisitsDays and noVisitDays cannot be longer than 90, because the club's records keep 90 days of bookings. refreshSeconds: how often the page asks for fresh figures by itself, so a front-desk screen never goes quietly stale.",
+  "historyStartsOn": null,
+  "about": "The staff landing page, Today at the Club. These numbers are PLACEHOLDERS until club staff confirm them (see CLAUDE.md). A member's name gets a warm 'say hello' note on that page when they are NEW (their household joined within newMemberDays, or this is their first booking ever) or when they have not been in much: no completed visit for noVisitDays days (or ever), or fewer than fewVisitsBelow completed visits in the last fewVisitsDays days. Only visits before today count, so a regular who arrives is not flagged and a rare visitor who has just checked in still is. fewVisitsDays and noVisitDays cannot be longer than 90, because the club's records keep 90 days of bookings. refreshSeconds: how often the page asks for fresh figures by itself, so a front-desk screen never goes quietly stale. historyStartsOn: the day the club began keeping its real records in this app (the switch-on day, written like 2026-12-01). Until that day is 'helloAfterHistoryDays' days ago the notes stay OFF on a real server, because with no history nearly everyone would look like a rare visitor. null means the day is not set yet, so the notes stay off. A server that allows invented data (a test version) has the invented club's history and shows the notes regardless.",
   "defaults": {
     "noVisitDays": 60,
     "fewVisitsDays": 90,
     "fewVisitsBelow": 2,
     "newMemberDays": 30,
-    "refreshSeconds": 120
+    "refreshSeconds": 120,
+    "helloAfterHistoryDays": 90
   }
 }

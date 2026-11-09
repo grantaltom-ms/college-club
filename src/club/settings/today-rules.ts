@@ -13,7 +13,16 @@ const RULES: Record<keyof TodayRuleValues, { label: string; min: number; max: nu
   fewVisitsBelow: { label: "fewVisitsBelow (fewer completed visits than this in that time gets the note)", min: 1, max: 50 },
   newMemberDays: { label: "newMemberDays (how many days a household counts as new after it joins)", min: 1, max: 365 },
   refreshSeconds: { label: "refreshSeconds (how often the page refreshes itself)", min: 30, max: 600 },
+  helloAfterHistoryDays: { label: "helloAfterHistoryDays (how many days of the club's own records must exist before the 'say hello' notes show)", min: 1, max: 365 },
 };
+
+/** A day written YYYY-MM-DD that is really on the calendar (2026-02-30 is not). */
+function isRealDay(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const at = new Date(Date.UTC(y, m - 1, d));
+  return at.getUTCFullYear() === y && at.getUTCMonth() === m - 1 && at.getUTCDate() === d;
+}
 
 /**
  * The rules are plain whole numbers. Unknown names are refused, so a typo in the file is caught rather than ignored. The look-backs
@@ -35,7 +44,10 @@ export function parseTodayRules(input: unknown): TodayRules {
     if (value < rule.min) throw new TodayRulesError(`defaults, ${rule.label} must be ${rule.min} or more.`);
     if (value > rule.max) throw new TodayRulesError(`defaults, ${rule.label} cannot be more than ${rule.max}.`);
   }
-  return { placeholder: data.placeholder !== false, defaults: { ...(data.defaults as unknown as TodayRuleValues) } };
+  const start = (input as { historyStartsOn?: unknown }).historyStartsOn;
+  if (start === undefined) throw new TodayRulesError('The Today at the Club rules file needs "historyStartsOn": a day like 2026-12-01, or null while the switch-on day is not set.');
+  if (start !== null && (typeof start !== "string" || !isRealDay(start))) throw new TodayRulesError('historyStartsOn must be a real day written like 2026-12-01, or null while the switch-on day is not set.');
+  return { placeholder: data.placeholder !== false, historyStartsOn: start, defaults: { ...(data.defaults as unknown as TodayRuleValues) } };
 }
 
 /** The rules the staff landing page runs on, read and checked once. */

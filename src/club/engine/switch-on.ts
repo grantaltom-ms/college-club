@@ -290,6 +290,12 @@ const PEOPLE: { id: string; title: string; detail: string; fix: string }[] = [
     fix: "Claude builds it when Grant asks; Grant sends the report.",
   },
   {
+    id: "hello_start",
+    title: "The day the club's records began is set, so the say-hello notes can switch on",
+    detail: "On the real server the say-hello notes on Today at the Club stay off until the club's own records cover 90 days, counted from historyStartsOn in today-rules.json. That day is empty until someone sets it, so the notes stay off.",
+    fix: "On the switch-on day Claude sets historyStartsOn in today-rules.json to that day; the notes then switch themselves on 90 days later.",
+  },
+  {
     id: "icrew_freeze",
     title: "iCrew stops taking boat bookings at the moment of the switch",
     detail: "Boats move all at once. If both systems took boat bookings, the same boat could be promised twice.",
