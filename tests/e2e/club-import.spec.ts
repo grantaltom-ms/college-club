@@ -101,6 +101,10 @@ test.describe("checking and adding", () => {
 
     // They are in the club now, with their details and a note in the household's file.
     await page.getByRole("link", { name: "See the households" }).click();
+    // The household list is a search now: the link leads to the search box, and the imported household is found by its name.
+    await expect(page.getByLabel("Search households")).toBeVisible();
+    await page.getByLabel("Search households").fill(`Una${t}1`);
+    await page.getByRole("button", { name: "Search" }).click();
     await page.getByRole("link", { name: `The Una${t}1 household` }).click();
     await expect(page.getByTestId("household-facts")).toContainText("Resident");
     await expect(page.getByTestId("member-row")).toHaveCount(2);
