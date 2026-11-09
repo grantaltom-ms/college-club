@@ -3,6 +3,9 @@ import { BOOKING_TYPES, type BookingType, type RuleValues } from "./types";
 
 /** Helpers for reading the address and form fields of the member pages. Anything unexpected falls back to a safe default. */
 
+/** Where a member of staff lands after signing in: Today at the Club, the same page for every one of them whatever their job. */
+export const STAFF_HOME = "/club/today";
+
 type Param = string | string[] | undefined;
 const first = (p: Param) => (Array.isArray(p) ? p[0] : p);
 

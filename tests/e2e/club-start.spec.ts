@@ -31,12 +31,12 @@ test.describe("the CCS System landing page", () => {
     await expect(page.getByTestId("household-name")).toContainText("Abernathy");
   });
 
-  test("the test staff view acts as Test staff and opens the Staff office", async ({ page }) => {
+  test("the test staff view acts as Test staff and opens Today at the Club, where every member of staff lands", async ({ page }) => {
     await page.goto("/club/start");
     await page.getByTestId("start-staff-open").click();
-    await expect(page).toHaveURL(/\/club\/admin$/);
+    await expect(page).toHaveURL(/\/club\/today$/);
     await expect(page.getByTestId("acting-as")).toHaveText("Acting as Test staff.");
-    await expect(page.getByRole("heading", { level: 1, name: "Staff office" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Today at the Club" })).toBeVisible();
   });
 
   test("going back and forth between the member and staff views, again and again, always lands on the right person", async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe("the CCS System landing page", () => {
       await page.goto("/club/start");
       await page.getByTestId("start-staff-open").click();
       await expect(page.getByTestId("acting-as")).toHaveText("Acting as Test staff.");
-      await expect(page).toHaveURL(/\/club\/admin$/);
+      await expect(page).toHaveURL(/\/club\/today$/);
     }
   });
 

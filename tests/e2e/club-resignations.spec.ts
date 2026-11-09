@@ -43,7 +43,7 @@ const openResignations = async (page: Page) => {
   await expect(page.getByRole("heading", { level: 1, name: "End memberships from a file" })).toBeVisible();
 };
 const openHousehold = async (page: Page, name: string) => {
-  await page.goto("/club");
+  await page.goto(`/club?q=${encodeURIComponent(name)}`);
   await page.getByRole("link", { name, exact: true }).click();
 };
 
@@ -119,7 +119,7 @@ test.describe("checking and ending", () => {
     await expect(notices).toContainText("no dues are billed from November 2026 on");
 
     // Looking changes nothing: the households are still active.
-    await page.goto("/club");
+    await page.goto(`/club?q=${encodeURIComponent(nameOf(t, 1, ["Una"]))}`);
     await page.getByRole("link", { name: nameOf(t, 1, ["Una"]), exact: true }).click();
     await expect(page.getByRole("list", { name: "Household history" })).not.toContainText("Membership ended");
 

@@ -86,7 +86,7 @@ const WRITERS_LOCK = "club:writes";
 const SEED_LOCK = "club:seed";
 
 /** How far back the screens and the rules look at bookings. Older ones stay in the database. */
-const DEFAULT_HISTORY_DAYS = 90;
+export const DEFAULT_HISTORY_DAYS = 90;
 
 /** How many of the most recent closed months have their invoice lines loaded (so an old month's file can still be downloaded). */
 const BILLING_MONTHS_LOADED = 24;

@@ -21,6 +21,13 @@ export function addDays(day: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
+/** Whole calendar days from one Pacific date to a later one: `daysBetween("2026-10-01", "2026-10-28")` is 27. Negative when `to` is earlier. */
+export function daysBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
+}
+
 /** "2026-10-03" becomes "Oct 3, 2026". */
 export function formatDay(day: string): string {
   const [y, m, d] = day.split("-").map(Number);
@@ -100,6 +107,14 @@ export function weekdayName(day: string): string {
 /** "Saturday, Oct 31". */
 export function formatDayLong(day: string): string {
   return `${weekdayName(day)}, ${formatDay(day).replace(/, \d{4}$/, "")}`;
+}
+
+const headingFormat = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" });
+
+/** A heading for a day, with the month written out: "Sunday, November 8". */
+export function formatDayHeading(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return headingFormat.format(new Date(Date.UTC(y, m - 1, d)));
 }
 
 const clockFormat = new Intl.DateTimeFormat("en-US", { timeZone: PACIFIC, hour: "numeric", minute: "2-digit" });

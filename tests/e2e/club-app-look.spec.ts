@@ -50,7 +50,7 @@ const viaStartTime = (from: string) => async (page: Page) => {
 
 /** From the staff Households list into one household, then by one of its links to a desk step (end, change details, remove). */
 const viaHousehold = (family: string, link: string, arrives: RegExp) => async (page: Page) => {
-  await page.goto("/club");
+  await page.goto(`/club?q=${encodeURIComponent(family)}`);
   await page.locator('main a[href^="/club/household/"]', { hasText: family }).first().click();
   await page.waitForURL(/\/club\/household\/[^/?]+$/);
   await page.locator(link).first().click();
@@ -60,7 +60,8 @@ const viaHousehold = (family: string, link: string, arrives: RegExp) => async (p
 const SCREENS: Screen[] = [
   // Part 1
   { name: "member home", who: "Nora Abernathy", path: "/club", h1: "The Abernathy household" },
-  { name: "staff households list", who: "Test staff", path: "/club", h1: "Households" },
+  { name: "staff households search (before a search)", who: "Test staff", path: "/club", h1: "Households" },
+  { name: "staff households search (with results)", who: "Test staff", path: "/club?q=household", h1: "Households" },
   { name: "Reservations: what to reserve", who: "Nora Abernathy", path: "/club/book", h1: "Reservations" },
   { name: "Reservations: shell sizes", who: "Nora Abernathy", path: "/club/book?what=shell", h1: "Reservations" },
   { name: "Reservations: the shell list", who: "Nora Abernathy", path: "/club/book?what=shell&kind=single", h1: "Reservations" },
@@ -101,6 +102,19 @@ const SCREENS: Screen[] = [
   { name: "the sign-in prompt", who: null, path: "/club/my-bookings", h1: "Choose a test member" },
   { name: "the test member picker", who: null, path: "/club/act-as", h1: "Act as a test member" },
   // Part 3: the staff screens
+  // Part 5: the staff landing page, with its lists folded and with both opened (the notes and chips only show when open)
+  { name: "Today at the Club (lists folded)", who: "Test staff", path: "/club/today", h1: "Today at the Club" },
+  {
+    name: "Today at the Club (both lists open)",
+    who: "Test staff",
+    path: "",
+    h1: "Today at the Club",
+    go: async (page) => {
+      await page.goto("/club/today");
+      for (const id of ["today-here", "today-upcoming"]) await page.getByTestId(id).getByRole("button").click();
+      await expect(page.getByTestId("today-row").first()).toBeVisible();
+    },
+  },
   { name: "Staff office", who: "Test staff", path: "/club/admin", h1: "Staff office" },
   { name: "Check someone in", who: "Test staff", path: "/club/admin/check-in", h1: "Check someone in" },
   { name: "Reservation attendance", who: "Test staff", path: "/club/admin/reservations", h1: "Reservation attendance" },
@@ -471,7 +485,7 @@ test.describe("hierarchy and clickability (part 4)", () => {
   test("a card that opens a page (a household on the staff list) carries an arrow that is part of the link, and lifts when the link is hovered", async ({ page }) => {
     await page.setViewportSize({ width: 1180, height: 900 });
     await actAs(page, "Test staff");
-    await page.goto("/club");
+    await page.goto("/club?q=household");
     const card = page.locator('[data-testid="household-row"]').first();
     const title = card.locator("h3 a");
     const arrow = await title.evaluate((el) => {

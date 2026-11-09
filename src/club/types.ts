@@ -810,6 +810,29 @@ export interface SnackRules {
   defaults: SnackRuleValues;
 }
 
+/**
+ * The numbers behind the staff landing page, "Today at the Club": when a member's name gets a warm "say hello" note, and how
+ * often the page refreshes itself. Every value lives in settings/today-rules.json, never in code.
+ */
+export interface TodayRuleValues {
+  /** A member with no completed visit in this many days (or ever) gets a "first visit in a while" note. */
+  noVisitDays: number;
+  /** The look-back for the next rule, in days. The club's records keep 90 days of bookings, so this cannot be longer. */
+  fewVisitsDays: number;
+  /** A member with fewer completed visits than this in the last `fewVisitsDays` days gets the same note. */
+  fewVisitsBelow: number;
+  /** A household that joined in the last this many days is new: its members get a "new member" note. */
+  newMemberDays: number;
+  /** How often the page asks for fresh figures by itself, in seconds, so a front-desk screen never goes quietly stale. */
+  refreshSeconds: number;
+}
+
+export interface TodayRules {
+  /** True while the numbers are placeholders. */
+  placeholder: boolean;
+  defaults: TodayRuleValues;
+}
+
 export const VISIT_VIA = ["ipad", "staff"] as const;
 export type VisitVia = (typeof VISIT_VIA)[number];
 

@@ -1,0 +1,11 @@
+{
+  "placeholder": true,
+  "about": "The staff landing page, Today at the Club. These numbers are PLACEHOLDERS until club staff confirm them (see CLAUDE.md). A member's name gets a warm 'say hello' note on that page when they are NEW (their household joined within newMemberDays, or this is their first booking ever) or when they have not been in much: no completed visit for noVisitDays days (or ever), or fewer than fewVisitsBelow completed visits in the last fewVisitsDays days. Only visits before today count, so a regular who arrives is not flagged and a rare visitor who has just checked in still is. fewVisitsDays and noVisitDays cannot be longer than 90, because the club's records keep 90 days of bookings. refreshSeconds: how often the page asks for fresh figures by itself, so a front-desk screen never goes quietly stale.",
+  "defaults": {
+    "noVisitDays": 60,
+    "fewVisitsDays": 90,
+    "fewVisitsBelow": 2,
+    "newMemberDays": 30,
+    "refreshSeconds": 120
+  }
+}

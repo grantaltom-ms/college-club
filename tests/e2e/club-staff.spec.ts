@@ -399,7 +399,7 @@ test.describe("on a phone", () => {
       const box = await button.boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(44);
     }
-    await page.goto("/club");
+    await page.goto("/club?q=lindqvist");
     await page.getByTestId("household-row").first().getByRole("link").click();
     expect(await noSidewaysScroll()).toBe(true);
     await page.getByTestId("end-link").click();

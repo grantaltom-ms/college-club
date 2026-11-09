@@ -10,6 +10,7 @@ import practices from "./practice-rules.json";
 import resignations from "./resignation-rules.json";
 import snacks from "./snack-rules.json";
 import tours from "./tour-rules.json";
+import today from "./today-rules.json";
 
 /**
  * Every rules file in this folder, with whether its numbers are still marked as placeholders. The switch-on checklist reads this to say
@@ -30,6 +31,7 @@ export const RULES_FILES: { file: string; placeholder: boolean }[] = [
   read("practice-rules.json", practices),
   read("resignation-rules.json", resignations),
   read("snack-rules.json", snacks),
+  read("today-rules.json", today),
   read("tour-rules.json", tours),
 ];
 

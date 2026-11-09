@@ -13,6 +13,8 @@ export type MemberNavLink = {
    * bookings with their class sign-ups, My bill, My boats): one dropdown called My account on a wide screen, one labelled group on a phone.
    */
   group: "go" | "me" | "coach" | "mine" | "desk" | "account";
+  /** Marked as the current page only on exactly this address, not on the pages under it (the Households list sits at /club, above every page). */
+  exact?: boolean;
 };
 
 const GROUP_LABEL: Record<MemberNavLink["group"], string> = {
@@ -40,7 +42,7 @@ export function MemberNav({
 }: {
   homeHref: string;
   homeLabel: string;
-  /** Where the home link sits: a member's household is the first thing in My account; staff's Households list is a plain link. */
+  /** Where the home link sits: a member's household is the first thing in My account; staff's Today at the Club is a plain link. */
   homeGroup?: MemberNavLink["group"];
   links: MemberNavLink[];
   showSignOut: boolean;
@@ -138,13 +140,14 @@ export function MemberNav({
     setAccountAt(null);
   };
   const allLinks: MemberNavLink[] = [{ href: homeHref, label: homeLabel, group: homeGroup }, ...links];
-  /** The page you are on is marked, so the bar can underline it. The home link only counts on its own address. */
-  const isHere = (href: string) => (href === homeHref ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
+  /** The page you are on is marked, so the bar can underline it. The home link, and any link marked `exact`, only counts on its own address. */
+  const exactOnly = new Set([homeHref, ...links.filter((l) => l.exact).map((l) => l.href)]);
+  const isHere = (href: string) => (exactOnly.has(href) ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
 
   return (
     <header ref={header} className="club-header" data-open={open ? "" : undefined}>
       <div className="club-header-bar">
-        <Link href="/club" className="club-brand" onClick={close}>
+        <Link href={homeHref} className="club-brand" onClick={close}>
           {/* The words beside the mark are the link's name, so the picture itself says nothing extra. */}
           <Image src="/club-logo-mark.png" alt="" width={40} height={40} className="club-brand-mark" priority />
           <span className="club-wordmark">College Club Seattle</span>

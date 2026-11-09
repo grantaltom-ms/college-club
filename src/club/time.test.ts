@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, clockToMinutes, formatClock, formatDay, formatDayLong, formatMoment, formatRange, middayPacific, pacificDate, pacificDayStart, pacificWall, weekdayName } from "./time";
+import { addDays, clockToMinutes, daysBetween, formatClock, formatDay, formatDayHeading, formatDayLong, formatMoment, formatRange, middayPacific, pacificDate, pacificDayStart, pacificWall, weekdayName } from "./time";
 
 describe("club time", () => {
   it("reads the Pacific date of a moment, across daylight saving", () => {
@@ -29,6 +29,27 @@ describe("club time", () => {
     expect(formatDay("2026-10-03")).toBe("Oct 3, 2026");
     expect(formatMoment("2026-10-03T18:00:00Z")).toBe("Oct 3, 2026, 11:00 am");
     expect(formatMoment("2026-12-03T19:00:00Z")).toBe("Dec 3, 2026, 11:00 am");
+  });
+});
+
+describe("counting and naming days", () => {
+  it("counts whole calendar days, across month ends, year ends and both clock changes", () => {
+    expect(daysBetween("2026-10-01", "2026-10-28")).toBe(27);
+    expect(daysBetween("2026-10-28", "2026-10-28")).toBe(0);
+    expect(daysBetween("2026-10-28", "2026-10-27")).toBe(-1);
+    expect(daysBetween("2026-12-31", "2027-01-01")).toBe(1);
+    expect(daysBetween("2026-02-28", "2026-03-01")).toBe(1);
+    expect(daysBetween("2025-11-09", "2026-11-09")).toBe(365);
+    // The day the clocks fall back is 25 hours long and the day they spring forward is 23: both are still one day.
+    expect(daysBetween("2026-10-31", "2026-11-02")).toBe(2);
+    expect(daysBetween("2027-03-13", "2027-03-15")).toBe(2);
+  });
+
+  it("writes a day as a heading with the month spelled out, whatever the time zone of the machine", () => {
+    expect(formatDayHeading("2026-11-08")).toBe("Sunday, November 8");
+    expect(formatDayHeading("2026-10-28")).toBe("Wednesday, October 28");
+    expect(formatDayHeading("2027-01-01")).toBe("Friday, January 1");
+    expect(formatDayHeading("2028-02-29")).toBe("Tuesday, February 29");
   });
 });
 

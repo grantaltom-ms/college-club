@@ -90,8 +90,8 @@ test.describe("checking and adding", () => {
     await expect(cards.nth(1)).toContainText("Intermediate · joined 2022-03-14");
 
     // Nothing is saved by checking.
-    await page.goto("/club");
-    await expect(page.getByText(`The Una${t}1 household`)).toHaveCount(0);
+    await page.goto(`/club?q=${encodeURIComponent(`Una${t}1`)}`);
+    await expect(page.getByTestId("no-household-match")).toBeVisible();
 
     await page.goto("/club/admin/import");
     await check(page, text);
@@ -183,7 +183,7 @@ test.describe("checking and adding", () => {
     await expect(page.getByTestId("import-done")).toContainText("Added 1 household with 1 adult. 1 household in the file was already here and left alone.");
 
     // The household that was already here kept its original type.
-    await page.goto("/club");
+    await page.goto(`/club?q=${encodeURIComponent(`Una${t}1`)}`);
     await page.getByRole("link", { name: `The Una${t}1 household` }).click();
     await expect(page.getByTestId("household-facts")).toContainText("Resident");
     await expect(page.getByTestId("household-facts")).not.toContainText("Non-Resident");
@@ -221,7 +221,7 @@ test.describe("checking and adding", () => {
       await page.getByTestId("import-add").click();
       await expect(page.getByTestId("import-done")).toContainText("Added 1 household with 2 adults.");
     }
-    await page.goto("/club");
+    await page.goto(`/club?q=${encodeURIComponent(`Una${t}`)}`);
     for (let n = 1; n <= 3; n++) await expect(page.getByRole("link", { name: `The Una${t}${n} household` })).toHaveCount(1);
   });
 
@@ -234,7 +234,7 @@ test.describe("checking and adding", () => {
     await expect(page.getByText("…and 10 more households.")).toBeVisible();
     await page.getByTestId("import-add").click();
     await expect(page.getByTestId("import-done")).toContainText("Added 60 households with 120 adults.");
-    await page.goto("/club");
+    await page.goto(`/club?q=${encodeURIComponent(`Una${t}60`)}`);
     await expect(page.getByRole("link", { name: `The Una${t}60 household` })).toHaveCount(1);
   });
 });

@@ -10,6 +10,7 @@ import { requireClub } from "@/club/guard";
 import { getIpadSecret } from "@/club/ipad-secret";
 import { demoMember } from "@/club/start";
 import { getClubStore } from "@/club/store/instance";
+import { STAFF_HOME } from "@/club/web";
 
 /** Nothing about the page, not even its title, appears where it does not exist. */
 export async function generateMetadata(): Promise<Metadata> {
@@ -74,11 +75,11 @@ export default async function StartPage() {
         </li>
         <li className="club-card" data-testid="start-staff">
           <h2>Test staff view</h2>
-          <p>See the staff office: households, bookings, check-in, equipment, charges and billing.</p>
+          <p>See what staff see: Today at the Club, then households, bookings, check-in, equipment, charges and billing.</p>
           <p className="club-meta">You will be acting as Test staff.</p>
           <form method="post" action="/api/club/act-as" className="club-actions">
             <input type="hidden" name="actor" value="staff" />
-            <input type="hidden" name="next" value="/club/admin" />
+            <input type="hidden" name="next" value={STAFF_HOME} />
             <button type="submit" className="club-button" data-testid="start-staff-open">
               Open staff view
             </button>

@@ -6,7 +6,7 @@ import { fullName } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { LOGIN_RULES } from "@/club/settings/login-rules";
-import { NOTICES } from "@/club/web";
+import { NOTICES, STAFF_HOME } from "@/club/web";
 import { SITE, phoneHref } from "@/site/content";
 import { PUBLIC_SITE_URL } from "@/site/links";
 import { HomeScreenCard } from "./HomeScreenCard";
@@ -47,7 +47,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<S
                 You are signed in as {actor.kind === "staff" ? actor.label : fullName(actor.member)}.
               </p>
               <p>
-                <Link href={actor.kind === "staff" ? "/club" : "/club/book"} className="ds-button ds-button-large">
+                <Link href={actor.kind === "staff" ? STAFF_HOME : "/club/book"} className="ds-button ds-button-large">
                   {actor.kind === "staff" ? "Go to the club" : "Make a reservation"}
                 </Link>
               </p>
