@@ -35,8 +35,11 @@ const VISITS: [string, number[]][] = [
   ["Britta Eriksen", [10, 40]],
 ];
 
-/** Kayaks and paddle boards need no qualification, so anyone can have had a visit on one. */
-const VISIT_ITEMS = ["Mink", "Otter", "Beaver", "Skimmer", "Drift"];
+/**
+ * Earlier visits are all on the Dock berths pool: it needs no qualification, so anyone can have had one, and no browser test looks up
+ * a member's rows by that name (a visit on the boat a test searches for, such as Skimmer, would be a second row with the same words).
+ */
+const VISIT_ITEM = "Dock berths";
 
 export async function seedSampleToday(store: ClubStore, now: Date): Promise<void> {
   const state = await store.read();
@@ -53,15 +56,15 @@ export async function seedSampleToday(store: ClubStore, now: Date): Promise<void
   const today = pacificDate(now);
   const at = (daysAgo: number, minutes: number) => pacificWall(addDays(today, -daysAgo), minutes);
 
-  // Earlier visits: a booking made the day before, then ticked off by staff ten minutes after it began. Each one has its own boat,
-  // day and hour, so none can clash with another or with a booking the browser tests make.
+  // Earlier visits: a booking made the day before, then ticked off by staff ten minutes after it began. Each one has its own day
+  // and hour, so none can clash with another or with a booking the browser tests make.
   let n = 0;
   for (const [who, days] of VISITS) {
     for (const daysAgo of days) {
       const hour = 6 + (n % 12);
       const start = at(daysAgo, hour * 60);
       const made = await createBooking(store, RULE_BOOK, { actor: SAMPLE_STAFF, now: at(daysAgo + 1, 12 * 60) }, {
-        itemId: item(VISIT_ITEMS[n % VISIT_ITEMS.length]),
+        itemId: item(VISIT_ITEM),
         bookerId: member(who),
         startsAt: start,
         endsAt: at(daysAgo, hour * 60 + 60),
@@ -71,8 +74,9 @@ export async function seedSampleToday(store: ClubStore, now: Date): Promise<void
       n++;
     }
   }
-  // Walter Pemberton has been in once in the last three months, 75 days ago, in the club room, which needs no check-in.
-  await createBooking(store, RULE_BOOK, { actor: SAMPLE_STAFF, now: at(76, 12 * 60) }, { itemId: item("Clubhouse room"), bookerId: member("Walter Pemberton"), startsAt: at(75, 10 * 60), endsAt: at(75, 11 * 60), crewIds: [] });
+  // Walter Pemberton has been in once in the last three months, 75 days ago.
+  const walters = await createBooking(store, RULE_BOOK, { actor: SAMPLE_STAFF, now: at(76, 12 * 60) }, { itemId: item(VISIT_ITEM), bookerId: member("Walter Pemberton"), startsAt: at(75, 10 * 60), endsAt: at(75, 11 * 60), crewIds: [] });
+  await recordAttendance(store, { actor: SAMPLE_STAFF, now: new Date(at(75, 10 * 60).getTime() + 10 * 60000) }, ATTENDANCE_RULES, { kind: "booking", id: walters.booking.id, outcome: "attended" });
 
   // Today. Booked yesterday, so the engine accepts them whatever time it is now.
   const yesterday = { actor: SAMPLE_STAFF, now: at(1, 12 * 60) };
