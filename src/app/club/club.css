@@ -737,7 +737,8 @@ a.slot-free:focus-visible {
 .club-form input[type="text"],
 .club-form input[type="email"],
 .club-form input[type="tel"],
-.club-form input[type="date"] {
+.club-form input[type="date"],
+.club-form input[type="search"] {
   min-height: 44px;
   width: 100%;
   max-width: 28rem;

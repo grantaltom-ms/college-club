@@ -232,8 +232,8 @@ test.describe("Today at the Club", () => {
   test("is staff's home: Today comes first in the menu, is marked while open, and the logo goes there", async ({ page }) => {
     await actAs(page, "Test staff");
     await page.goto("/club/today");
-    const links = await nav(page).getByRole("link").allInnerTexts();
-    expect(links[0]).toBe("Today");
+    // The text as written (the menu draws capitals with a style, which innerText would pick up).
+    const links = await nav(page).getByRole("link").allTextContents();
     expect(links.slice(0, 3)).toEqual(["Today", "Households", "Book"]);
     await expect(nav(page).getByRole("link", { name: "Today", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(nav(page).getByRole("link", { name: "Households", exact: true })).not.toHaveAttribute("aria-current", "page");
@@ -338,7 +338,7 @@ test.describe("Households is search-first", () => {
       await page.goto(`/club?q=${encodeURIComponent(typed)}`);
       await expect(page.getByTestId("no-household-match"), typed).toHaveText("No household matches that search.");
       await expect(cards(page)).toHaveCount(0);
-      await expect(page.getByRole("link", { name: /household$/ })).toHaveCount(0);
+      await expect(page.locator('main a[href^="/club/household/"]')).toHaveCount(0);
     }
     // The search box keeps what was typed, as typed text and not as markup.
     await expect(page.getByLabel("Search households")).toHaveValue("<script>alert(1)</script>");

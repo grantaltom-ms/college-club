@@ -21,12 +21,13 @@ const GROUP_LABEL: Record<MemberNavLink["group"], string> = {
   go: "Book and join",
   me: "My account",
   coach: "Coaching",
-  mine: "My club",
+  mine: "Home",
   desk: "Staff desk",
   account: "Account",
 };
 
-const GROUP_ORDER: MemberNavLink["group"][] = ["go", "me", "coach", "mine", "desk", "account"];
+// "mine" (staff's Today at the Club and the household search) comes first: it is where staff land. A member has nothing in it.
+const GROUP_ORDER: MemberNavLink["group"][] = ["mine", "go", "me", "coach", "desk", "account"];
 
 /**
  * The member-area menu. On a phone it collapses behind a Menu button (same idea as the public site header); from 900px the
