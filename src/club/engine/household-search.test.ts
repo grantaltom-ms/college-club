@@ -88,6 +88,18 @@ describe("searching for a household", () => {
     ]);
   });
 
+  it("finds a member whose name is not written in Latin letters, and says nothing matches for one nobody has, never every household", async () => {
+    const state = await club();
+    const dee = state.members.find((m) => m.firstName === "Dee")!;
+    dee.firstName = "伟";
+    dee.lastName = "张";
+    state.members.find((m) => m.firstName === "Eli")!.lastName = "Иванов";
+    expect(names(state, "张")).toEqual(["The Reed household"]);
+    expect(names(state, "伟 张")).toEqual(["The Reed household"]);
+    expect(names(state, "иванов")).toEqual(["The Reed household"]);
+    for (const nobody of ["李明", "Мария", "علي"]) expect(searchHouseholds(state, nobody), nobody).toEqual({ query: nobody, total: 0, shown: [] });
+  });
+
   it("says nothing matches when nothing does, and a query with no letter or digit in it matches nothing rather than everything", async () => {
     const state = await club();
     expect(searchHouseholds(state, "zzzz")).toEqual({ query: "zzzz", total: 0, shown: [] });
