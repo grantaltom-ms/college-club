@@ -432,7 +432,7 @@ describe.each(STORE_KINDS)("the switch-on checklist: records, read from the %s s
 describe("the switch-on checklist: the words and the counts", () => {
   it("lists the people's lines, never marks them ready, and says who does each", () => {
     const people = switchOnReport(input()).rows.filter((r) => r.group === "people");
-    expect(people.map((r) => r.id)).toEqual(["domain_records", "tracking_off", "mail_test", "sales_tax", "quickbooks_names", "equipment_confirmed", "future_bookings", "icrew_freeze", "switch_date"]);
+    expect(people.map((r) => r.id)).toEqual(["domain_records", "tracking_off", "mail_test", "sales_tax", "quickbooks_names", "equipment_confirmed", "future_bookings", "hello_start", "icrew_freeze", "switch_date"]);
     for (const r of people) {
       expect(r.status).toBe("person");
       expect(r.fix.length, r.id).toBeGreaterThan(10);
@@ -464,20 +464,20 @@ describe("the switch-on checklist: the words and the counts", () => {
   it("counts the three kinds, and the counts add up to every row", () => {
     const report = switchOnReport(input());
     expect(report.counts.ready + report.counts.notReady + report.counts.person).toBe(report.rows.length);
-    expect(report.counts.person).toBe(9);
+    expect(report.counts.person).toBe(10);
     // The settings of a ready server pass; nothing is loaded, so the records lines and the rules line are the ones to fix.
     expect(report.rows.filter((r) => r.status === "not_ready").map((r) => r.id)).toEqual(["households_loaded", "quickbooks_ids", "can_sign_in", "equipment_loaded", "archive_loaded"]);
   });
 
   it("says how many things are to fix, singular and plural, and never claims the switch-on is ready while people's lines remain", () => {
-    expect(switchOnReport(input()).verdict).toBe("5 things to fix before switch-on, and 9 things only a person can confirm.");
+    expect(switchOnReport(input()).verdict).toBe("5 things to fix before switch-on, and 10 things only a person can confirm.");
     const real = stateOf({ households: [hh("a")], members: [adult("a1", "a")], items: [boat("Real one")] });
     const onlyArchive = switchOnReport(input({ state: real, archive: { rows: 0, fileNames: [] } }));
     expect(onlyArchive.counts.notReady).toBe(1);
-    expect(onlyArchive.verdict).toBe("1 thing to fix before switch-on, and 9 things only a person can confirm.");
+    expect(onlyArchive.verdict).toBe("1 thing to fix before switch-on, and 10 things only a person can confirm.");
     const clean = switchOnReport(input({ state: real, archive: { rows: 5, fileNames: ["iCrew-2026.csv"] } }));
     expect(clean.counts.notReady).toBe(0);
-    expect(clean.verdict).toBe("Every check the computer can make passes. 9 things still need a person to confirm.");
+    expect(clean.verdict).toBe("Every check the computer can make passes. 10 things still need a person to confirm.");
     expect(clean.verdict).not.toMatch(/ready to switch on/i);
   });
 

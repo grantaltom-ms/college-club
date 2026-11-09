@@ -51,8 +51,8 @@ test.describe("Today at the Club", () => {
     await page.goto("/club/today");
     await expect(page.getByRole("heading", { level: 1, name: "Today at the Club" })).toBeVisible();
     await expect(page.getByTestId("today-date")).toHaveText("Wednesday, October 28");
-    // Biggest first, in the club's own categories: "14 reservations today — 7 boats, 2 dock, 2 class places, 2 room, 1 gym" on a fresh club.
-    await expect(page.getByTestId("today-summary")).toHaveText(/^\d+ reservations today — \d+ (boats?|gym|dock|class places?|room|work spaces?)(, \d+ (boats?|gym|dock|class places?|room|work spaces?))*$/);
+    // Biggest first, in the club's own categories: "20 reservations today — 7 boats, 6 event RSVPs, 2 dock, 2 class places, 2 room, 1 gym" on a fresh club.
+    await expect(page.getByTestId("today-summary")).toHaveText(/^\d+ reservations today — \d+ (boats?|gym|dock|class places?|event RSVPs?|room|work spaces?)(, \d+ (boats?|gym|dock|class places?|event RSVPs?|room|work spaces?))*$/);
     const asOf = page.getByTestId("today-asof");
     await expect(asOf).toHaveText("1:00 pm");
     await expect(asOf).toHaveAttribute("datetime", "2026-10-28T20:00:00.000Z");
@@ -114,6 +114,34 @@ test.describe("Today at the Club", () => {
     await expect(page.getByRole("heading", { level: 2 })).toHaveCount(2);
   });
 
+
+  test("counts and lists events: an event under way puts its members in 'here now', a later one in 'upcoming', each tagged Event", async ({ page }) => {
+    await actAs(page, "Test staff");
+    await page.goto("/club/today");
+    await expect(page.getByTestId("today-summary")).toContainText(/\d+ event RSVPs?/);
+    await openBoth(page);
+    // The Coffee Hour is under way at 1 pm: three members are here for it, two of them on something else as well.
+    for (const name of ["Britta Eriksen", "Declan Halloran", "Dev Rao"]) {
+      await expect(row(here(page), name)).toContainText("Coffee Hour");
+      await expect(row(here(page), name)).toContainText("Event");
+    }
+    await expect(row(here(page), "Britta Eriksen")).toContainText("Dock slip B");
+    await expect(row(here(page), "Declan Halloran")).toContainText("Weight room");
+    // The Evening Talk is still to come: its members are upcoming, and it is not shown as under way.
+    for (const name of ["Camille Moreau", "Dev Rao", "Priya Rao"]) {
+      await expect(row(upcoming(page), name)).toContainText("Evening Talk");
+      await expect(row(upcoming(page), name)).toContainText("Event");
+    }
+    await expect(row(here(page), "Priya Rao")).not.toContainText("Evening Talk");
+    await expect(row(here(page), "Dev Rao")).not.toContainText("Evening Talk");
+    // The Coffee Hour is not still to come for the people already at it, and the talk does not make anyone "here".
+    await expect(row(upcoming(page), "Britta Eriksen")).toHaveCount(0);
+    await expect(row(upcoming(page), "Declan Halloran")).toHaveCount(0);
+    // A member who brings guests is listed once, and the guests are not listed or counted.
+    await expect(here(page).getByTestId("today-row").filter({ hasText: "Declan Halloran" })).toHaveCount(1);
+    await expect(page.getByRole("main")).not.toContainText(/guest/i);
+  });
+
   test("marks people the desk has not seen in a while, or has not met, with warm words and never a number", async ({ page }) => {
     await actAs(page, "Test staff");
     await page.goto("/club/today");
@@ -124,6 +152,8 @@ test.describe("Today at the Club", () => {
     // Regulars carry no note.
     await expect(row(here(page), "Britta Eriksen").getByTestId("today-hello")).toHaveCount(0);
     await expect(row(here(page), "Declan Halloran").getByTestId("today-hello")).toHaveCount(0);
+    // The notes are on: a test version has the invented club's history, so the line that says they are off is not there.
+    await expect(page.getByTestId("today-hello-off")).toHaveCount(0);
     for (const note of await page.getByTestId("today-hello").allInnerTexts()) {
       expect([HELLO_RARE, HELLO_NEW]).toContain(note);
       expect(note).not.toMatch(/\d/);

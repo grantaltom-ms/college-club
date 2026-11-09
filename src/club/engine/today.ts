@@ -1,5 +1,5 @@
-import { daysBetween, formatClock, formatDayHeading, pacificDate } from "../time";
-import type { AttendanceRules, Booking, BookingType, ClubState, Member, SignUp, TodayRules } from "../types";
+import { addDays, daysBetween, formatClock, formatDay, formatDayHeading, pacificDate } from "../time";
+import type { AttendanceRules, Booking, BookingType, ClubState, Member, Rsvp, SignUp, TodayRules } from "../types";
 import { bookingTypeOf, checkInNeeded } from "./attendance";
 import { fullName, householdOf } from "./queries";
 
@@ -10,8 +10,9 @@ import { fullName, householdOf } from "./queries";
  * in a while or has never met. It is worked out from the club's own records each time; nothing is stored for it.
  *
  * Staff pages only. The hello notes are never shown to a member, on this page or any other; nothing outside the staff landing
- * page asks for them. Reservations are boat and space bookings and class places (the categories My bookings already uses). Events
- * and practices are not reservations here: events have their own RSVP list and practices their own lineup.
+ * page asks for them. Reservations are boat and space bookings, class places (the categories My bookings already uses) and event
+ * RSVPs (Grant, Nov 9: events count too, one for each member going; the guests they bring are not members and are not listed).
+ * Practices are not reservations here: they have their own lineup.
  *
  * No clock time of any reservation is part of what this returns, on purpose: the page is for knowing who to greet, not for
  * reading out a schedule. The one time on the page is when the figures were worked out (`asOf`).
@@ -20,7 +21,7 @@ import { fullName, householdOf } from "./queries";
 /* ---------- The categories ---------- */
 
 /** What a reservation is, in the club's own words. The booking types are the ones the app already has; a class place is a class. */
-export type TodayCategoryKey = "boat" | "gym" | "dock" | "class" | "room" | "work";
+export type TodayCategoryKey = "boat" | "gym" | "dock" | "class" | "event" | "room" | "work";
 
 interface TodayCategory {
   key: TodayCategoryKey;
@@ -33,18 +34,20 @@ interface TodayCategory {
   many: string;
 }
 
-/** Biggest-first ties keep this order: boats, gym, dock, classes, room, work space. */
+/** Biggest-first ties keep this order: boats, gym, dock, classes, events, room, work space. */
 export const TODAY_CATEGORIES: readonly TodayCategory[] = [
   { key: "boat", types: ["Shell", "Kayak", "Paddle Board"], tag: "Boat", one: "boat", many: "boats" },
   { key: "gym", types: ["Gym Space"], tag: "Gym", one: "gym", many: "gym" },
   { key: "dock", types: ["Dock Space"], tag: "Dock", one: "dock", many: "dock" },
   { key: "class", types: [], tag: "Class", one: "class place", many: "class places" },
+  { key: "event", types: [], tag: "Event", one: "event RSVP", many: "event RSVPs" },
   { key: "room", types: ["Room Space"], tag: "Room", one: "room", many: "room" },
   { key: "work", types: ["Work Space"], tag: "Work space", one: "work space", many: "work spaces" },
 ];
 
 const categoryOfType = (type: BookingType): TodayCategory | undefined => TODAY_CATEGORIES.find((c) => c.types.includes(type));
 const CLASS_CATEGORY = TODAY_CATEGORIES.find((c) => c.key === "class")!;
+const EVENT_CATEGORY = TODAY_CATEGORIES.find((c) => c.key === "event")!;
 
 /* ---------- What the page shows ---------- */
 
@@ -60,9 +63,9 @@ export const HELLO_WORDS: Record<HelloFlag["kind"], string> = {
 };
 
 export interface TodayWhat {
-  /** The boat, space or class, as members know it: "Dear Prudence", "Weight room", "Morning Yoga". */
+  /** The boat, space, class or event, as members know it: "Dear Prudence", "Weight room", "Morning Yoga", "Coffee Hour". */
   title: string;
-  /** "Boat", "Gym", "Dock", "Class", "Room", "Work space". */
+  /** "Boat", "Gym", "Dock", "Class", "Event", "Room", "Work space". */
   category: string;
 }
 
@@ -95,6 +98,8 @@ export interface TodayView {
     /** "14 reservations today — 6 boats, 3 gym, 2 dock, 2 class places, 1 room", or "No reservations today." */
     words: string;
   };
+  /** Whether the "say hello" notes are switched on. When they are off every row's `hello` is null. */
+  helloOn: boolean;
   /** Members whose reservation is under way, or who have checked in for one that has not ended. */
   here: TodayRow[];
   /** Members with a reservation still to start today. */
@@ -136,6 +141,14 @@ function signUpStage(g: SignUp, startsAt: string, endsAt: string, nowMs: number)
   return "coming";
 }
 
+/** The same for an event RSVP. A waiting place holds nothing, and staff mark events, so "going" is here only once the event is under way. */
+function rsvpStage(r: Rsvp, startsAt: string, endsAt: string, nowMs: number): Stage | null {
+  if (r.status !== "going" && r.status !== "attended") return null;
+  if (nowMs >= Date.parse(endsAt)) return "over";
+  if (r.status === "attended" || nowMs >= Date.parse(startsAt)) return "here";
+  return "coming";
+}
+
 /** The per-person lines for today's lists, and the count of reservations that start today, by category. */
 function reservationsToday(state: ClubState, now: Date): { lines: Line[]; counts: Map<TodayCategoryKey, number> } {
   const today = pacificDate(now);
@@ -169,6 +182,18 @@ function reservationsToday(state: ClubState, now: Date): { lines: Line[]; counts
     if (stage === "coming" && !startsToday) continue;
     const what = { title: state.classes.find((c) => c.id === session.classId)?.name ?? "A class", category: CLASS_CATEGORY.tag };
     lines.push({ memberId: g.memberId, what, startMs: Date.parse(session.startsAt), stage });
+  }
+
+  const events = new Map(state.events.map((e) => [e.id, e]));
+  for (const r of state.rsvps) {
+    const event = events.get(r.eventId);
+    if (!event || event.status !== "scheduled") continue;
+    const startsToday = pacificDate(new Date(event.startsAt)) === today;
+    if (startsToday && (r.status === "going" || r.status === "attended" || r.status === "no_show")) count("event");
+    const stage = rsvpStage(r, event.startsAt, event.endsAt, nowMs);
+    if (stage === null || stage === "over") continue;
+    if (stage === "coming" && !startsToday) continue;
+    lines.push({ memberId: r.memberId, what: { title: event.title, category: EVENT_CATEGORY.tag }, startMs: Date.parse(event.startsAt), stage });
   }
   return { lines, counts };
 }
@@ -243,21 +268,48 @@ export function helloFor(joinedOn: string, history: TodayHistory, today: string,
   return null;
 }
 
+/* ---------- When the notes are on ---------- */
+
+/**
+ * Whether the "say hello" notes show (Grant, Nov 9: off until the app has 90 days of its own records). On a real server the notes
+ * wait until `helloAfterHistoryDays` days after `historyStartsOn`, and stay off while that day is not set: in the first weeks
+ * after switch-on nearly everyone would look like a rare visitor, so a note by every name would mean nothing. A server that allows
+ * invented data (a test version, the demo, the automated tests) has the invented club's history in its place, so it shows them.
+ */
+export function helloNotesOn(rules: TodayRules, today: string, inventedClub: boolean): boolean {
+  if (inventedClub) return true;
+  const start = rules.historyStartsOn;
+  return start !== null && daysBetween(start, today) >= rules.defaults.helloAfterHistoryDays;
+}
+
+/** One quiet line for staff when the notes are off, so nobody wonders where they went. */
+export function helloOffWords(rules: TodayRules): string {
+  const days = rules.defaults.helloAfterHistoryDays;
+  const start = rules.historyStartsOn;
+  if (start === null) return `The say-hello notes are switched off until the club's own records cover ${days} days. The day the records began has not been set yet.`;
+  return `The say-hello notes are switched off until the club's own records cover ${days} days. They switch on ${formatDay(addDays(start, days))}.`;
+}
+
 /* ---------- Putting it together ---------- */
 
 const byName = (a: Member, b: Member) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || a.id.localeCompare(b.id);
 
-/** Today at the club, as of `now`. Identical for every member of staff: nothing here depends on who is asking. */
-export function todayAtTheClub(state: ClubState, now: Date, rules: TodayRules, attendance: AttendanceRules): TodayView {
+/**
+ * Today at the club, as of `now`. Identical for every member of staff: nothing here depends on who is asking. `hello` says whether
+ * the "say hello" notes are on (`helloNotesOn` decides, and the page passes it); it is on unless told otherwise.
+ */
+export function todayAtTheClub(state: ClubState, now: Date, rules: TodayRules, attendance: AttendanceRules, options: { hello?: boolean } = {}): TodayView {
+  const helloOn = options.hello ?? true;
   const day = pacificDate(now);
   const { lines, counts } = reservationsToday(state, now);
 
   // Only active adults of active households are listed: someone who has left cannot hold a live reservation anyway.
   const members = new Map(state.members.filter((m) => m.status === "active" && householdOf(state, m.householdId)?.status === "active").map((m) => [m.id, m]));
   const listed = lines.filter((l) => members.has(l.memberId));
-  const history = historyOf(state, new Set(listed.map((l) => l.memberId)), now, attendance);
+  const history = helloOn ? historyOf(state, new Set(listed.map((l) => l.memberId)), now, attendance) : new Map<string, TodayHistory>();
   const hello = new Map<string, HelloFlag | null>();
   const helloOf = (m: Member) => {
+    if (!helloOn) return null;
     if (!hello.has(m.id)) hello.set(m.id, helloFor(householdOf(state, m.householdId)!.joinedOn, history.get(m.id)!, day, rules));
     return hello.get(m.id)!;
   };
@@ -290,6 +342,7 @@ export function todayAtTheClub(state: ClubState, now: Date, rules: TodayRules, a
     asOf: now.toISOString(),
     asOfClock: formatClock(now),
     summary: { total, parts, words: summaryWords(total, wordParts) },
+    helloOn,
     // Here now: by name, so the desk can find someone. Still to come: whoever is next first, then by name.
     here: rows("here", (a, b) => byName(a.member, b.member)),
     upcoming: rows("coming", (a, b) => a.first - b.first || byName(a.member, b.member)),

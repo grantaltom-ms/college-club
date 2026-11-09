@@ -22,24 +22,26 @@ async function sampleAt(clockNow: () => Date) {
 const shape = (rows: TodayRow[]) => rows.map((r) => [r.name, r.what.map((w) => `${w.title} (${w.category})`).join("; "), r.hello?.kind ?? "none"]);
 
 describe("the sample club on Today at the Club", () => {
-  it("tells the whole story at 1 pm: people under way, someone checked in, people still to come, a rare visitor and a new member", async () => {
+  it("tells the whole story at 1 pm: people under way, someone checked in, an event under way, people still to come, a rare visitor and a new member", async () => {
     const store = await sampleAt(() => NOW);
     const v = todayAtTheClub(await store.read(), NOW, TODAY_RULES, ATTENDANCE_RULES);
     expect(v.heading).toBe("Wednesday, October 28");
-    expect(v.summary.words).toBe("14 reservations today — 7 boats, 2 dock, 2 class places, 2 room, 1 gym");
+    expect(v.summary.words).toBe("20 reservations today — 7 boats, 6 event RSVPs, 2 dock, 2 class places, 2 room, 1 gym");
     expect(shape(v.here)).toEqual([
-      ["Britta Eriksen", "Dock slip B (Dock)", "none"], // under way, not checked in
-      ["Declan Halloran", "Weight room (Gym)", "none"], // checked in
+      ["Britta Eriksen", "Dock slip B (Dock); Coffee Hour (Event)", "none"], // under way, not checked in
+      ["Declan Halloran", "Weight room (Gym); Coffee Hour (Event)", "none"], // checked in
       ["Amara Okonkwo", "Otter (Boat)", "rare"], // has never been in
       ["Chidi Okonkwo", "Skimmer (Boat)", "none"],
       ["Walter Pemberton", "Clubhouse room (Room)", "rare"], // one visit in the last 75 days
+      ["Dev Rao", "Coffee Hour (Event)", "none"], // at the coffee hour now, a boat and the talk to come
       ["Priya Rao", "Mink (Boat)", "none"],
     ]);
     expect(shape(v.upcoming)).toEqual([
-      ["Camille Moreau", "Lunchtime Mobility (Class)", "none"],
+      ["Camille Moreau", "Lunchtime Mobility (Class); Evening Talk (Event)", "none"],
       ["Julien Moreau", "Lunchtime Mobility (Class); Drift (Boat)", "none"],
-      ["Dev Rao", "Beaver (Boat)", "none"],
+      ["Dev Rao", "Beaver (Boat); Evening Talk (Event)", "none"],
       ["Yuki Nakamura", "Dock slip C (Dock)", "new"], // joined this month
+      ["Priya Rao", "Evening Talk (Event)", "none"], // under way on a boat now, and in both lists
     ]);
   });
 
@@ -54,7 +56,7 @@ describe("the sample club on Today at the Club", () => {
     expect(v.here.map((r) => r.name)).not.toContain("Yuki Nakamura");
   });
 
-  it("has an empty 'here now' while two people are still to come, and nobody in either list once the day is over", async () => {
+  it("has an empty 'here now' while people are still to come, and nobody in either list once the day is over", async () => {
     let clock = NOW;
     const store = await sampleAt(() => clock);
     const lists = async (t: Date) => {
@@ -62,8 +64,9 @@ describe("the sample club on Today at the Club", () => {
       const v = todayAtTheClub(await store.read(), t, TODAY_RULES, ATTENDANCE_RULES);
       return [v.here.map((r) => r.name), v.upcoming.map((r) => r.name)];
     };
-    expect(await lists(at(14, 30))).toEqual([[], ["Julien Moreau", "Yuki Nakamura"]]);
-    expect(await lists(at(15, 30))).toEqual([["Julien Moreau", "Yuki Nakamura"], []]);
+    expect(await lists(at(14, 30))).toEqual([[], ["Julien Moreau", "Yuki Nakamura", "Camille Moreau", "Dev Rao", "Priya Rao"]]);
+    expect(await lists(at(15, 30))).toEqual([["Julien Moreau", "Yuki Nakamura"], ["Camille Moreau", "Dev Rao", "Priya Rao"]]);
+    expect(await lists(at(18))).toEqual([["Camille Moreau", "Dev Rao", "Priya Rao"], []]);
     expect(await lists(at(21))).toEqual([[], []]);
   });
 
@@ -82,7 +85,7 @@ describe("the sample club on Today at the Club", () => {
     for (const clock of [at(3), at(13), at(23, 30)]) {
       const store = await sampleAt(() => clock);
       const v = todayAtTheClub(await store.read(), NOW, TODAY_RULES, ATTENDANCE_RULES);
-      expect(v.summary.total, clock.toISOString()).toBe(14);
+      expect(v.summary.total, clock.toISOString()).toBe(20);
     }
   });
 });

@@ -825,11 +825,19 @@ export interface TodayRuleValues {
   newMemberDays: number;
   /** How often the page asks for fresh figures by itself, in seconds, so a front-desk screen never goes quietly stale. */
   refreshSeconds: number;
+  /** The "say hello" notes stay off until the app's own records cover this many days (counted from `historyStartsOn`). */
+  helloAfterHistoryDays: number;
 }
 
 export interface TodayRules {
   /** True while the numbers are placeholders. */
   placeholder: boolean;
+  /**
+   * The day the club began keeping its real records in this app (the switch-on day), as YYYY-MM-DD, or null when that day is not
+   * set yet. On a real server the "say hello" notes are off until `helloAfterHistoryDays` days after it, and off for good while it
+   * is null. Servers that allow invented data have the invented club's history instead, so they ignore it.
+   */
+  historyStartsOn: string | null;
   defaults: TodayRuleValues;
 }
 
