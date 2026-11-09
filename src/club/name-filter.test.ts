@@ -33,4 +33,18 @@ describe("narrowing the iPad's names as someone types", () => {
     expect(nameMatches("Siobhán O'Neill", "o'n")).toBe(true);
     expect(nameMatches("Siobhán O'Neill", "siobhan o")).toBe(true);
   });
+
+  it("does not read letters from another alphabet as nothing typed: it finds only names that start that way", () => {
+    expect(nameMatches("Priya Rao", "张伟")).toBe(false);
+    expect(nameMatches("Priya Rao", "Мария")).toBe(false);
+    expect(nameMatches("张伟 Li", "张伟")).toBe(true);
+    expect(nameMatches("张伟 Li", "张")).toBe(true);
+    expect(nameMatches("Li 张伟", "张伟")).toBe(true);
+    expect(nameMatches("Мария Иванова", "иван")).toBe(true);
+    expect(nameMatches("Мария Иванова", "иванов")).toBe(true);
+    expect(nameMatches("Ørsted Larsen", "ørs")).toBe(true);
+    expect(nameMatches("Ørsted Larsen", "lars")).toBe(true);
+    // Only punctuation is still "nothing typed".
+    expect(nameMatches("Priya Rao", "...")).toBe(true);
+  });
 });

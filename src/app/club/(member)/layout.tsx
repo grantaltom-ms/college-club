@@ -5,6 +5,7 @@ import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { memberAppMetadata, memberAppViewport } from "@/club/pwa";
 import { readClubOnce } from "@/club/store/read-once";
+import { STAFF_HOME } from "@/club/web";
 import "../club-app.css";
 import { MemberNav, type MemberNavLink } from "./MemberNav";
 
@@ -39,6 +40,8 @@ export default async function MemberLayout({ children }: { children: React.React
       links.push({ href: "/club/incidents", label: "Report an incident", group: "coach" });
     }
     if (actor.kind === "staff") {
+      // Today at the Club is staff's home (below); the household search sits right after it.
+      links.push({ href: "/club", label: "Households", group: "mine", exact: true });
       links.push({ href: "/club/admin", label: "Staff office", group: "desk" });
       links.push({ href: "/club/equipment", label: "Equipment", group: "desk" });
     }
@@ -61,8 +64,8 @@ export default async function MemberLayout({ children }: { children: React.React
         Test build. Every household, member and booking here is invented. Nothing is connected to real club data.
       </p>
       <MemberNav
-        homeHref="/club"
-        homeLabel={actor?.kind === "staff" ? "Households" : "My household"}
+        homeHref={actor?.kind === "staff" ? STAFF_HOME : "/club"}
+        homeLabel={actor?.kind === "staff" ? "Today" : "My household"}
         homeGroup={actor?.kind === "member" ? "me" : "mine"}
         links={links}
         showSignOut={actor?.source === "login"}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { pickerEnabled } from "@/club/enabled";
-import { householdOf, membersOf } from "@/club/engine/queries";
+import { SEARCH_MAX_CHARS, SEARCH_SHOW_MAX, searchHouseholds } from "@/club/engine/household-search";
+import { householdOf } from "@/club/engine/queries";
 import { requireClub } from "@/club/guard";
 import { getCurrentActor } from "@/club/identity";
 import { readClubOnce } from "@/club/store/read-once";
@@ -8,7 +9,10 @@ import { formatDay } from "@/club/time";
 import { HouseholdView } from "./HouseholdView";
 import { PageBand } from "./PageBand";
 
-export default async function ClubHome() {
+type Search = Record<string, string | string[] | undefined>;
+const one = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p) ?? "";
+
+export default async function ClubHome({ searchParams }: { searchParams: Promise<Search> }) {
   await requireClub();
   const actor = await getCurrentActor();
   if (!actor) {
@@ -38,7 +42,8 @@ export default async function ClubHome() {
     return <HouseholdView state={state} household={household} viewerIsStaff={false} />;
   }
 
-  const households = [...state.households].sort((a, b) => a.displayName.localeCompare(b.displayName));
+  // Staff: the search box first. No list of every household, and no results until a search is run (typed and sent).
+  const found = searchHouseholds(state, one((await searchParams).q));
   return (
     <section>
       <PageBand eyebrow="Staff" title="Households">
@@ -46,22 +51,43 @@ export default async function ClubHome() {
           Add a household
         </Link>
       </PageBand>
-      <p className="club-meta club-band-facts">{households.length} test households. Staff see all of them.</p>
-      <ul className="club-cards" aria-label="All households">
-        {households.map((h) => {
-          const adults = membersOf(state, h.id).filter((m) => m.status === "active").length;
-          return (
-            <li key={h.id} className="club-card" data-testid="household-row">
-              <h3>
-                <Link href={`/club/household/${h.id}`}>{h.displayName}</Link>
-              </h3>
-              <p className="club-meta">
-                {h.membershipType} · {h.status === "ended" ? `ended ${formatDay(h.endedOn!)}` : `${adults} active adult${adults === 1 ? "" : "s"}`}
-              </p>
-            </li>
-          );
-        })}
-      </ul>
+      <form method="get" action="/club" className="club-form" role="search">
+        <p>
+          <label htmlFor="household-search">Search households</label>
+          <input id="household-search" name="q" type="search" maxLength={SEARCH_MAX_CHARS} defaultValue={found.query} autoComplete="off" aria-describedby="household-search-hint" />
+          <span className="club-meta" id="household-search-hint">
+            A household name, a member&apos;s name, an email address or a phone number.
+          </span>
+        </p>
+        <p>
+          <button type="submit" className="club-button">
+            Search
+          </button>
+        </p>
+      </form>
+      {found.query !== "" &&
+        (found.total === 0 ? (
+          <p data-testid="no-household-match">No household matches that search.</p>
+        ) : (
+          <>
+            <p className="club-meta" data-testid="household-count">
+              {found.total === 1 ? "1 household matches." : `${found.total} households match.`}
+              {found.total > found.shown.length ? ` Showing the first ${SEARCH_SHOW_MAX}. Type more of the name to narrow it down.` : ""}
+            </p>
+            <ul className="club-cards" aria-label="Households found">
+              {found.shown.map(({ household: h, activeAdults }) => (
+                <li key={h.id} className="club-card" data-testid="household-row">
+                  <h3>
+                    <Link href={`/club/household/${h.id}`}>{h.displayName}</Link>
+                  </h3>
+                  <p className="club-meta">
+                    {h.membershipType} · {h.status === "ended" ? `ended ${formatDay(h.endedOn!)}` : `${activeAdults} active adult${activeAdults === 1 ? "" : "s"}`}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
+        ))}
     </section>
   );
 }

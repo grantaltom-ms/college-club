@@ -4,12 +4,14 @@
  * extra spaces do not matter. Nothing typed shows everyone in the list.
  */
 
+// Letters and digits from any alphabet are kept (a name written in Chinese or Cyrillic is a name, not "nothing typed"); accents are
+// dropped, and any other mark or punctuation becomes a space. Typed text with no letter or digit in it at all is "nothing typed".
 const plain = (text: string) =>
   text
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9\s'-]/g, " ")
+    .replace(/[^\p{L}\p{N}\p{M}\s'-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 

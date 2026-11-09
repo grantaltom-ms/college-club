@@ -56,12 +56,16 @@ test("partners can share an email address and a three-adult household lists all 
   await expect(page.getByTestId("member-row")).toHaveCount(3);
 });
 
-test("staff see every household and can open any of them, with the staff-only records", async ({ page }) => {
+test("staff find any household by searching and can open it, with the staff-only records", async ({ page }) => {
   await actAs(page, "Test staff");
   await expect(page.getByRole("heading", { level: 1, name: "Households" })).toBeVisible();
-  // The 14 invented households, plus any that other tests on this shared server have added through the staff desk.
-  expect(await page.getByTestId("household-row").count()).toBeGreaterThanOrEqual(14);
-  await expect(page.getByRole("link", { name: "The Lindqvist household" })).toBeVisible();
+  // Staff get a search box, not a list of every household: nothing is listed until a search is run.
+  await expect(page.getByTestId("household-row")).toHaveCount(0);
+  await page.getByLabel("Search households").fill("nakamura");
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page).toHaveURL(/\/club\?q=nakamura$/);
+  await expect(page.getByTestId("household-row")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "The Lindqvist household" })).toHaveCount(0);
   await page.getByRole("link", { name: "The Nakamura household" }).click();
   await expect(page.getByTestId("household-name")).toHaveText("The Nakamura household");
   await expect(page.getByLabel("Household records")).toContainText("QuickBooks ID");
@@ -71,13 +75,16 @@ test("staff see every household and can open any of them, with the staff-only re
 
 test("a member can open their own household's address but not anyone else's", async ({ page }) => {
   await actAs(page, "Test staff");
-  await page.goto("/club");
-  const links = await page.getByTestId("household-row").getByRole("link").evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute("href")!));
-  expect(links.length).toBeGreaterThanOrEqual(14); // the 14 invented ones, plus any other tests have added
+  // Staff find households by searching: these three searches give Erik Lindqvist's own household and two others.
+  const links: string[] = [];
+  for (const q of ["lindqvist", "nakamura", "okonkwo"]) {
+    await page.goto(`/club?q=${q}`);
+    links.push(...(await page.getByTestId("household-row").getByRole("link").evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute("href")!))));
+  }
+  expect(links.length).toBeGreaterThanOrEqual(3);
   await actAs(page, "Erik Lindqvist");
-  // Every address is asked for directly (with this member's cookie) instead of being opened in the browser. The staff list also holds
-  // every household that other tests have added, hundreds by the end of a full run, and opening each in a browser took almost the
-  // whole time limit. The one that answers is then opened in the browser to check it is the right household.
+  // Every address is asked for directly (with this member's cookie) instead of being opened in the browser.
+  // The one that answers is then opened in the browser to check it is the right household.
   const answers: { href: string; status: number }[] = [];
   for (let i = 0; i < links.length; i += 10) {
     answers.push(...(await Promise.all(links.slice(i, i + 10).map(async (href) => ({ href, status: (await page.request.get(href)).status() })))));

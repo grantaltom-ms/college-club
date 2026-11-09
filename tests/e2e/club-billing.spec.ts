@@ -490,7 +490,7 @@ test.describe("closing a month", () => {
   test("with the ID added, the preview shows every line of the invoice and the close button appears; looking changes nothing", async ({ page }) => {
     test.skip(!open, "September 2026 was already closed on this server.");
     await actAs(page, "Test staff");
-    await page.goto("/club");
+    await page.goto(`/club?q=${encodeURIComponent(NEW)}`);
     await page.getByRole("link", { name: NEW }).click();
     const form = page.getByTestId("quickbooks-form");
     await form.getByLabel("QuickBooks ID").fill(ID);

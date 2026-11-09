@@ -5,6 +5,7 @@ import { clubNow } from "@/club/clock";
 import { clubEnabled } from "@/club/enabled";
 import { ACTOR_COOKIE, REMEMBER_COOKIE, SESSION_COOKIE } from "@/club/identity";
 import { LOGIN_RULES } from "@/club/settings/login-rules";
+import { STAFF_HOME } from "@/club/web";
 import { field, sameOrigin, see } from "@/club/web-post";
 import { identityKey } from "@/club/auth/identities";
 
@@ -26,8 +27,8 @@ export async function POST(request: NextRequest) {
   const signedIn = await confirmSignIn(await getLoginDeps(), { secret: field(form, "token", 100), identity: field(form, "identity", 400), now: clubNow() });
   if (!signedIn) return see(request, "/club/sign-in?notice=signin_link");
 
-  // Members land on Book — the job they came to do. Staff land on the household list.
-  const home = signedIn.identity.kind === "staff" ? "/club" : "/club/book";
+  // Members land on Book — the job they came to do. Staff land on Today at the Club, the same page for every one of them.
+  const home = signedIn.identity.kind === "staff" ? STAFF_HOME : "/club/book";
   const response = see(request, home);
   const secure = request.nextUrl.protocol === "https:";
   // The cookie's life is counted by the browser's own clock from now, so a frozen test clock cannot make it expire at once.

@@ -69,7 +69,7 @@ test.describe("My bill", () => {
     await expect(page.getByRole("link", { name: "Monthly billing" })).toBeVisible();
     await expect(page.getByTestId("bill-lines")).toHaveCount(0);
 
-    await page.goto("/club");
+    await page.goto("/club?q=lindqvist");
     await page.getByTestId("household-row").filter({ hasText: "Lindqvist" }).getByRole("link").first().click();
     await expect(page.getByTestId("household-name")).toContainText("Lindqvist");
     await page.getByTestId("household-bill-link").click();

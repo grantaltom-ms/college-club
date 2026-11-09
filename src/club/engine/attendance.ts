@@ -58,7 +58,7 @@ interface Target {
 }
 
 /** What kind of booking an item takes (Shell, Room Space, ...), or null if its class is not in the rules file. */
-function bookingTypeOf(s: ClubState, itemId: string): BookingType | null {
+export function bookingTypeOf(s: ClubState, itemId: string): BookingType | null {
   const item = s.items.find((i) => i.id === itemId);
   if (!item) return null;
   try {

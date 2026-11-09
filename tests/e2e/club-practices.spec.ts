@@ -92,7 +92,7 @@ const seatRow = (page: Page, boat: string, n: number) => page.locator(`[data-tes
 test.describe("coaches", () => {
   test("staff mark an adult as a coach on the household page and the file says so; that member then sees Practices, an ordinary member does not, and unmarking takes it away", async ({ page }) => {
     await actAs(page, "Test staff");
-    await page.goto("/club");
+    await page.goto("/club?q=Castellanos");
     await page.getByRole("link", { name: /Castellanos/ }).first().click();
     const adult = page.locator('[data-testid="desk-adult"]', { hasText: "Rafael Castellanos" });
     await expect(adult.getByTestId("coach-status")).toHaveText("Not a coach.");
@@ -116,7 +116,7 @@ test.describe("coaches", () => {
     expect((await page.goto("/club/practices/new"))?.status()).toBe(404);
 
     await actAs(page, "Test staff");
-    await page.goto("/club");
+    await page.goto("/club?q=Castellanos");
     await page.getByRole("link", { name: /Castellanos/ }).first().click();
     await settled(page);
     await adult.getByRole("button", { name: "Take the coach mark off Rafael Castellanos" }).click();

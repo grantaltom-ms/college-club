@@ -138,10 +138,11 @@ test.describe("a member signing in", () => {
 
   test("staff see that a member has signed in", async ({ page }) => {
     await asPicker(page, "Test staff");
+    await page.goto("/club?q=Abernathy");
     await page.getByRole("link", { name: "The Abernathy household" }).click();
     // Nora signed in during the first test (they share one server), so her login slot is filled; Lars never signed in.
     await expect(page.getByTestId("member-row").filter({ hasText: "Nora Abernathy" }).getByTestId("login-state")).toHaveText(/has signed in|has not signed in yet/);
-    await page.goto("/club");
+    await page.goto("/club?q=Eriksen");
     await page.getByRole("link", { name: "The Eriksen household" }).click();
     await expect(page.getByTestId("member-row").filter({ hasText: "Britta Eriksen" }).getByTestId("login-state")).toHaveText("has not signed in yet");
   });

@@ -157,8 +157,11 @@ test.describe("the staff office board", () => {
     await expect(page.getByTestId("needs-look").getByText("Clubhouse room")).toHaveCount(0);
     await page.goto("/club/admin/check-in");
     await expect(page.getByTestId("around-now").getByText("Clubhouse room")).toHaveCount(0);
+    // Yuki has a dock slip this afternoon, which is offered; the club room this morning is not.
     await searchFor(page, "Yuki");
-    await expect(page.getByTestId("person-empty")).toBeVisible();
+    const yuki = page.getByRole("list", { name: "Reservations for Yuki Nakamura" });
+    await expect(yuki).toContainText("Dock slip C");
+    await expect(yuki).not.toContainText("Clubhouse room");
     // The member sees the same.
     await actAs(page, "Yuki Nakamura");
     await page.goto("/club/my-bookings");
@@ -399,7 +402,7 @@ test.describe("on a phone", () => {
       const box = await button.boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(44);
     }
-    await page.goto("/club");
+    await page.goto("/club?q=lindqvist");
     await page.getByTestId("household-row").first().getByRole("link").click();
     expect(await noSidewaysScroll()).toBe(true);
     await page.getByTestId("end-link").click();
