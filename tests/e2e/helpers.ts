@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { sampleData } from "../../src/lib/sample";
 import { sampleShells } from "../../src/lib/shells";
 import { sampleEvents } from "../../src/lib/events";
@@ -36,6 +36,20 @@ export const dashboardNav = (page: Page) => page.getByRole("navigation", { name:
 export async function openNavMenu(page: Page, label: "Usage" | "Board Materials") {
   await dashboardNav(page).getByRole("button", { name: label }).click();
   return dashboardNav(page).getByRole("menu", { name: label });
+}
+
+/**
+ * Picks a page from one of the two menus and waits until that page is really open and the menu has closed again.
+ *
+ * Choosing an item closes the menu at once, but the new page arrives a moment later, and each menu is rebuilt, closed, when the page
+ * changes. A test that opens a menu again straight after choosing an item can therefore open it just before the page changes and have
+ * it closed from under it, and then wait for an item that never comes. Waiting here for the address, and for the menu to be gone,
+ * means the next step starts on the new page with a menu that stays as it is left.
+ */
+export async function chooseFromNavMenu(page: Page, label: "Usage" | "Board Materials", item: string, path: RegExp | string) {
+  await (await openNavMenu(page, label)).getByRole("menuitem", { name: item }).click();
+  await expect(page).toHaveURL(path);
+  await expect(dashboardNav(page).getByRole("menu")).toHaveCount(0);
 }
 
 /** The test server's Financials password (playwright.config.ts). */
