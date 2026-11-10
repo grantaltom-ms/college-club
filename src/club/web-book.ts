@@ -56,6 +56,18 @@ export function visibleBrowse(state: ClubState, book: RuleBook, now: Date, visib
   });
 }
 
+/** The shell sizes to offer: only sizes with at least one shell this person can see (a member who is not a coach gets 1x and 2x). */
+export function visibleShellKinds(state: ClubState, book: RuleBook, visibleItem: (item: Item) => boolean): (typeof SHELL_KINDS)[number][] {
+  const seats = new Set(
+    state.items
+      .filter(visibleItem)
+      .map((i) => classOf(book, i))
+      .filter((c) => c.type === "Shell")
+      .map((c) => c.seats),
+  );
+  return SHELL_KINDS.filter((k) => seats.has(k.seats));
+}
+
 /** Map a legacy ?type= URL onto a browse id so old links and tests keep working. */
 export function browseFromType(type: BookingType | null): BookBrowse | null {
   if (!type) return null;

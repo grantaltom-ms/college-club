@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
-import { accessKind, itemVisibleTo } from "@/club/engine/boat-access";
+import { shownForBooking } from "@/club/engine/availability";
+import { accessKind } from "@/club/engine/boat-access";
 import { checkBooking, type Reason } from "@/club/engine/bookings";
 import { describeRules } from "@/club/engine/describe";
 import { meetsQualification } from "@/club/engine/eligibility";
@@ -33,7 +34,8 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   const start = momentParam(params.start);
   if (!item || !start) notFound();
   // A private boat is not shown to anyone who is not on its list, so it is not found for them either.
-  if (!itemVisibleTo(state, item, viewerOf(actor))) notFound();
+  // A coaches-only club boat (4x/+, 8+) is not found for a member who is not a coach either (Grant, Nov 10).
+  if (!shownForBooking(state, RULE_BOOK, item, viewerOf(actor))) notFound();
 
   const { cls, rules, requiredQualification } = rulesFor(RULE_BOOK, item);
   const lengths = lengthChoices(rules);

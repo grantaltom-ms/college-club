@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { dayView, pickableDays, type ItemDayView, type SlotView } from "@/club/engine/availability";
-import { itemVisibleTo } from "@/club/engine/boat-access";
+import { dayView, pickableDays, shownForBooking, type ItemDayView, type SlotView } from "@/club/engine/availability";
 import { noticeWords, openDamageNotices } from "@/club/engine/damage";
 import { weightRangeWords } from "@/club/engine/equipment-edit";
 import { requireClub } from "@/club/guard";
@@ -8,6 +7,7 @@ import { getCurrentActor } from "@/club/identity";
 import { clubNow } from "@/club/clock";
 import { RULE_BOOK, classOf } from "@/club/settings/rulebook";
 import { readClubOnce } from "@/club/store/read-once";
+import type { Item } from "@/club/types";
 import { formatDayLong, pacificDate, pacificMinutes } from "@/club/time";
 import { pickDay, typeParam } from "@/club/web";
 import {
@@ -16,7 +16,7 @@ import {
   itemMatchesBrowse,
   shellKindById,
   visibleBrowse,
-  SHELL_KINDS,
+  visibleShellKinds,
   type BookBrowse,
 } from "@/club/web-book";
 import { blockedReason, viewerOf } from "@/club/web-actor";
@@ -188,12 +188,15 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const hour = hourRaw && /^\d{1,2}$/.test(hourRaw) ? Number(hourRaw) : null;
   const hourLive = hour !== null && hour >= 0 && hour <= 23 ? hour : null;
 
-  const options = visibleBrowse(state, RULE_BOOK, now, (i) => itemVisibleTo(state, i, viewer));
+  const shown = (i: Item) => shownForBooking(state, RULE_BOOK, i, viewer);
+  const options = visibleBrowse(state, RULE_BOOK, now, shown);
+  // Only the shell sizes this person can actually book: a member who is not a coach never sees 4x/+ or 8+.
+  const shellSizes = visibleShellKinds(state, RULE_BOOK, shown);
   const browse = (whatRaw ? browseById(whatRaw) : null) ?? browseFromType(askedType);
   const browseLive = browse && (options.some((o) => o.id === browse.id) || Boolean(whatRaw || askedType)) ? browse : null;
   // Shells always need a size (1x/2x/4x/+/8+) before times — including legacy ?type=Shell links. The full fleet is 100+ boats.
   const needsKind = Boolean(browseLive && "kinds" in browseLive && browseLive.kinds);
-  const kind = shellKindById(kindRaw);
+  const kind = shellSizes.find((k) => k.id === shellKindById(kindRaw)?.id) ?? null;
   const ready = Boolean(browseLive && (!needsKind || kind));
   const denseShells = Boolean(needsKind && kind);
 
@@ -283,7 +286,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           {options.map((b) => (
             <Link key={b.id} href={href({ what: b.id, kind: null, hour: null })} className="club-book-choose-card" data-browse={b.id}>
               <span className="club-book-choose-label">{b.label}</span>
-              <span className="club-book-choose-hint">{chooseHint(b)}</span>
+              <span className="club-book-choose-hint">{chooseHint(b, shellSizes)}</span>
             </Link>
           ))}
         </nav>
@@ -295,7 +298,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             <Link href="/club/book">All categories</Link>
           </p>
           <nav aria-label="Shell size" className="club-book-shell-sizes" data-testid="shell-kinds">
-            {SHELL_KINDS.map((k) => (
+            {shellSizes.map((k) => (
               <Link key={k.id} href={href({ what: "shell", kind: k.id, hour: null })} className="club-book-shell-size" data-kind={k.id}>
                 <span className="club-book-shell-size-label">{k.label}</span>
                 <span className="club-book-shell-size-hint">{k.hint}</span>
@@ -443,8 +446,8 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
 const first = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
-function chooseHint(b: BookBrowse): string {
-  if (b.id === "shell") return "1x, 2x, 4x/+, 8+";
+function chooseHint(b: BookBrowse, sizes: readonly { label: string }[]): string {
+  if (b.id === "shell") return sizes.map((k) => k.label).join(", ");
   if (b.id === "paddle") return "Kayaks and paddle boards";
   if (b.id === "dock") return "Warm months";
   if (b.id === "gym") return "Ergs and floor";
