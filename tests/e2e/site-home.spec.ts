@@ -325,9 +325,13 @@ test.describe("the menu on a phone", () => {
   test("closes by itself when the screen is turned wide, and the page can scroll again", async ({ page }) => {
     await page.goto("/site");
     await menuButton(page).click();
+    // The page is locked while the menu is open, so "can scroll again" below means something.
+    await expect.poll(() => page.evaluate(() => document.documentElement.style.overflow)).toBe("hidden");
     await page.setViewportSize({ width: 1000, height: 800 });
     await expect(menuButton(page)).toBeHidden();
-    expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe("");
+    // The button is hidden by the stylesheet the moment the screen is wide; the page's scrolling is given back a moment later,
+    // when the menu has closed itself, so wait for that rather than read it once.
+    await expect.poll(() => page.evaluate(() => document.documentElement.style.overflow)).toBe("");
   });
 
   test("sits right under the header, whatever the page has scrolled to, without dimming the header itself", async ({ page }) => {

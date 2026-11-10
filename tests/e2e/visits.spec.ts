@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { sampleData } from "../../src/lib/sample";
 import { headline, OFTEN_EXTRA_BOOKINGS, quietByJoined, visitsByType } from "../../src/lib/stats";
-import { mockDashboard } from "./helpers";
+import { chooseFromNavMenu, mockDashboard } from "./helpers";
 
 const sample = sampleData();
 const types = visitsByType(sample.members);
@@ -60,11 +60,10 @@ test("the work-from-the-club card leads with the count and keeps its method one 
     await expect(how).toBeHidden();
   }
   for (let i = 0; i < 4; i++) {
-    const nav = page.getByRole("navigation", { name: "Dashboard sections" });
-    await nav.getByRole("button", { name: "Usage" }).click();
-    await nav.getByRole("menuitem", { name: "Timing" }).click();
-    await nav.getByRole("button", { name: "Usage" }).click();
-    await nav.getByRole("menuitem", { name: "Visits" }).click();
+    // Each page has to be open before the menu is opened again: the menu is rebuilt, closed, when the page changes.
+    await chooseFromNavMenu(page, "Usage", "Timing", /\/timing$/);
+    await expect(page.getByRole("heading", { level: 1, name: "When people come." })).toBeVisible();
+    await chooseFromNavMenu(page, "Usage", "Visits", /\/visits$/);
     await expect(page.getByTestId("multi-share")).toHaveText(first);
   }
 });
