@@ -1076,9 +1076,9 @@ export class PgClubStore implements ClubStore {
       await c.query(`insert into club.booking_rule_defaults (id, placeholder, rules) values (true, $1, $2) on conflict (id) do update set placeholder = excluded.placeholder, rules = excluded.rules`, [book.placeholder, JSON.stringify(book.defaults)]);
       for (const k of book.classes) {
         await c.query(
-          `insert into club.item_classes (code, booking_type, name, seats, required_qualification, rules) values ($1,$2,$3,$4,$5,$6)
-           on conflict (code) do update set booking_type = excluded.booking_type, name = excluded.name, seats = excluded.seats, required_qualification = excluded.required_qualification, rules = excluded.rules`,
-          [k.code, k.type, k.name, k.seats, k.requiredQualification, JSON.stringify(k.rules)],
+          `insert into club.item_classes (code, booking_type, name, seats, required_qualification, rules, coaches_only) values ($1,$2,$3,$4,$5,$6,$7)
+           on conflict (code) do update set booking_type = excluded.booking_type, name = excluded.name, seats = excluded.seats, required_qualification = excluded.required_qualification, rules = excluded.rules, coaches_only = excluded.coaches_only`,
+          [k.code, k.type, k.name, k.seats, k.requiredQualification, JSON.stringify(k.rules), k.coachesOnly === true],
         );
       }
       if (classRules) {

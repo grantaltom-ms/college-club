@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "../time";
-import { dayView } from "./availability";
+import { dayView, shownForBooking } from "./availability";
 import { bookingLedger, createBooking } from "./bookings";
 import { describeRules } from "./describe";
 import { endHousehold } from "./households";
+import { addBoatOwner } from "./boat-access";
 import { setCoach } from "./practices";
-import { STORE_KINDS, TODAY, NOW, addMembers, at, bookAs, fixtureFor, refusalMessages, refusedFor, request, staffCtx, type Fixture } from "./testkit";
+import { REAL_CLASS_RULES, STORE_KINDS, TODAY, NOW, addMembers, at, bookAs, fixtureFor, refusalMessages, refusedFor, request, staffCtx, type Fixture } from "./testkit";
 
 /**
- * The 8x is booked only by coaches and club staff (Grant, Nov 5, 2026). A member who is not a coach still sees it, marked "Coaches
- * only", but cannot book it. A coach books it without a skill check and can crew it with any active member. Staff book it for anyone,
- * with no reason needed. Every test runs on both stores, so the in-memory copy and Postgres must agree.
+ * The 8x (Grant, Nov 5, 2026) and the 4x (Grant, Nov 10) are booked only by coaches and club staff. A member who is not a coach does
+ * not see them on the Book screens at all (Grant, Nov 10), and cannot book them. A coach books one without a skill check and can crew it with any active
+ * member. Staff book one for anyone, with no reason needed. A private boat of either size is left to its own owners. These tests use
+ * the real rules file's classes (REAL_CLASS_RULES), not the engine tests' open quad. Every test runs on both stores, so the
+ * in-memory copy and Postgres must agree.
  */
 
 /** Adds an eight to the invented club. The fixture's own boats are the 1x, 2x and 4x. */
@@ -27,8 +30,8 @@ const coach = (f: Fixture, who: string) => setCoach(f.store, staffCtx(), f.m[who
 const tomorrow = addDays(TODAY, 1);
 
 for (const kind of STORE_KINDS) {
-  describe(`coaches-only boats (the 8x) on the ${kind} store`, () => {
-    const fixture = fixtureFor(kind);
+  describe(`coaches-only boats (the 4x and the 8x) on the ${kind} store`, () => {
+    const fixture = () => fixtureFor(kind)(REAL_CLASS_RULES);
 
     describe("who may book", () => {
       it("refuses a member who is not a coach, even one with the highest skill level, and says why", async () => {
@@ -93,52 +96,134 @@ for (const kind of STORE_KINDS) {
         expect(waived).toEqual([]);
       });
 
-      it("leaves every other boat as it was: a member who is not a coach books a quad as before", async () => {
+      it("leaves the singles and doubles as they were: a member who is not a coach books a double, with its skill level", async () => {
         const f = await fixture();
         await addEight(f);
-        expect(await refusedFor(bookAs(f, "Ada", "Albatross", at(1, 7), at(1, 8)))).toEqual([]);
-        // The quad still asks for its skill level: Dee holds level 1 and the quad needs level 3.
-        expect(await refusedFor(bookAs(f, "Dee", "Albatross", at(1, 9), at(1, 10)))).toEqual(["not_qualified"]);
+        expect(await refusedFor(bookAs(f, "Ada", "Loon", at(1, 7), at(1, 8)))).toEqual([]);
+        expect(await refusedFor(bookAs(f, "Eli", "Heron", at(1, 7), at(1, 8)))).toEqual([]);
+        // The double still asks for its skill level: Dee holds level 1 and the double needs level 2.
+        expect(await refusedFor(bookAs(f, "Dee", "Pelican", at(1, 9), at(1, 10)))).toEqual(["not_qualified"]);
+      });
+    });
+
+    describe("the 4x is coaches-only too", () => {
+      it("refuses a member who is not a coach, even one with the highest skill level, and says why", async () => {
+        const f = await fixture();
+        expect(await refusedFor(bookAs(f, "Ada", "Albatross", at(1, 7), at(1, 8)))).toEqual(["coaches_only"]);
+        expect(await refusalMessages(bookAs(f, "Eli", "Albatross", at(1, 7), at(1, 8)))).toEqual(["Albatross can only be booked by coaches and club staff. Ask a coach or club staff to book it."]);
+        expect((await f.store.read()).bookings).toEqual([]);
+      });
+
+      it("lets a coach with no skill level book it with any members as crew, even a boat that stores a level", async () => {
+        const f = await fixture();
+        // A second quad carrying iCrew's own skill level, as the fleet boats do. It is not checked on a coaches-only boat.
+        await f.store.transaction(async (s, newId) => {
+          s.items.push({ id: newId(), name: "Puffin", classCode: "shell-quad", ruleOverrides: {}, requiredQualification: "scull-3" });
+        });
+        f.i.Puffin = (await f.store.read()).items.find((i) => i.name === "Puffin")!.id;
+        await coach(f, "Cy"); // Cy holds no qualification at all.
+        const { booking } = await bookAs(f, "Cy", "Puffin", at(1, 7), at(1, 8), ["Dee", "Ben", "Eli"]);
+        expect(booking).toMatchObject({ bookerId: f.m.Cy, status: "upcoming", crew: [f.m.Dee, f.m.Ben, f.m.Eli] });
+      });
+
+      it("lets staff book it for a member who is not a coach, with nothing set aside", async () => {
+        const f = await fixture();
+        const { booking, waived } = await createBooking(f.store, f.book, staffCtx(), request(f, "Dee", "Albatross", at(1, 7), at(1, 8), ["Cy"]));
+        expect(booking).toMatchObject({ bookerId: f.m.Dee, status: "upcoming" });
+        expect(waived).toEqual([]);
+      });
+
+      it("still counts the seats for a coach: four seats, so three others at most", async () => {
+        const f = await fixture();
+        await coach(f, "Ada");
+        expect(await refusedFor(bookAs(f, "Ada", "Albatross", at(1, 7), at(1, 8), ["Ben", "Cy", "Dee", "Eli"]))).toEqual(["too_many_crew"]);
+      });
+    });
+
+    describe("a private boat of either size", () => {
+      it("is booked by its owner, who is not a coach, and is not marked coaches only", async () => {
+        const f = await fixture();
+        for (const [name, classCode] of [["Tern", "shell-quad"], ["Gannet", "shell-eight"]]) {
+          await f.store.transaction(async (s, newId) => {
+            s.items.push({ id: newId(), name, classCode, ruleOverrides: {}, isPrivate: true });
+          });
+          f.i[name] = (await f.store.read()).items.find((i) => i.name === name)!.id;
+          await addBoatOwner(f.store, staffCtx(), { itemId: f.i[name], memberId: f.m.Dee });
+        }
+        expect(await refusedFor(bookAs(f, "Dee", "Tern", at(1, 7), at(1, 8)))).toEqual([]);
+        expect(await refusedFor(bookAs(f, "Dee", "Gannet", at(2, 7), at(2, 8)))).toEqual([]);
+        const day = dayView(await f.store.read(), f.book, { day: tomorrow, now: NOW, viewer: { kind: "member", memberId: f.m.Dee } });
+        for (const name of ["Tern", "Gannet"]) expect(day.items.find((i) => i.item.name === name)).toMatchObject({ coachesOnly: false, coachBlocked: false });
       });
     });
 
     describe("what members see", () => {
       const view = async (f: Fixture, viewer: Parameters<typeof dayView>[2]["viewer"]) => {
         const day = dayView(await f.store.read(), f.book, { day: tomorrow, now: NOW, viewer });
-        return { eight: day.items.find((i) => i.item.name === "Gull")!, quad: day.items.find((i) => i.item.name === "Albatross")! };
+        return {
+          eight: day.items.find((i) => i.item.name === "Gull")!,
+          quad: day.items.find((i) => i.item.name === "Albatross")!,
+          double: day.items.find((i) => i.item.name === "Loon")!,
+        };
       };
 
-      it("shows the eight to everyone, marks it coaches only, and blocks it for a member who is not a coach", async () => {
+      it("hides the eight and the quad from a member who is not a coach, and shows them, marked coaches only, to a coach and to staff", async () => {
         const f = await fixture();
         await addEight(f);
         await coach(f, "Ben");
         const member = await view(f, { kind: "member", memberId: f.m.Ada });
-        expect(member.eight).toMatchObject({ coachesOnly: true, coachBlocked: true });
         const theCoach = await view(f, { kind: "member", memberId: f.m.Ben });
-        expect(theCoach.eight).toMatchObject({ coachesOnly: true, coachBlocked: false });
         const staff = await view(f, { kind: "staff" });
-        expect(staff.eight).toMatchObject({ coachesOnly: true, coachBlocked: false });
-        // Its free times are still free in the data: the page decides to show them as "Coaches only".
-        expect(member.eight.slots.some((s) => s.state === "free")).toBe(true);
-        // Nothing else is marked.
-        for (const v of [member, theCoach, staff]) expect(v.quad).toMatchObject({ coachesOnly: false, coachBlocked: false });
+        for (const boat of ["eight", "quad"] as const) {
+          expect(member[boat]).toBeUndefined();
+          expect(theCoach[boat]).toMatchObject({ coachesOnly: true, coachBlocked: false });
+          expect(staff[boat]).toMatchObject({ coachesOnly: true, coachBlocked: false });
+          expect(theCoach[boat].slots.some((s) => s.state === "free")).toBe(true);
+        }
+        // Asking for the four-seat or eight-seat size gives a member who is not a coach nothing at all.
+        const state = await f.store.read();
+        for (const seats of [4, 8]) {
+          expect(dayView(state, f.book, { day: tomorrow, now: NOW, viewer: { kind: "member", memberId: f.m.Ada }, type: "Shell", seats }).items).toHaveLength(0);
+        }
+        // The double is shown to everyone and not marked.
+        for (const v of [member, theCoach, staff]) expect(v.double).toMatchObject({ coachesOnly: false, coachBlocked: false });
       });
 
-      it("does not show a skill level for the eight, even when the boat carries one, and still shows the quad's", async () => {
+      it("shownForBooking: staff and an active coach see a coaches-only boat; an ordinary member, an unmarked coach and a coach who left do not", async () => {
+        const f = await fixture();
+        await addEight(f);
+        await coach(f, "Ben");
+        let state = await f.store.read();
+        const gull = state.items.find((i) => i.name === "Gull")!;
+        const loon = state.items.find((i) => i.name === "Loon")!;
+        expect(shownForBooking(state, f.book, gull, { kind: "staff" })).toBe(true);
+        expect(shownForBooking(state, f.book, gull, { kind: "member", memberId: f.m.Ben })).toBe(true);
+        expect(shownForBooking(state, f.book, gull, { kind: "member", memberId: f.m.Ada })).toBe(false);
+        expect(shownForBooking(state, f.book, loon, { kind: "member", memberId: f.m.Ada })).toBe(true);
+        await setCoach(f.store, staffCtx(), f.m.Ben, false);
+        state = await f.store.read();
+        expect(shownForBooking(state, f.book, gull, { kind: "member", memberId: f.m.Ben })).toBe(false);
+      });
+
+      it("does not show a skill level for the eight or the quad, even when the boat carries one, and still shows the double's", async () => {
         const f = await fixture();
         await addEight(f, "Gull", { requiredQualification: "scull-3" });
-        const { eight, quad } = await view(f, { kind: "member", memberId: f.m.Ada });
+        await coach(f, "Ben");
+        const { eight, quad, double } = await view(f, { kind: "member", memberId: f.m.Ben });
         expect(eight).toMatchObject({ needs: null, qualified: null });
-        expect(quad.needs).not.toBeNull();
+        expect(quad).toMatchObject({ needs: null, qualified: null });
+        expect(double.needs).not.toBeNull();
       });
 
-      it("shows a coach's booking as booked to others and as theirs to them, like any boat", async () => {
+      it("shows a coach's booking as booked to staff and to another coach, and as theirs to them, like any boat", async () => {
         const f = await fixture();
         await addEight(f);
         await coach(f, "Ben");
         await bookAs(f, "Ben", "Gull", at(1, 7), at(1, 8));
         const slotAt7 = (v: { eight: { slots: { startsAt: string; state: string }[] } }) => v.eight.slots.find((s) => s.startsAt === at(1, 7).toISOString())!.state;
+        await coach(f, "Ada");
         expect(slotAt7(await view(f, { kind: "member", memberId: f.m.Ada }))).toBe("booked");
+        expect(slotAt7(await view(f, { kind: "staff" }))).toBe("booked");
         expect(slotAt7(await view(f, { kind: "member", memberId: f.m.Ben }))).toBe("yours");
       });
 
@@ -150,9 +235,11 @@ for (const kind of STORE_KINDS) {
         expect(lines).toContain("Only coaches and club staff can book this boat. No skill level is checked: the coach decides who rows.");
         expect(lines.some((l) => /You need/.test(l))).toBe(false);
         expect(lines.some((l) => l.includes("any active member can be crew"))).toBe(true);
-        // The quad's rules are unchanged.
+        // The quad says the same; the double's rules are unchanged.
         const quad = describeRules(state, f.book, state.items.find((i) => i.name === "Albatross")!);
-        expect(quad.lines.some((l) => /You need/.test(l))).toBe(true);
+        expect(quad.lines).toContain("Only coaches and club staff can book this boat. No skill level is checked: the coach decides who rows.");
+        const double = describeRules(state, f.book, state.items.find((i) => i.name === "Loon")!);
+        expect(double.lines.some((l) => /You need/.test(l))).toBe(true);
       });
     });
   });

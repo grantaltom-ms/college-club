@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { clubNow } from "@/club/clock";
-import { accessKind, itemVisibleTo } from "@/club/engine/boat-access";
+import { shownForBooking } from "@/club/engine/availability";
+import { accessKind } from "@/club/engine/boat-access";
 import { checkBooking, type Reason } from "@/club/engine/bookings";
 import { describeRules } from "@/club/engine/describe";
 import { meetsQualification } from "@/club/engine/eligibility";
@@ -33,7 +34,8 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   const start = momentParam(params.start);
   if (!item || !start) notFound();
   // A private boat is not shown to anyone who is not on its list, so it is not found for them either.
-  if (!itemVisibleTo(state, item, viewerOf(actor))) notFound();
+  // A coaches-only club boat (4x/+, 8+) is not found for a member who is not a coach either (Grant, Nov 10).
+  if (!shownForBooking(state, RULE_BOOK, item, viewerOf(actor))) notFound();
 
   const { cls, rules, requiredQualification } = rulesFor(RULE_BOOK, item);
   const lengths = lengthChoices(rules);
@@ -68,7 +70,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
 
   // Who can sit in the other seats: active members who hold the qualification.
   // On a private boat the other seats go to its owners and the people they invited instead.
-  // On a coaches-only boat (the 8x) no skill level is checked, even one stored on the boat, so any active member can be crew.
+  // On a coaches-only boat (the 4x and the 8x) no skill level is checked, even one stored on the boat, so any active member can be crew.
   const crewNeed = cls.coachesOnly ? null : requiredQualification;
   const crewChoices =
     cls.seats > 1

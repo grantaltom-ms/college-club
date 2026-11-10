@@ -100,7 +100,8 @@ test.describe("what members see", () => {
 
   test("the booking form for a private boat says it is private and checks no skill level, so a member with no qualification can book it", async ({ page }) => {
     const boat = `Playwright Quad ${tag()}`;
-    // A club quad needs level 3. Britta Eriksen holds no qualification at all.
+    // A club quad is for coaches and staff only (Nov 10), but a private one is its owners' to book. Britta Eriksen is not a coach and
+    // holds no qualification at all.
     await upload(page, privateRow(boat, "4", "Britta Eriksen"));
     await actAs(page, "Britta Eriksen");
     await page.goto(dayOf(3, "quad", 8));

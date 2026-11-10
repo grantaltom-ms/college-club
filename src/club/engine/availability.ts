@@ -46,7 +46,7 @@ export interface ItemDayView {
   isPrivate: boolean;
   /** A private boat with no owner who can use it: nobody can book it until staff add an owner. */
   locked: boolean;
-  /** A coaches-only boat (the 8x): shown to everyone, bookable only by staff and by members marked as coaches. */
+  /** A coaches-only boat (the 4x and the 8x, unless it is private): shown to everyone, bookable only by staff and by members marked as coaches. */
   coachesOnly: boolean;
   /** True when this viewer cannot book it because it is coaches-only and they are not a coach: the page marks it "Coaches only". */
   coachBlocked: boolean;
@@ -57,6 +57,18 @@ export interface DayView {
   items: ItemDayView[];
 }
 
+/**
+ * Whether this person is offered the item on the Book screens at all (Grant, Nov 10: members who are not coaches
+ * should not even see the 4x/+ and 8+ as an option). Everything `itemVisibleTo` hides stays hidden; on top of that a
+ * club boat whose class is coaches-only is shown only to staff and active coaches. A private boat follows its own list.
+ */
+export function shownForBooking(state: ClubState, book: RuleBook, item: Item, viewer: Viewer): boolean {
+  if (!itemVisibleTo(state, item, viewer)) return false;
+  if (viewer.kind === "staff" || isPrivate(item)) return true;
+  if (classOf(book, item).coachesOnly !== true) return true;
+  return activeCoach(state, viewer.memberId) !== undefined;
+}
+
 /** One day of what is free and booked, by item. Slots are stepped in real time, so the 25-hour day on Nov 1 has no lost or doubled slot. */
 export function dayView(
   state: ClubState,
@@ -65,7 +77,7 @@ export function dayView(
 ): DayView {
   const { day, now, viewer } = input;
   const items = state.items
-    .filter((item) => itemVisibleTo(state, item, viewer))
+    .filter((item) => shownForBooking(state, book, item, viewer))
     .filter((item) => !input.type || classOf(book, item).type === input.type)
     .filter((item) => input.seats == null || classOf(book, item).seats === input.seats)
     .map((item): ItemDayView => {
@@ -134,8 +146,8 @@ export function dayView(
         note,
         isPrivate: isPrivate(item),
         locked: boatLocked(state, item),
-        coachesOnly: cls.coachesOnly === true,
-        coachBlocked: cls.coachesOnly === true && viewer.kind === "member" && !activeCoach(state, viewer.memberId),
+        coachesOnly: cls.coachesOnly === true && !isPrivate(item),
+        coachBlocked: cls.coachesOnly === true && !isPrivate(item) && viewer.kind === "member" && !activeCoach(state, viewer.memberId),
       };
     });
   return { day, items };

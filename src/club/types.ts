@@ -154,7 +154,7 @@ export interface ItemClass {
   /** Qualification code needed to use items of this class, or null for none. */
   requiredQualification: string | null;
   /**
-   * Booked only by staff and by members staff have marked as coaches (the 8x). Members who are not coaches still see these items,
+   * Booked only by staff and by members staff have marked as coaches (the 4x and the 8x). Members who are not coaches still see these items,
    * marked "Coaches only", but cannot book them. No skill level is checked for these items: the coach decides who rows.
    */
   coachesOnly?: boolean;

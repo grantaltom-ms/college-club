@@ -46,14 +46,16 @@ describe("the shipped booking rules", () => {
   it("describe singles, doubles and quads by seat count, with a qualification per boat class", () => {
     const seats = Object.fromEntries(RULE_BOOK.classes.map((c) => [c.code, c.seats]));
     expect(seats).toMatchObject({ "shell-single": 1, "shell-double": 2, "shell-quad": 4, "shell-eight": 8 });
-    expect(classOf(RULE_BOOK, { classCode: "shell-quad" }).requiredQualification).toBe("scull-3");
-    // The eight is for coaches and staff only, and its skill level is not checked: the coach decides who rows (Grant, Nov 5, 2026).
+    // The quad (Grant, Nov 10, 2026) and the eight (Nov 5) are for coaches and staff only, and their skill level is not checked:
+    // the coach decides who rows.
+    expect(classOf(RULE_BOOK, { classCode: "shell-quad" })).toMatchObject({ requiredQualification: null, coachesOnly: true });
     expect(classOf(RULE_BOOK, { classCode: "shell-eight" })).toMatchObject({ requiredQualification: null, coachesOnly: true });
+    expect(classOf(RULE_BOOK, { classCode: "shell-double" })).toMatchObject({ requiredQualification: "scull-2" });
     expect(classOf(RULE_BOOK, { classCode: "kayak" }).requiredQualification).toBeNull();
   });
 
-  it("mark only the eight as coaches only", () => {
-    expect(RULE_BOOK.classes.filter((c) => c.coachesOnly === true).map((c) => c.code)).toEqual(["shell-eight"]);
+  it("mark only the quad and the eight as coaches only", () => {
+    expect(RULE_BOOK.classes.filter((c) => c.coachesOnly === true).map((c) => c.code)).toEqual(["shell-quad", "shell-eight"]);
   });
 
   it("cover shells, kayaks, paddle boards and the spaces, using only booking types the engine knows", () => {

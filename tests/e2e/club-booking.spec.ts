@@ -523,8 +523,9 @@ test("Reservations opens on categories first: gym before shells, kayaks with boa
   await page.getByTestId("book-choose").locator("[data-browse=shell]").click();
   await expect(page.getByTestId("shell-kinds")).toBeVisible();
   await expect(page.getByTestId("item-card")).toHaveCount(0);
-  // Size strip includes 8x from the iCrew fleet (before a size is chosen).
-  await expect(page.getByTestId("shell-kinds").locator("[data-kind=eight]")).toBeVisible();
+  // Since Nov 10 a member who is not a coach is offered only the sizes they can book: no 4x/+ or 8+ (Grant).
+  await expect(page.getByTestId("shell-kinds").locator("[data-kind=single]")).toBeVisible();
+  await expect(page.getByTestId("shell-kinds").locator("[data-kind=quad], [data-kind=eight]")).toHaveCount(0);
   await page.getByTestId("shell-kinds").locator("[data-kind=single]").click();
   await expect(page.getByTestId("browse-label")).toHaveText(/Shells · 1x/);
   await expect(page.getByTestId("day-heading")).toBeVisible();

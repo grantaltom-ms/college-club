@@ -37,7 +37,8 @@
       "type": "Shell",
       "name": "Quad or four",
       "seats": 4,
-      "requiredQualification": "scull-3",
+      "requiredQualification": null,
+      "coachesOnly": true,
       "rules": {}
     },
     {

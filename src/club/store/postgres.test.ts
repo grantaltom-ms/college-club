@@ -715,10 +715,15 @@ describe.skipIf(!STORE_KINDS.includes("postgres"))("the Postgres store", () => {
       const db = databaseUrls.get(store)!;
       const pool = createClubPool(db, 1);
       try {
-        const classes = (await pool.query("select code, booking_type, seats, required_qualification, rules from club.item_classes order by code")).rows;
+        const classes = (await pool.query("select code, booking_type, seats, required_qualification, rules, coaches_only from club.item_classes order by code")).rows;
         expect(classes.map((c) => c.code)).toEqual(RULE_BOOK.classes.map((c) => c.code).sort());
-        expect(classes.find((c) => c.code === "shell-quad")).toMatchObject({ booking_type: "Shell", seats: 4, required_qualification: "scull-3", rules: {} });
-        expect(classes.find((c) => c.code === "shell-eight")).toMatchObject({ booking_type: "Shell", seats: 8, required_qualification: null, rules: {} });
+        expect(classes.find((c) => c.code === "shell-quad")).toMatchObject({ booking_type: "Shell", seats: 4, required_qualification: null, rules: {}, coaches_only: true });
+        expect(classes.find((c) => c.code === "shell-eight")).toMatchObject({ booking_type: "Shell", seats: 8, required_qualification: null, rules: {}, coaches_only: true });
+        // Only the quad and the eight carry the flag in the database, as in the rules file.
+        expect(classes.filter((c) => c.coaches_only).map((c) => c.code)).toEqual(["shell-eight", "shell-quad"]);
+        // A class that loses the flag in the rules file loses it in the database too.
+        await store.syncRules({ ...RULE_BOOK, classes: RULE_BOOK.classes.map((c) => (c.code === "shell-quad" ? { ...c, coachesOnly: undefined } : c)) });
+        expect((await pool.query("select coaches_only from club.item_classes where code = 'shell-quad'")).rows[0].coaches_only).toBe(false);
         expect((await pool.query("select placeholder, rules from club.booking_rule_defaults")).rows).toEqual([{ placeholder: true, rules: RULE_BOOK.defaults }]);
         await store.syncRules({ ...RULE_BOOK, defaults: { ...RULE_BOOK.defaults, windowDays: 5 } });
         expect((await pool.query("select rules from club.booking_rule_defaults")).rows[0].rules.windowDays).toBe(5);

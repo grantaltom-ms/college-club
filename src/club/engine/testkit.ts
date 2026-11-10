@@ -43,15 +43,31 @@ export const at = (daysAhead: number, hour: number, minute = 0, today = TODAY) =
  */
 const TEST_NUMBERS: Partial<RuleValues> = { windowDays: 7, defaultMinutes: 60, maxMinutes: 120, maxFuturePerType: 2, maxPerDayPerType: 1 };
 
-/** The real rules file with the test numbers above, and then any numbers the test names, on top. */
-export function ruleBookWith(defaults: Partial<RuleValues>, classes?: (cls: Record<string, unknown>[]) => void): RuleBook {
+/**
+ * Since Nov 10, 2026 the real rules file makes the quad coaches-only, like the eight (Grant). The engine tests about skill levels,
+ * crew and seats need an ordinary multi-seat boat that members book themselves, so in the test rules the quad stays what it was
+ * before: level 3, open to any qualified member. The real quad's rule is tested with `REAL_CLASS_RULES` (coaches-only.test.ts) and
+ * on the file itself (rulebook.test.ts).
+ */
+function openQuad(classes: Record<string, unknown>[]): void {
+  const quad = classes.find((c) => c.code === "shell-quad")!;
+  quad.requiredQualification = "scull-3";
+  delete quad.coachesOnly;
+}
+
+/** The real rules file with the test numbers above (and an open quad), and then any numbers the test names, on top. */
+export function ruleBookWith(defaults: Partial<RuleValues>, classes?: (cls: Record<string, unknown>[]) => void, { realClasses = false } = {}): RuleBook {
   const copy = structuredClone(raw) as { defaults: Record<string, unknown>; classes: Record<string, unknown>[] };
   Object.assign(copy.defaults, TEST_NUMBERS, defaults);
+  if (!realClasses) openQuad(copy.classes);
   classes?.(copy.classes);
   return parseRuleBook(copy, QUALIFICATIONS);
 }
 
 export const TEST_RULES: RuleBook = ruleBookWith({});
+
+/** The test numbers with the real file's classes, untouched: the quad and the eight are both coaches-only. */
+export const REAL_CLASS_RULES: RuleBook = ruleBookWith({}, undefined, { realClasses: true });
 
 /**
  * The tests that matter run on both stores: the in-memory copy, and Postgres when CLUB_TEST_DATABASE_URL is set

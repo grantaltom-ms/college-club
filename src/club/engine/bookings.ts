@@ -175,9 +175,10 @@ export function checkBooking(state: ClubState, book: RuleBook, ctx: Ctx, req: Bo
     }
   }
 
-  // A coaches-only boat (the 8x): a member books it only if staff have marked them as a coach (and they are still an active member).
-  // Staff book it for anyone, with no reason needed, because staff can run practices too. Crew can be any member.
-  if (cls.coachesOnly && ctx.actor.kind !== "staff" && !activeCoach(state, booker.id)) {
+  // A coaches-only boat (the 4x and the 8x): a member books it only if staff have marked them as a coach (and they are still an
+  // active member). Staff book it for anyone, with no reason needed, because staff can run practices too. Crew can be any member.
+  // A private boat is the exception: its own list of owners and invited people decides who books it, whatever its size.
+  if (cls.coachesOnly && !isPrivate(item) && ctx.actor.kind !== "staff" && !activeCoach(state, booker.id)) {
     add("coaches_only", `${item.name} can only be booked by coaches and club staff. Ask a coach or club staff to book it.`);
   }
 

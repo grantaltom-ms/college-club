@@ -23,12 +23,12 @@ export const BOOK_BROWSE: readonly BookBrowse[] = [
   { id: "work", label: "Work space", types: ["Work Space"] },
 ];
 
-/** Shell seat choices after someone picks Shells. Labels are the usual rowing shorthand. */
+/** Shell seat choices after someone picks Shells. Labels are the usual rowing shorthand: "4x/+" covers quads and fours, "8+" is an eight with a cox (Grant, Nov 10). */
 export const SHELL_KINDS = [
   { id: "single", label: "1x", seats: 1, hint: "Single" },
   { id: "double", label: "2x", seats: 2, hint: "Double" },
-  { id: "quad", label: "4x", seats: 4, hint: "Quad or four" },
-  { id: "eight", label: "8x", seats: 8, hint: "Eight" },
+  { id: "quad", label: "4x/+", seats: 4, hint: "Quad or four" },
+  { id: "eight", label: "8+", seats: 8, hint: "Eight" },
 ] as const;
 
 export type ShellKindId = (typeof SHELL_KINDS)[number]["id"];
@@ -54,6 +54,18 @@ export function visibleBrowse(state: ClubState, book: RuleBook, now: Date, visib
     if ("seasonal" in b && b.seasonal && !dockSeasonOpen(now)) return false;
     return b.types.some((t) => present.has(t));
   });
+}
+
+/** The shell sizes to offer: only sizes with at least one shell this person can see (a member who is not a coach gets 1x and 2x). */
+export function visibleShellKinds(state: ClubState, book: RuleBook, visibleItem: (item: Item) => boolean): (typeof SHELL_KINDS)[number][] {
+  const seats = new Set(
+    state.items
+      .filter(visibleItem)
+      .map((i) => classOf(book, i))
+      .filter((c) => c.type === "Shell")
+      .map((c) => c.seats),
+  );
+  return SHELL_KINDS.filter((k) => seats.has(k.seats));
 }
 
 /** Map a legacy ?type= URL onto a browse id so old links and tests keep working. */
