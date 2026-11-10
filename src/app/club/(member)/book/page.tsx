@@ -191,7 +191,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const options = visibleBrowse(state, RULE_BOOK, now, (i) => itemVisibleTo(state, i, viewer));
   const browse = (whatRaw ? browseById(whatRaw) : null) ?? browseFromType(askedType);
   const browseLive = browse && (options.some((o) => o.id === browse.id) || Boolean(whatRaw || askedType)) ? browse : null;
-  // Shells always need a size (1x/2x/4x/8x) before times — including legacy ?type=Shell links. The full fleet is 100+ boats.
+  // Shells always need a size (1x/2x/4x/+/8+) before times — including legacy ?type=Shell links. The full fleet is 100+ boats.
   const needsKind = Boolean(browseLive && "kinds" in browseLive && browseLive.kinds);
   const kind = shellKindById(kindRaw);
   const ready = Boolean(browseLive && (!needsKind || kind));
@@ -444,7 +444,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 const first = (p: string | string[] | undefined) => (Array.isArray(p) ? p[0] : p);
 
 function chooseHint(b: BookBrowse): string {
-  if (b.id === "shell") return "1x, 2x, 4x, 8x";
+  if (b.id === "shell") return "1x, 2x, 4x/+, 8+";
   if (b.id === "paddle") return "Kayaks and paddle boards";
   if (b.id === "dock") return "Warm months";
   if (b.id === "gym") return "Ergs and floor";

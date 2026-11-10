@@ -68,7 +68,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
 
   // Who can sit in the other seats: active members who hold the qualification.
   // On a private boat the other seats go to its owners and the people they invited instead.
-  // On a coaches-only boat (the 8x) no skill level is checked, even one stored on the boat, so any active member can be crew.
+  // On a coaches-only boat (the 4x and the 8x) no skill level is checked, even one stored on the boat, so any active member can be crew.
   const crewNeed = cls.coachesOnly ? null : requiredQualification;
   const crewChoices =
     cls.seats > 1
