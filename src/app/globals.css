@@ -281,6 +281,62 @@ main.frame {
   margin-top: 36px;
 }
 
+/* ---------- Committee pages (Nov 9): their own header, no dashboard menu ---------- */
+
+.committee-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.committee-nav a[aria-current="page"] {
+  color: var(--cyberspace);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.committee-contents ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.committee-shared {
+  color: var(--slate);
+}
+
+.committee-section {
+  margin-top: 64px;
+  padding-top: 32px;
+  border-top: 2px solid var(--waterloo);
+  scroll-margin-top: 80px;
+}
+
+.committee-kicker {
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.committee-section-title {
+  margin-top: 4px;
+  font-size: 32px;
+  line-height: 1.2;
+}
+
+.committee-why {
+  margin-top: 10px;
+  max-width: 720px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--waterloo);
+  background: var(--oyster-50);
+}
+
 .sample-banner {
   margin-top: 16px;
   padding: 10px 14px;

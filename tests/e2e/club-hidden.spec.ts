@@ -339,6 +339,17 @@ for (const [name, base] of Object.entries(HIDDEN)) {
       }
     });
 
+    test("the committee pages open like the dashboard, and say nothing about the reservation system", async () => {
+      // They are dashboard pages with their own header (Nov 9), so they are live like the dashboard.
+      for (const [slug, name] of [["boathouse", "Boathouse Committee"], ["membership", "Membership Committee"], ["social", "Social Committee"]]) {
+        const res = await fetch(`${base}/committees/${slug}`);
+        expect(res.status, slug).toBe(200);
+        const html = await res.text();
+        expect(html, slug).toContain(name);
+        expect(html, slug).not.toMatch(/\/club\b|CCS System|act-as/);
+      }
+    });
+
     test("the dashboard menu leaves out CCS System and says nothing about the reservation system", async ({ page }) => {
       // The menu asks, when a page opens, what extras to show; here the answer is an empty list.
       const extras = await fetch(`${base}/api/nav-extras`);
