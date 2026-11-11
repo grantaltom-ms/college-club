@@ -7,7 +7,7 @@ import { dashboardNav } from "./helpers";
  * checks in club-hidden.spec.ts prove it is "page not found" on the live site).
  */
 
-const VIEWS = ["Test member view", "Test staff view", "Test iPad: honor snack bar", "Test iPad: check-in"];
+const VIEWS = ["Test member view", "Test staff view", "Test iPad: honor snack bar", "Test iPad: check-in", "Preview: new club website"];
 
 test.describe("the CCS System landing page", () => {
   test("the dashboard's CCS System link opens it, and it offers the four views", async ({ page }) => {
@@ -74,6 +74,22 @@ test.describe("the CCS System landing page", () => {
     await expect(page).toHaveURL(/\/club\/start$/);
   });
 
+  test("the website preview tile opens the new public site in a new tab, again and again, and the landing page stays put", async ({ page }) => {
+    await page.goto("/club/start");
+    const link = page.getByTestId("start-site-open");
+    await expect(link).toHaveAttribute("href", "/site");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", /noopener/);
+    for (let lap = 0; lap < 3; lap++) {
+      const [tab] = await Promise.all([page.context().waitForEvent("page"), link.click()]);
+      await expect(tab).toHaveURL(/\/site$/);
+      await expect(tab.getByTestId("site-header")).toBeVisible();
+      await expect(tab.getByRole("heading", { level: 1 })).toBeVisible();
+      await tab.close();
+    }
+    await expect(page).toHaveURL(/\/club\/start$/);
+  });
+
   test("a different test member can be picked, and the way back to the dashboard works", async ({ page }) => {
     await page.goto("/club/start");
     await page.getByTestId("start-member-other").click();
@@ -89,7 +105,7 @@ test.describe("the CCS System landing page", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/club/start");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    for (const id of ["start-member-open", "start-staff-open", "start-snacks-open", "start-checkin-open"]) {
+    for (const id of ["start-member-open", "start-staff-open", "start-snacks-open", "start-checkin-open", "start-site-open"]) {
       const box = await page.getByTestId(id).boundingBox();
       expect(box?.height ?? 0, id).toBeGreaterThanOrEqual(44);
     }
