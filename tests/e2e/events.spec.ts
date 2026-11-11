@@ -1,10 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import { sampleEvents } from "../../src/lib/events";
 import { seedEventsData } from "../../src/lib/events-seed.testkit";
-import { dashboardNav, openNavMenu } from "./helpers";
+import { sampleMembership } from "../../src/lib/membership";
+import { dashboardNav, mockDashboard, openNavMenu } from "./helpers";
 
 /** Serve the eight pilot events from the events endpoint, as it answers when the table is loaded, so no test touches the real database. */
 async function mockSeed(page: Page) {
+  await mockDashboard(page);
+  const membership = JSON.stringify(sampleMembership());
+  await page.route("**/api/membership", (route) => route.fulfill({ status: 200, contentType: "application/json", body: membership }));
   const body = JSON.stringify(seedEventsData());
   await page.route("**/api/events", (route) => route.fulfill({ status: 200, contentType: "application/json", body }));
 }
@@ -131,22 +135,48 @@ test.describe("the Events and Marketing page with the table loaded", () => {
     ]);
   });
 
-  test("shows the four member snapshots, each with its as-of label, and says they are not live", async ({ page }) => {
-    await expect(page.getByText("Snapshots, not live figures")).toBeVisible();
+  test("shows the four member cards from the same live data as the Summary, each with how far its data goes", async ({ page }) => {
+    await expect(page.getByText("Snapshots, not live figures")).toHaveCount(0);
+    await expect(page.getByText("The same member list and visit data as the Summary page")).toBeVisible();
+    await expect(page.getByText("Member list: QuickBooks member list, Oct 21, 2026.")).toBeVisible();
     const visited = page.getByTestId("stand-visited");
-    await expect(visited).toContainText("483 of 550 members visited at least once in the last 6 months of data");
-    await expect(visited).toContainText("As of: through Sep 27, 2026");
+    await expect(visited).toContainText("455 of 497 members came in at least once this year");
+    await expect(visited).toContainText("As of: visits Jan 1 – Sep 27, 2026");
     const rarely = page.getByTestId("stand-rarely");
-    await expect(rarely).toContainText("185 of 550 (34%) visit less than once a month");
-    await expect(rarely).toContainText("As of: through Sep 27, 2026");
+    await expect(rarely).toContainText("133 of 497 (27%) came in less than once a month, or not at all");
+    await expect(rarely).toContainText("As of: visits Jan 1 – Sep 27, 2026");
     const none = page.getByTestId("stand-none");
-    await expect(none).toContainText("63 have not visited at all in the data we hold");
-    await expect(none).toContainText("As of: through Sep 27, 2026");
+    await expect(none).toContainText("31 have not visited at all in the data we hold");
     const waitlist = page.getByTestId("stand-waitlist");
     await expect(waitlist.getByRole("heading", { level: 3 })).toHaveText("Waitlist");
-    await expect(waitlist).toContainText("16 people on the waitlist");
-    await expect(waitlist).toContainText("As of: October 2026");
+    await expect(waitlist).toContainText("12 people on the waitlist");
+    await expect(waitlist).toContainText("As of: Mar 2024");
     await expect(page.locator("[data-testid^='stand-']")).toHaveCount(4);
+    // The old typed-in iCrew figures are gone for good.
+    await expect(page.getByText("of 550")).toHaveCount(0);
+  });
+
+  test("says plainly when the membership figures fail, and Try again brings the waitlist back", async ({ page }) => {
+    let fail = true;
+    const membership = JSON.stringify(sampleMembership());
+    await page.route("**/api/membership", (route) =>
+      fail
+        ? route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "The membership figures could not be loaded." }) })
+        : route.fulfill({ status: 200, contentType: "application/json", body: membership }),
+    );
+    await page.goto("/events");
+    const waitlist = page.getByTestId("stand-waitlist");
+    await expect(waitlist).toContainText("As of: the membership figures could not be loaded");
+    await expect(waitlist).not.toContainText("not loaded yet");
+    const targets = page.getByTestId("targets-table").locator("tbody tr");
+    await expect(targets.nth(4).getByRole("cell").nth(1)).toHaveText("Could not be loaded");
+    // The member cards still show: only the waitlist depends on the membership figures.
+    await expect(page.getByTestId("stand-rarely")).toContainText("133 of 497");
+    fail = false;
+    await waitlist.getByRole("button", { name: "Try again" }).click();
+    await expect(waitlist).toContainText("12 people on the waitlist");
+    await expect(waitlist.getByRole("button", { name: "Try again" })).toHaveCount(0);
+    await expect(targets.nth(4).getByRole("cell").nth(1)).toHaveText("12");
   });
 
   test("lists the two tests as approved or ready and not sent, in the wording the committee agreed", async ({ page }) => {
@@ -167,11 +197,11 @@ test.describe("the Events and Marketing page with the table loaded", () => {
     await expect(table.getByRole("columnheader")).toHaveText(["Measure", "Where we are now", "Target"]);
     const rows = table.locator("tbody tr");
     await expect(rows).toHaveCount(5);
-    await expect(rows.nth(0).getByRole("cell")).toHaveText(["% of members visiting at least monthly", "66% (365 of 550)", "Not set yet — board to set"]);
-    await expect(rows.nth(1).getByRole("cell")).toHaveText(["Members with no visit at all in the data", "63", "Not set yet — board to set"]);
+    await expect(rows.nth(0).getByRole("cell")).toHaveText(["% of members visiting at least monthly", "71% (353 of 497)", "Not set yet — board to set"]);
+    await expect(rows.nth(1).getByRole("cell")).toHaveText(["Members with no visit at all in the data", "31", "Not set yet — board to set"]);
     await expect(rows.nth(2).getByRole("cell")).toHaveText(["Event capacity filled (persons)", "53–78% across Sep–Oct ticketed events", "Not set yet — board to set"]);
     await expect(rows.nth(3).getByRole("cell")).toHaveText(["New members with 3+ visits in their first 90 days", "Not measured yet", "Not set yet — board to set"]);
-    await expect(rows.nth(4).getByRole("cell")).toHaveText(["Waitlist", "16", "Not set yet — board to set"]);
+    await expect(rows.nth(4).getByRole("cell")).toHaveText(["Waitlist", "12", "Not set yet — board to set"]);
     await expect(table.locator("td:nth-child(3)")).toHaveText(Array(5).fill("Not set yet — board to set"));
   });
 

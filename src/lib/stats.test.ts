@@ -12,6 +12,7 @@ import {
   heatColor,
   heatmap,
   headline,
+  standing,
   noVisitsDetail,
   hourSeries,
   quietByJoined,
@@ -413,5 +414,34 @@ describe("visits by membership type and by when members joined", () => {
   it("leaves members with no creation date out of every group, and handles an empty list", () => {
     expect(quietByJoined([member({ qbCreatedOn: null })], "2026-09-27").every((r) => r.members === 0)).toBe(true);
     expect(visitsByType([]).every((r) => r.members === 0 && r.quietShare === 0)).toBe(true);
+  });
+});
+
+describe("where members stand (the Events and Marketing page)", () => {
+  it("agrees with the Summary's headline on the sample club, so the two pages can never disagree", () => {
+    const h = headline(data.members);
+    const st = standing(data.members);
+    expect(st).toEqual({ total: 497, visited: 455, rarely: 133, rarelyShare: 27, none: 31, monthly: 353, monthlyShare: 71 });
+    expect(st.total).toBe(h.total);
+    expect(st.rarely).toBe(h.quiet);
+    expect(st.none).toBe(h.noVisits);
+    // Everyone is in exactly one place: visited, never visited, or not started yet.
+    expect(st.visited + st.none + h.notStarted).toBe(st.total);
+    // Monthly visitors and rarely-visit members together are everyone who has started.
+    expect(st.monthly + st.rarely).toBe(h.started);
+  });
+
+  it("keeps not-started members in the total but out of every count", () => {
+    const members = [
+      member({ band: "0 visits", visitDays: 0, doorEntries: 0 }),
+      member({ band: "0 visits", visitDays: 0, doorEntries: 0, notStarted: true, qbCreatedOn: "2026-06-01" }),
+      member({ band: "Under 1/month", doorEntries: 3 }),
+      member({ band: "4+/month", doorEntries: 100 }),
+    ];
+    expect(standing(members)).toEqual({ total: 4, visited: 2, rarely: 2, rarelyShare: 50, none: 1, monthly: 1, monthlyShare: 25 });
+  });
+
+  it("gives zeroes, not errors, for an empty list", () => {
+    expect(standing([])).toEqual({ total: 0, visited: 0, rarely: 0, rarelyShare: 0, none: 0, monthly: 0, monthlyShare: 0 });
   });
 });

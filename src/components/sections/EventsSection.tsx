@@ -1,38 +1,38 @@
 "use client";
 
+import { WithData } from "@/components/DataProvider";
 import { useJson, type JsonState } from "@/components/useJson";
 import { formatDay } from "@/lib/dates";
 import { capacityFilledPct, isUpcoming, sortEvents } from "@/lib/events";
-import { fmtInt } from "@/lib/stats";
-import type { EventsData, PromotedEvent } from "@/lib/types";
+import { monthLabel, sortMonths } from "@/lib/membership";
+import { dataRange, fmtInt, standing } from "@/lib/stats";
+import type { DashboardData, EventsData, MembershipData, MembershipMonth, PromotedEvent } from "@/lib/types";
 
 /**
- * SNAPSHOT, not live. The four figures below were counted once and typed in here on purpose: there is no table or feed behind
- * them, and none should be built for this page. When they are recounted, edit this list and its as-of dates.
+ * Where members stand and the "where we are now" column of the board targets.
  *
- * As-of dates:
- *   - Visited at least once, rarely visit, no visits at all: the member-visit data through Sep 27, 2026. The handoff dated only
- *     the first figure; the other two come from the same analysis, so they carry the same date.
- *   - Waitlist: October 2026 (the same 16 as the Oct 2026 row of the membership table).
- *
- * These counts use the member list as it stood then (550 members). The Summary page now counts the QuickBooks member list, so
- * its numbers differ; the note under the section heading says so.
+ * Live since Nov 11, 2026 (Grant asked why the Social committee page still said 550 members as of Sep 27). They were typed in
+ * until then, a snapshot of the iCrew list; now they come from the same roster and usage groups as the Summary page (the
+ * QuickBooks list), and each card says how far the visit data goes. The waitlist is the latest month of the membership table
+ * that has a waitlist count. Only the event capacity row is still written text: it describes the Sep–Oct ticketed events.
  */
-const MEMBERS_STAND = [
-  { key: "visited", area: "Visited at least once", value: "483 of 550", lead: "members visited at least once in the last 6 months of data.", asOf: "through Sep 27, 2026" },
-  { key: "rarely", area: "Rarely visit", value: "185 of 550 (34%)", lead: "visit less than once a month.", asOf: "through Sep 27, 2026" },
-  { key: "none", area: "No visits at all", value: "63", lead: "have not visited at all in the data we hold.", asOf: "through Sep 27, 2026" },
-  { key: "waitlist", area: "Waitlist", value: "16", lead: "people on the waitlist.", asOf: "October 2026" },
-] as const;
+const CAPACITY_NOW = "53–78% across Sep–Oct ticketed events";
 
-/** Where we are now, per the same snapshot. No target numbers are made up here: the board sets them. */
-const BOARD_TARGETS = [
-  { measure: "% of members visiting at least monthly", now: "66% (365 of 550)" },
-  { measure: "Members with no visit at all in the data", now: "63" },
-  { measure: "Event capacity filled (persons)", now: "53–78% across Sep–Oct ticketed events" },
-  { measure: "New members with 3+ visits in their first 90 days", now: "Not measured yet" },
-  { measure: "Waitlist", now: "16" },
-] as const;
+/** The waitlist figure: the newest month that has a count, or why there is none (still loading, failed, or no month has one). */
+interface Waitlist {
+  month: MembershipMonth | null;
+  /** Shown in place of a month when there is no figure. */
+  missing: string;
+  failed: boolean;
+  retry: () => void;
+}
+
+function latestWaitlist(state: JsonState<MembershipData>, retry: () => void): Waitlist {
+  if (state.status === "loading") return { month: null, missing: "loading", failed: false, retry };
+  if (state.status === "error") return { month: null, missing: "the membership figures could not be loaded", failed: true, retry };
+  const withCount = sortMonths(state.data.months).filter((m) => m.waitlist !== null);
+  return { month: withCount[withCount.length - 1] ?? null, missing: "no month of the membership table has a waitlist count", failed: false, retry };
+}
 
 const TARGET_UNSET = "Not set yet — board to set";
 
@@ -53,6 +53,8 @@ const KEEPING_HONEST = [
 /** The body of the Events dashboard page, without its heading, so a committee page can show it too. */
 export function EventsSection() {
   const { state, retry } = useJson<EventsData>("/api/events", "The event figures could not be loaded.");
+  const membership = useJson<MembershipData>("/api/membership", "The membership figures could not be loaded.");
+  const waitlist = latestWaitlist(membership.state, membership.retry);
   return (
     <>
       <p className="page-sub">What we promoted, who signed up, and who showed up — from the Watercooler, iCrew and the front door.</p>
@@ -62,13 +64,17 @@ export function EventsSection() {
         </p>
       )}
 
-      {/* Only the scoreboard reads the event_scoreboard table, so only it shows a "could not be loaded" message. Everything else is written text. */}
+      {/* The scoreboard reads the event_scoreboard table; the member cards and targets read the dashboard data. The rest is written text. */}
       <div className="stack">
         <Scoreboard state={state} retry={retry} />
         <HowToRead />
-        <WhereMembersStand />
+        <WithData>
+          {(data) => <WhereMembersStand data={data} waitlist={waitlist} />}
+        </WithData>
         <TestsWeAreRunning />
-        <BoardTargets />
+        <WithData>
+          {(data) => <BoardTargets data={data} waitlist={waitlist} />}
+        </WithData>
         <KeepingHonest />
       </div>
     </>
@@ -195,20 +201,48 @@ function HowToRead() {
   );
 }
 
-function WhereMembersStand() {
+function WhereMembersStand({ data, waitlist }: { data: DashboardData; waitlist: Waitlist }) {
+  const st = standing(data.members);
+  const visits = `visits ${dataRange(data)}`;
+  const cards = [
+    { key: "visited", area: "Visited at least once", value: `${fmtInt(st.visited)} of ${fmtInt(st.total)}`, lead: "members came in at least once this year.", asOf: visits },
+    {
+      key: "rarely",
+      area: "Rarely visit",
+      value: `${fmtInt(st.rarely)} of ${fmtInt(st.total)} (${st.rarelyShare}%)`,
+      lead: "came in less than once a month, or not at all.",
+      asOf: visits,
+    },
+    { key: "none", area: "No visits at all", value: fmtInt(st.none), lead: "have not visited at all in the data we hold.", asOf: visits },
+    {
+      key: "waitlist",
+      area: "Waitlist",
+      value: waitlist.month ? fmtInt(waitlist.month.waitlist as number) : "—",
+      lead: "people on the waitlist.",
+      asOf: waitlist.month ? monthLabel(waitlist.month) : waitlist.missing,
+    },
+  ];
   return (
     <section aria-labelledby="stand-title">
       <h2 className="card-title" id="stand-title">
         Where members stand
       </h2>
-      <p className="card-sub">Snapshots, not live figures: each card says the date it is as of. The Summary page now counts the QuickBooks member list, so its numbers differ.</p>
+      <p className="card-sub">
+        The same member list and visit data as the Summary page, so the two always agree. Each card says how far its data goes.
+        {data.roster.asOf && <> Member list: {data.roster.source}, {formatDay(data.roster.asOf, true)}.</>}
+      </p>
       <div className="stat-grid ev-two-up">
-        {MEMBERS_STAND.map((s) => (
+        {cards.map((s) => (
           <section className="stat-card" key={s.key} aria-label={s.area} data-testid={`stand-${s.key}`}>
             <h3 className="stat-area">{s.area}</h3>
             <p className="stat-value ev-stand-value num">{s.value}</p>{" "}
             <p className="stat-lead">{s.lead}</p>
             <p className="stat-detail">As of: {s.asOf}</p>
+            {s.key === "waitlist" && waitlist.failed && (
+              <button type="button" className="link-button" onClick={waitlist.retry}>
+                Try again
+              </button>
+            )}
           </section>
         ))}
       </div>
@@ -246,7 +280,15 @@ function TestsWeAreRunning() {
   );
 }
 
-function BoardTargets() {
+function BoardTargets({ data, waitlist }: { data: DashboardData; waitlist: Waitlist }) {
+  const st = standing(data.members);
+  const targets = [
+    { measure: "% of members visiting at least monthly", now: `${st.monthlyShare}% (${fmtInt(st.monthly)} of ${fmtInt(st.total)})` },
+    { measure: "Members with no visit at all in the data", now: fmtInt(st.none) },
+    { measure: "Event capacity filled (persons)", now: CAPACITY_NOW },
+    { measure: "New members with 3+ visits in their first 90 days", now: "Not measured yet" },
+    { measure: "Waitlist", now: waitlist.month ? fmtInt(waitlist.month.waitlist as number) : waitlist.failed ? "Could not be loaded" : "—" },
+  ];
   return (
     <section className="card" aria-labelledby="targets-title">
       <h2 className="card-title" id="targets-title">
@@ -262,7 +304,7 @@ function BoardTargets() {
             </tr>
           </thead>
           <tbody>
-            {BOARD_TARGETS.map((t) => (
+            {targets.map((t) => (
               <tr key={t.measure}>
                 <td>{t.measure}</td>
                 <td>{t.now}</td>

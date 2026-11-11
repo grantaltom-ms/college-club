@@ -621,3 +621,39 @@ export function periodRange(period: DoorPeriod): string {
 }
 
 export const fmtInt = (n: number) => Math.round(n).toLocaleString("en-US");
+
+/* ---------- Where members stand (the Events and Marketing page) ---------- */
+
+export interface Standing {
+  /** Everyone on the roster, started or not: the "of N" in every card. */
+  total: number;
+  /** Members who came in at least once this year. */
+  visited: number;
+  /** Less than once a month, or never: the Summary's "rarely visit". */
+  rarely: number;
+  rarelyShare: number;
+  /** Started and no visit at all. */
+  none: number;
+  /** At least once a month on average. */
+  monthly: number;
+  monthlyShare: number;
+}
+
+/**
+ * The "where members stand" figures, from the same roster and the same usage groups as the Summary, so the two pages always agree.
+ * Until Nov 11, 2026 these were typed into the page (483 of 550 and so on, the iCrew list through Sep 27) and went stale.
+ */
+export function standing(members: Member[]): Standing {
+  const h = headline(members);
+  const visited = h.started - h.noVisits;
+  const monthly = h.started - h.quiet;
+  return {
+    total: h.total,
+    visited,
+    rarely: h.quiet,
+    rarelyShare: h.quietShare,
+    none: h.noVisits,
+    monthly,
+    monthlyShare: percent(monthly, h.total),
+  };
+}
