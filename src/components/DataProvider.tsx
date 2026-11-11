@@ -47,6 +47,13 @@ export function useDashboard(): DashboardData | null {
   return ctx?.state.status === "ready" ? ctx.state.data : null;
 }
 
+/** The dashboard data once loaded, null if it could not be loaded, undefined while it is still loading. */
+export function useDashboardState(): DashboardData | null | undefined {
+  const ctx = useContext(Context);
+  if (!ctx || ctx.state.status === "error") return null;
+  return ctx.state.status === "ready" ? ctx.state.data : undefined;
+}
+
 /** Renders children only once data has loaded; shows plain loading and error states otherwise. */
 export function WithData({ children }: { children: (data: DashboardData) => ReactNode }) {
   const ctx = useContext(Context);
