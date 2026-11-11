@@ -113,6 +113,14 @@ Grant (Nov 9) asked for pages for three club committees built from the dashboard
 - **Tests:** `src/lib/committees.test.ts` (the agreed sections and order, own before shared, "shared" exactly when another committee shows it, no Financials or Goals, a reason for each), `tests/e2e/committees.spec.ts` (each page's heading, contents, sections, labels and reasons, every section loaded with no error, the charts really there, the contents links, the header and its links, the dashboard's menu and pages never linking to them, a phone with 44px taps, an unknown committee 404), and a check in `club-hidden.spec.ts` that both live-style servers open all three and say nothing about the reservation system.
 - **Not built, on purpose:** a link from the dashboard; a page for the House Committee (not asked); passwords on these pages; committee-specific figures that the dashboard does not already have.
 
+## The executive page (Nov 11; dashboard data, but not on the dashboard)
+
+Grant (Nov 11) asked for an executive page: the three highest-priority things for club leadership to watch, concisely stated, from everything gathered. It lives at **`/executive`**, in its own route group `src/app/(executive)/` with a plain header (the club's name only), public and noindex like the dashboard and the committee pages, and **no link from the dashboard's menu** (same reasoning as the committee pages; ask Grant before adding one).
+
+- **The three** (`src/components/ExecutivePage.tsx`): (1) the waitlist that refills the club is almost gone, so keeping members is the membership plan; (2) members use the club for fitness and social life as much as rowing, and rowing use is falling; (3) the building plan has large bills coming and almost none has a price. Each has what the data says, what it means, a question for the board and a "read with care" line, and the page ends with "What all three are missing": a board target.
+- **Live figures** come from the dashboard's own data through `src/lib/executive.ts` (`waitlistOutlook` from `/api/membership`, `rowingOutlook` from `/api/shells` using `yearToDate`, `usageOutlook` from `headline()`), so they move with the dashboard. **Written figures** (the 2025 and 2026 surveys, the House Committee's capital planner and requests) are dated text on the page; update them by hand when those documents change.
+- **Tests:** `src/lib/executive.test.ts` (the real 28-month seed gives waitlist 16 / 34 / 50, 71 resignations in 12 months, 2.7 months of cover, 29 last winter; edge cases) and `tests/e2e/executive.spec.ts` (sections and order, live figures equal the library's, the jump links, a failed source, no dashboard menu and no link from it, a phone).
+
 ## Where the reservation system lives
 
 | Thing | Place |
