@@ -63,6 +63,25 @@ test("a figure whose source cannot load says so, and the rest of the page still 
   await expect(priorities(page)).toHaveCount(3);
 });
 
+test("when the dashboard's own data cannot load, its figures say so instead of loading for ever", async ({ page }) => {
+  await page.route("**/api/dashboard", (route) => route.fulfill({ status: 502, contentType: "application/json", body: '{"error":"x"}' }));
+  await page.goto("/executive");
+  await expect(page.locator("li").filter({ hasText: "came in less than once a month" }).first()).toContainText("(not available) of (not available) member households");
+  await expect(page.locator('[data-figure="rarely"]')).toHaveCount(0);
+  await expect(page.getByText("(loading)")).toHaveCount(0);
+  await expect(priorities(page)).toHaveCount(3);
+});
+
+test("a move the server refuses puts the list back in its saved order", async ({ page }) => {
+  await unlock(page);
+  await page.route("**/api/executive/order", (route) => route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"The new order could not be saved."}' }));
+  await priorities(page).nth(1).getByRole("button", { name: "Move up" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "could not be saved" })).toBeVisible();
+  await expect(page.locator(".exec-title")).toHaveText(SEED_PRIORITIES.map((p) => p.title));
+  await page.unroute("**/api/executive/order");
+  await page.getByRole("button", { name: "Stop editing on this device" }).click();
+});
+
 test("the one-line list jumps to each priority", async ({ page }) => {
   await page.goto("/executive");
   const list = page.getByRole("list", { name: "Each priority in one line" }).getByRole("link");

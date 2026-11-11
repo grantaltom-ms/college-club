@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, type FormEvent } from "react";
-import { useDashboard } from "@/components/DataProvider";
+import { useDashboardState } from "@/components/DataProvider";
 import { useJson, type JsonState } from "@/components/useJson";
 import { rowingOutlook, usageOutlook, waitlistOutlook } from "@/lib/executive";
 import {
@@ -65,13 +65,13 @@ export function ExecutivePage() {
   const priorities = useJson<PrioritiesData>("/api/executive", "The priorities could not be loaded.");
   const membership = useJson<MembershipData>("/api/membership", "The membership figures could not be loaded.");
   const shells = useJson<ShellData>("/api/shells", "The shell figures could not be loaded.");
-  const dashboard = useDashboard();
+  const dashboard = useDashboardState();
 
   const sources: LiveSources = {
     waitlist: settled(membership.state, (m) => waitlistOutlook(m.months)),
     rowing: settled(shells.state, (s) => rowingOutlook(s.outings, s.through)),
-    usage: dashboard ? usageOutlook(dashboard.members) : undefined,
-    visitsThrough: dashboard ? dashboard.dataThrough : undefined,
+    usage: dashboard && usageOutlook(dashboard.members),
+    visitsThrough: dashboard && dashboard.dataThrough,
   };
 
   const state = priorities.state;
@@ -143,8 +143,12 @@ function Board({ data, sources }: { data: PrioritiesData; sources: LiveSources }
     const next = [...items];
     const [moved] = next.splice(index, 1);
     next.splice(index + by, 0, moved);
+    const saved = items;
     setItems(next);
-    void run(() => send("/api/executive/order", "POST", { ids: next.map((p) => p.id) }));
+    void run(() => send("/api/executive/order", "POST", { ids: next.map((p) => p.id) })).then((problem) => {
+      // A refused move puts the list back the way it is saved.
+      if (problem) setItems(saved);
+    });
   };
 
   const remove = (p: Priority) => {
