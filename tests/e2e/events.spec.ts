@@ -216,7 +216,7 @@ test.describe("the Events and Marketing page with the table loaded", () => {
   test("lives in the Board Materials menu, after Financials, which is marked as the active section", async ({ page }) => {
     await expect(dashboardNav(page).getByRole("button", { name: "Board Materials" })).toHaveAttribute("aria-current", "page");
     const menu = await openNavMenu(page, "Board Materials");
-    await expect(menu.getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials", "Events and Marketing"]);
+    await expect(menu.getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials", "Events and Marketing", "Executive Priorities"]);
     await expect(menu.getByRole("menuitem", { name: "Events and Marketing" })).toHaveAttribute("aria-current", "page");
     await expect(menu.getByRole("menuitem", { name: "Financials" })).not.toHaveAttribute("aria-current", "page");
   });
