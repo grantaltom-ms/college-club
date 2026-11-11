@@ -23,6 +23,8 @@ const BOARD_LINKS: NavLink[] = [
   { href: "/membership", label: "Membership" },
   { href: "/financials", label: "Financials" },
   { href: "/events", label: "Events and Marketing" },
+  // The executive page (Nov 11, Grant) keeps its own plain header; this is only the way to it.
+  { href: "/executive", label: "Executive Priorities" },
 ];
 
 /**

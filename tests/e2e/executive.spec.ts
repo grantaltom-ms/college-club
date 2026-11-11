@@ -91,11 +91,15 @@ test("the one-line list jumps to each priority", async ({ page }) => {
   await expect(priorities(page).nth(2)).toBeInViewport();
 });
 
-test("stands apart from the dashboard: no dashboard menu, and the dashboard does not link to it", async ({ page }) => {
+test("has its own plain header, and the dashboard reaches it only from the Board Materials menu (Nov 11)", async ({ page }) => {
   await page.goto("/executive");
   await expect(dashboardNav(page)).toHaveCount(0);
   await page.goto("/");
   await expect(page.locator('a[href="/executive"]')).toHaveCount(0);
+  await page.getByRole("navigation").getByRole("button", { name: "Board Materials" }).click();
+  await page.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem", { name: "Executive Priorities" }).click();
+  await expect(page).toHaveURL(/\/executive$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Things to watch." })).toBeVisible();
 });
 
 test("a wrong password is refused and nothing becomes editable", async ({ page }) => {

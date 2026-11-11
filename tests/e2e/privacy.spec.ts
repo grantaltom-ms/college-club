@@ -22,14 +22,14 @@ test.describe("what the public site shows", () => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Dashboard sections" });
     await expect(nav.getByRole("link", { name: "Members", exact: true })).toHaveCount(0);
-    // Visits, Timing, Reservations and Shells live under the Usage menu, and Email, Membership, Financials and Events and Marketing under
+    // Visits, Timing, Reservations and Shells live under the Usage menu, and Email, Membership, Financials, Events and Marketing and Executive Priorities under
     // Board Materials, not as top-level links. CCS System is the test-build link (this server allows invented data).
     await expect(nav.getByRole("link")).toHaveText(["CCS System", "Summary", "Goals"]);
     await expect(nav.getByRole("button", { name: "Usage" })).toBeVisible();
     await nav.getByRole("button", { name: "Usage" }).click();
     await expect(nav.getByRole("menu", { name: "Usage" }).getByRole("menuitem")).toHaveText(["Visits", "Timing", "Reservations", "Shells"]);
     await nav.getByRole("button", { name: "Board Materials" }).click();
-    await expect(nav.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials", "Events and Marketing"]);
+    await expect(nav.getByRole("menu", { name: "Board Materials" }).getByRole("menuitem")).toHaveText(["Email", "Membership", "Financials", "Events and Marketing", "Executive Priorities"]);
   });
 
   test("every page but Financials opens without a password", async ({ page }) => {
