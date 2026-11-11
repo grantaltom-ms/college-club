@@ -42,7 +42,7 @@ export function bandFor(visitsPerMonth: number, visitDays: number): Band {
 
 const squash = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
 
-const EMPTY_MONTHS = () => Array<number>(9).fill(0);
+const EMPTY_MONTHS = () => Array<number>(11).fill(0);
 
 export interface Roster {
   members: Member[];
