@@ -20,7 +20,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * The test landing page: four ways into the reservation system, for trying it out. The dashboard's "CCS System" link comes here.
+ * The test landing page: four ways into the reservation system, for trying it out, plus a tile that opens the preview of the new
+ * public website (/site, which is hidden on the live site exactly like /club). The dashboard's "CCS System" link comes here.
  * The building comparison: the model apartment's front door, with a sign saying which of the four rooms to look at.
  *
  * Member and staff views sign you in as an invented person (the test picker, by one button each). The two iPad views open in a
@@ -116,6 +117,16 @@ export default async function StartPage() {
           ) : (
             <IpadOff />
           )}
+        </li>
+        <li className="club-card" data-testid="start-site">
+          <h2>Preview: new club website</h2>
+          <p>The public website that will replace the Wix site: the homepage, About, Membership, Programs, Contact and the Request a tour form.</p>
+          <p className="club-meta">Opens in a new tab. It is a preview: it is not live, and a tour request sent here only reaches this test club.</p>
+          <p className="club-actions">
+            <a href="/site" target="_blank" rel="noopener noreferrer" className="club-button club-button-link" data-testid="start-site-open">
+              Open website preview
+            </a>
+          </p>
         </li>
       </ul>
       <p className="club-meta">
