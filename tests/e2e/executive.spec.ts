@@ -18,7 +18,7 @@ test("shows the three priorities in order, each with its data, meaning, a questi
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Three things to watch.");
   await expect(page.locator(".exec-title")).toHaveText([
     "The waitlist that refills the club is almost gone.",
-    "Members use the club for more than rowing, and rowing use is falling.",
+    "Rowers and non-rowers each need a strategy: rowing use is falling, and non-rowers are the least satisfied.",
     "The building plan has large bills coming and almost none of them has a price.",
   ]);
   for (const id of IDS) {

@@ -83,7 +83,7 @@ function Body({ data, membership, shells }: { data: DashboardData; membership: J
           <a href="#waitlist">The waitlist that refills the club is almost gone, so keeping members is now the membership plan.</a>
         </li>
         <li>
-          <a href="#direction">Members use the club for fitness and social life as much as rowing, and rowing use is falling.</a>
+          <a href="#direction">Rowers and non-rowers each need their own strategy: rowing use is falling, and non-rowers are the least satisfied.</a>
         </li>
         <li>
           <a href="#building">The building plan has large bills coming and almost none of them has a price.</a>
@@ -162,7 +162,7 @@ function Body({ data, membership, shells }: { data: DashboardData; membership: J
       <Priority
         n={2}
         id="direction"
-        title="Members use the club for more than rowing, and rowing use is falling."
+        title="Rowers and non-rowers each need a strategy: rowing use is falling, and non-rowers are the least satisfied."
         facts={[
           <Live key="s" state={shells}>
             {(s) => {
@@ -192,8 +192,8 @@ function Body({ data, membership, shells }: { data: DashboardData; membership: J
             of door entries. Most of them are early-morning rowers and gym users.
           </>,
         ]}
-        meaning="Most members now value the club for fitness and social life, and those members are the least enthusiastic about it. At the same time the regular rowers are the club's most loyal core, and their use is falling. The club needs to know why rowing fell before deciding whether to invest in it or shift attention away from it."
-        question="Why did rowing outings fall by about a quarter, and does the way the club spends its time and money match how members actually use it?"
+        meaning="These are two separate jobs, not a choice between them. Regular rowers are the club's most loyal members and their use is falling, so the rowing strategy is about what stands between them (and the members who say they want to row) and the water. Non-rowers are now close to half of households, value the gym and social life most, and are the least enthusiastic, so their strategy is about making the club better for how they use it."
+        question="Who will map out each of the two strategies, what does each aim for, and when will the board see them?"
         careful="Each survey is about 120 self-selected responses, two-thirds from members over 50, so year-to-year changes are signals rather than proof. Outings are reservations, not confirmed trips."
       />
 
