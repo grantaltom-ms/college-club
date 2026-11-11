@@ -156,6 +156,29 @@ test.describe("the Events and Marketing page with the table loaded", () => {
     await expect(page.getByText("of 550")).toHaveCount(0);
   });
 
+  test("says plainly when the membership figures fail, and Try again brings the waitlist back", async ({ page }) => {
+    let fail = true;
+    const membership = JSON.stringify(sampleMembership());
+    await page.route("**/api/membership", (route) =>
+      fail
+        ? route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "The membership figures could not be loaded." }) })
+        : route.fulfill({ status: 200, contentType: "application/json", body: membership }),
+    );
+    await page.goto("/events");
+    const waitlist = page.getByTestId("stand-waitlist");
+    await expect(waitlist).toContainText("As of: the membership figures could not be loaded");
+    await expect(waitlist).not.toContainText("not loaded yet");
+    const targets = page.getByTestId("targets-table").locator("tbody tr");
+    await expect(targets.nth(4).getByRole("cell").nth(1)).toHaveText("Could not be loaded");
+    // The member cards still show: only the waitlist depends on the membership figures.
+    await expect(page.getByTestId("stand-rarely")).toContainText("133 of 497");
+    fail = false;
+    await waitlist.getByRole("button", { name: "Try again" }).click();
+    await expect(waitlist).toContainText("12 people on the waitlist");
+    await expect(waitlist.getByRole("button", { name: "Try again" })).toHaveCount(0);
+    await expect(targets.nth(4).getByRole("cell").nth(1)).toHaveText("12");
+  });
+
   test("lists the two tests as approved or ready and not sent, in the wording the committee agreed", async ({ page }) => {
     const retention = page.getByTestId("test-retention");
     await expect(retention.getByRole("heading", { level: 3 })).toHaveText("Winter retention test — approved, not sent");

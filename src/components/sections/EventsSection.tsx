@@ -18,11 +18,20 @@ import type { DashboardData, EventsData, MembershipData, MembershipMonth, Promot
  */
 const CAPACITY_NOW = "53–78% across Sep–Oct ticketed events";
 
-/** The newest month that has a waitlist count, or null. */
-function latestWaitlist(state: JsonState<MembershipData>): MembershipMonth | null {
-  if (state.status !== "ready") return null;
+/** The waitlist figure: the newest month that has a count, or why there is none (still loading, failed, or no month has one). */
+interface Waitlist {
+  month: MembershipMonth | null;
+  /** Shown in place of a month when there is no figure. */
+  missing: string;
+  failed: boolean;
+  retry: () => void;
+}
+
+function latestWaitlist(state: JsonState<MembershipData>, retry: () => void): Waitlist {
+  if (state.status === "loading") return { month: null, missing: "loading", failed: false, retry };
+  if (state.status === "error") return { month: null, missing: "the membership figures could not be loaded", failed: true, retry };
   const withCount = sortMonths(state.data.months).filter((m) => m.waitlist !== null);
-  return withCount[withCount.length - 1] ?? null;
+  return { month: withCount[withCount.length - 1] ?? null, missing: "no month of the membership table has a waitlist count", failed: false, retry };
 }
 
 const TARGET_UNSET = "Not set yet — board to set";
@@ -45,7 +54,7 @@ const KEEPING_HONEST = [
 export function EventsSection() {
   const { state, retry } = useJson<EventsData>("/api/events", "The event figures could not be loaded.");
   const membership = useJson<MembershipData>("/api/membership", "The membership figures could not be loaded.");
-  const waitlist = latestWaitlist(membership.state);
+  const waitlist = latestWaitlist(membership.state, membership.retry);
   return (
     <>
       <p className="page-sub">What we promoted, who signed up, and who showed up — from the Watercooler, iCrew and the front door.</p>
@@ -192,7 +201,7 @@ function HowToRead() {
   );
 }
 
-function WhereMembersStand({ data, waitlist }: { data: DashboardData; waitlist: MembershipMonth | null }) {
+function WhereMembersStand({ data, waitlist }: { data: DashboardData; waitlist: Waitlist }) {
   const st = standing(data.members);
   const visits = `visits ${dataRange(data)}`;
   const cards = [
@@ -208,9 +217,9 @@ function WhereMembersStand({ data, waitlist }: { data: DashboardData; waitlist: 
     {
       key: "waitlist",
       area: "Waitlist",
-      value: waitlist ? fmtInt(waitlist.waitlist as number) : "—",
+      value: waitlist.month ? fmtInt(waitlist.month.waitlist as number) : "—",
       lead: "people on the waitlist.",
-      asOf: waitlist ? monthLabel(waitlist) : "not loaded yet",
+      asOf: waitlist.month ? monthLabel(waitlist.month) : waitlist.missing,
     },
   ];
   return (
@@ -229,6 +238,11 @@ function WhereMembersStand({ data, waitlist }: { data: DashboardData; waitlist: 
             <p className="stat-value ev-stand-value num">{s.value}</p>{" "}
             <p className="stat-lead">{s.lead}</p>
             <p className="stat-detail">As of: {s.asOf}</p>
+            {s.key === "waitlist" && waitlist.failed && (
+              <button type="button" className="link-button" onClick={waitlist.retry}>
+                Try again
+              </button>
+            )}
           </section>
         ))}
       </div>
@@ -266,14 +280,14 @@ function TestsWeAreRunning() {
   );
 }
 
-function BoardTargets({ data, waitlist }: { data: DashboardData; waitlist: MembershipMonth | null }) {
+function BoardTargets({ data, waitlist }: { data: DashboardData; waitlist: Waitlist }) {
   const st = standing(data.members);
   const targets = [
     { measure: "% of members visiting at least monthly", now: `${st.monthlyShare}% (${fmtInt(st.monthly)} of ${fmtInt(st.total)})` },
     { measure: "Members with no visit at all in the data", now: fmtInt(st.none) },
     { measure: "Event capacity filled (persons)", now: CAPACITY_NOW },
     { measure: "New members with 3+ visits in their first 90 days", now: "Not measured yet" },
-    { measure: "Waitlist", now: waitlist ? fmtInt(waitlist.waitlist as number) : "—" },
+    { measure: "Waitlist", now: waitlist.month ? fmtInt(waitlist.month.waitlist as number) : waitlist.failed ? "Could not be loaded" : "—" },
   ];
   return (
     <section className="card" aria-labelledby="targets-title">
