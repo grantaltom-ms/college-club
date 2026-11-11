@@ -44,6 +44,9 @@ interface MemberRow {
   visit_days_2026_07: number | null;
   visit_days_2026_08: number | null;
   visit_days_2026_09: number | null;
+  /** Added Nov 2026 (db/members.sql). Missing on a table that has not been extended yet, which reads as no visits. */
+  visit_days_2026_10?: number | null;
+  visit_days_2026_11?: number | null;
 }
 
 interface TotalRow {
@@ -136,6 +139,8 @@ export function toMember(r: MemberRow): Member {
       r.visit_days_2026_07,
       r.visit_days_2026_08,
       r.visit_days_2026_09,
+      r.visit_days_2026_10,
+      r.visit_days_2026_11,
     ].map((v) => v ?? 0),
   };
 }

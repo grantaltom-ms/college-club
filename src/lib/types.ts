@@ -38,7 +38,7 @@ export interface Member {
   qbCreatedOn: string | null;
   /** Joined this year and has no visit yet: a waitlist member who has not started. Left out of the usage groups. */
   notStarted: boolean;
-  /** Visit days for Jan..Sep (9 values). */
+  /** Visit days for Jan..Nov (11 values; a month after the data ends is 0). */
   monthly: number[];
 }
 

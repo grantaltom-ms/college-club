@@ -32,8 +32,21 @@ describe("database rows to dashboard data", () => {
     expect(m.earlyShare).toBeNull();
     expect(m.weekendShare).toBeNull();
     expect(m.household).toBe(false);
-    expect(m.monthly).toEqual([0, 0, 1, 0, 2, 4, 20, 5, 4]);
+    expect(m.monthly).toEqual([0, 0, 1, 0, 2, 4, 20, 5, 4, 0, 0]);
     expect(m.lastVisit).toBe("2026-09-26");
+  });
+
+  it("reads October and November once the table has them", () => {
+    const m = toMember({
+      member_name: "Test Person", usage_band: "1-2/month", visits_per_month: 1.5, visit_days: 15, door_entries: 9,
+      icrew_booking_days_jul_sep: 0, last_visit: "2026-11-10", own_brivo_fob: true, joined: null,
+      icrew_member_type: "Resident", data_through: "2026-11-10",
+      visit_days_2026_01: 1, visit_days_2026_02: 1, visit_days_2026_03: 1, visit_days_2026_04: 1, visit_days_2026_05: 1,
+      visit_days_2026_06: 1, visit_days_2026_07: 1, visit_days_2026_08: 1, visit_days_2026_09: 1,
+      visit_days_2026_10: 4, visit_days_2026_11: 2,
+    });
+    expect(m.monthly).toHaveLength(11);
+    expect(m.monthly.slice(9)).toEqual([4, 2]);
   });
 
   it("falls back to 'No visits' for a band it does not know", () => {

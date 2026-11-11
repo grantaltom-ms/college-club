@@ -95,7 +95,7 @@ function buildMembers(): Member[] {
       const [lo, hi] = BAND_DAYS[band];
       const visitDays = lo + Math.floor(rand() * (hi - lo + 1));
       const ownFob = rand() < 0.88;
-      const monthly = Array<number>(9).fill(0);
+      const monthly = Array<number>(11).fill(0);
       for (let d = 0; d < visitDays; d++) monthly[Math.floor(rand() * 9)] += 1;
       const first = FIRST[n % FIRST.length];
       const last = LAST[Math.floor(n / FIRST.length) % LAST.length];
@@ -126,7 +126,7 @@ function buildMembers(): Member[] {
         memberType: types[n],
         qbCreatedOn: created,
         notStarted,
-        monthly: doorOnly ? Array<number>(9).fill(0) : monthly,
+        monthly: doorOnly ? Array<number>(11).fill(0) : monthly,
       });
       n += 1;
     }
