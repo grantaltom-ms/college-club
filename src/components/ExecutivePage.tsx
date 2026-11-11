@@ -1,232 +1,403 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { WithData } from "@/components/DataProvider";
+import { useCallback, useState, type FormEvent } from "react";
+import { useDashboard } from "@/components/DataProvider";
 import { useJson, type JsonState } from "@/components/useJson";
-import { formatDay } from "@/lib/dates";
 import { rowingOutlook, usageOutlook, waitlistOutlook } from "@/lib/executive";
+import {
+  LIMITS,
+  LIVE_FIGURES,
+  MAX_ITEMS,
+  pageHeading,
+  splitFigures,
+  type LiveSources,
+  type PrioritiesData,
+  type Priority,
+  type PriorityInput,
+} from "@/lib/executive-items";
 import type { ShellData } from "@/lib/shells";
-import { fmtInt } from "@/lib/stats";
-import type { DashboardData, MembershipData } from "@/lib/types";
+import type { MembershipData } from "@/lib/types";
 
-/** A live figure, or a plain placeholder while it loads or when its source cannot be read. */
-function Live<T>({ state, children }: { state: JsonState<T>; children: (data: T) => ReactNode }) {
-  if (state.status === "loading") return <span className="exec-pending">(loading)</span>;
-  if (state.status === "error") return <span className="exec-pending">(this figure could not be loaded)</span>;
-  return <>{children(state.data)}</>;
+/** What a live-figure source looks like to the text: undefined while loading, null when it could not be read. */
+function settled<T, R>(state: JsonState<T>, pick: (data: T) => R | null): R | null | undefined {
+  if (state.status === "loading") return undefined;
+  if (state.status === "error") return null;
+  return pick(state.data);
 }
 
-interface PriorityProps {
-  n: number;
-  id: string;
-  title: string;
-  facts: ReactNode[];
-  meaning: string;
-  question: string;
-  careful: string;
-}
-
-function Priority({ n, id, title, facts, meaning, question, careful }: PriorityProps) {
-  return (
-    <section id={id} className="exec-priority" aria-labelledby={`${id}-heading`} data-testid={`priority-${id}`}>
-      <p className="exec-number" aria-hidden="true">
-        {n}
-      </p>
-      <div>
-        <h2 id={`${id}-heading`} className="exec-title">
-          {title}
-        </h2>
-        <h3 className="exec-label">What the data says</h3>
-        <ul className="exec-facts">
-          {facts.map((f, i) => (
-            <li key={i}>{f}</li>
-          ))}
-        </ul>
-        <h3 className="exec-label">What it means</h3>
-        <p>{meaning}</p>
-        <p className="exec-question">
-          <strong>Question for the board:</strong> {question}
-        </p>
-        <p className="exec-careful">
-          <strong>Read with care:</strong> {careful}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-const pct = (n: number | null) => (n === null ? "no change to compare" : `${n > 0 ? "up" : "down"} ${Math.abs(n)}%`);
-
-export function ExecutivePage() {
-  const membership = useJson<MembershipData>("/api/membership", "The membership figures could not be loaded.");
-  const shells = useJson<ShellData>("/api/shells", "The shell figures could not be loaded.");
+/** Text with its live figures filled in. */
+function Figured({ text, sources }: { text: string; sources: LiveSources }) {
   return (
     <>
-      <h1 className="page-title">Three things to watch.</h1>
-      <p className="page-sub">
-        For the board and club leadership: where the club&apos;s data points for the year ahead. Membership, visit and boat figures are
-        the dashboard&apos;s own and update with it. Survey and building figures come from the dated documents named under each one.
-      </p>
-      <WithData>{(data) => <Body data={data} membership={membership.state} shells={shells.state} />}</WithData>
+      {splitFigures(text, sources).map((part, i) => {
+        if ("text" in part) return <span key={i}>{part.text}</span>;
+        if (!part.known) return <span key={i} className="exec-pending">[unknown figure: {part.figure}]</span>;
+        if (part.value === undefined) return <span key={i} className="exec-pending">(loading)</span>;
+        if (part.value === null) return <span key={i} className="exec-pending">(not available)</span>;
+        return (
+          <strong key={i} data-figure={part.figure}>
+            {part.value}
+          </strong>
+        );
+      })}
     </>
   );
 }
 
-function Body({ data, membership, shells }: { data: DashboardData; membership: JsonState<MembershipData>; shells: JsonState<ShellData> }) {
-  const usage = usageOutlook(data.members);
-  const through = formatDay(data.dataThrough, true);
+async function send(url: string, method: string, body?: unknown): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (res.ok) return null;
+    const data = await res.json().catch(() => null);
+    return data?.error ?? "That change could not be saved. Try again.";
+  } catch {
+    return "That change could not be saved. Check your connection and try again.";
+  }
+}
+
+const EMPTY: PriorityInput = { title: "", summary: "", facts: [], meaning: "", question: "", careful: "" };
+
+export function ExecutivePage() {
+  const priorities = useJson<PrioritiesData>("/api/executive", "The priorities could not be loaded.");
+  const membership = useJson<MembershipData>("/api/membership", "The membership figures could not be loaded.");
+  const shells = useJson<ShellData>("/api/shells", "The shell figures could not be loaded.");
+  const dashboard = useDashboard();
+
+  const sources: LiveSources = {
+    waitlist: settled(membership.state, (m) => waitlistOutlook(m.months)),
+    rowing: settled(shells.state, (s) => rowingOutlook(s.outings, s.through)),
+    usage: dashboard ? usageOutlook(dashboard.members) : undefined,
+    visitsThrough: dashboard ? dashboard.dataThrough : undefined,
+  };
+
+  const state = priorities.state;
+  if (state.status === "ready") return <Board data={state.data} sources={sources} />;
   return (
     <>
-      {data.source === "sample" && <p className="sample-banner">Sample data: these are invented figures, not the club&apos;s.</p>}
-      <ol className="exec-summary" aria-label="The three in one line each">
-        <li>
-          <a href="#waitlist">The waitlist that refills the club is almost gone, so keeping members is now the membership plan.</a>
-        </li>
-        <li>
-          <a href="#direction">Rowers and non-rowers each need their own strategy: rowing use is falling, and non-rowers are the least satisfied.</a>
-        </li>
-        <li>
-          <a href="#building">The building plan has large bills coming and almost none of them has a price.</a>
-        </li>
-      </ol>
+      <Intro heading="Things to watch." />
+      {state.status === "loading" ? (
+        <p className="status" role="status">
+          Loading the priorities
+        </p>
+      ) : (
+        <div className="status-error" role="alert">
+          <p>{state.message}</p>
+          <button type="button" className="link-button" onClick={priorities.retry}>
+            Try again
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
 
-      <Priority
-        n={1}
-        id="waitlist"
-        title="The waitlist that refills the club is almost gone."
-        facts={[
-          <Live key="w" state={membership}>
-            {(m) => {
-              const o = waitlistOutlook(m.months);
-              if (!o) return "No waitlist figure has been loaded yet.";
-              return (
-                <>
-                  The waitlist was <strong data-testid="waitlist-now">{fmtInt(o.now.waitlist)}</strong> in {o.now.label}
-                  {o.yearAgo && (
-                    <>
-                      , down from {fmtInt(o.yearAgo.waitlist)} a year earlier
-                    </>
-                  )}
-                  {o.twoYearsAgo && <> and {fmtInt(o.twoYearsAgo.waitlist)} two years earlier</>}.
-                </>
-              );
-            }}
-          </Live>,
-          <Live key="r" state={membership}>
-            {(m) => {
-              const o = waitlistOutlook(m.months);
-              if (!o) return "No resignation figures have been loaded yet.";
-              return (
-                <>
-                  <strong data-testid="resignations-12">{fmtInt(o.resignations12)}</strong> households resigned in the last{" "}
-                  {o.monthsCounted} months, about {o.perMonth} a month.
-                  {o.monthsOfCover !== null && (
-                    <>
-                      {" "}
-                      Today&apos;s waitlist would replace about <strong data-testid="months-of-cover">{o.monthsOfCover}</strong> months of
-                      that.
-                    </>
-                  )}
-                  {o.lastWinter && (
-                    <>
-                      {" "}
-                      Last winter ({o.lastWinter.label}) {fmtInt(o.lastWinter.resignations)} resigned.
-                    </>
-                  )}
-                </>
-              );
-            }}
-          </Live>,
-          <>
-            <strong data-testid="rarely">{fmtInt(usage.rarely)}</strong> of {fmtInt(usage.total)} member households ({usage.rarelyShare}%)
-            came in less than once a month this year (visits through {through}). They are the likeliest to leave.
-          </>,
-          <Live key="m" state={membership}>
-            {(m) => {
-              const o = waitlistOutlook(m.months);
-              if (!o) return "";
-              return (
-                <>
-                  Dues-paying members were {fmtInt(o.members)} in {o.membersLabel}. The total has held steady for two years because
-                  applicants from the waitlist replaced the people who left.
-                </>
-              );
-            }}
-          </Live>,
-        ]}
-        meaning="Until now a resignation cost the club little, because someone on the waitlist took the place. With the waitlist this short, each resignation this winter is very likely a lost household and lost dues. Keeping the members the club has is worth more than recruiting this season."
-        question="What winter resignation number would the board call a success, and who owns reaching it?"
-        careful="A few older monthly waitlist counts are estimates (they are flagged on the Membership page). A visit is a day with a door entry or a booking."
-      />
+function Intro({ heading }: { heading: string }) {
+  return (
+    <>
+      <h1 className="page-title">{heading}</h1>
+      <p className="page-sub">
+        For the board and club leadership: where the club&apos;s data points for the year ahead. Bold figures are the dashboard&apos;s own
+        and update with it. Survey and building figures come from the dated documents named under each one.
+      </p>
+    </>
+  );
+}
 
-      <Priority
-        n={2}
-        id="direction"
-        title="Rowers and non-rowers each need a strategy: rowing use is falling, and non-rowers are the least satisfied."
-        facts={[
-          <Live key="s" state={shells}>
-            {(s) => {
-              const o = rowingOutlook(s.outings, s.through);
-              if (!o) return "Not enough shell data has been loaded to compare years.";
-              const day = formatDay(o.through);
-              return (
-                <>
-                  Member outings in club boats from Jan 1 to {day}: <strong data-testid="rowing-now">{fmtInt(o.now)}</strong> in {o.year}{" "}
-                  against {fmtInt(o.before)} in {o.year - 1}, <strong data-testid="rowing-change">{pct(o.change)}</strong>, with a similar
-                  number of boats in use. Team practices are not counted.
-                </>
-              );
-            }}
-          </Live>,
-          <>
-            In the 2026 member survey, gym and fitness (94%) and social events (93%) were rated very or somewhat important. Rowing split
-            members: 42% very important, 30% not important.
-          </>,
-          <>Households that say they never row rose from 34% (2025 survey) to 45% (2026 survey).</>,
-          <>
-            The recommend score fell from 78 to 70. It is lowest among members who never row and members aged 33 to 50 (+59 each) and
-            highest among regular rowers (+85).
-          </>,
-          <>
-            The <strong data-testid="regulars">{fmtInt(usage.regulars)}</strong> members who come weekly or more make {usage.regularEntryShare}%
-            of door entries. Most of them are early-morning rowers and gym users.
-          </>,
-        ]}
-        meaning="These are two separate jobs, not a choice between them. Regular rowers are the club's most loyal members and their use is falling, so the rowing strategy is about what stands between them (and the members who say they want to row) and the water. Non-rowers are now close to half of households, value the gym and social life most, and are the least enthusiastic, so their strategy is about making the club better for how they use it."
-        question="Who will map out each of the two strategies, what does each aim for, and when will the board see them?"
-        careful="Each survey is about 120 self-selected responses, two-thirds from members over 50, so year-to-year changes are signals rather than proof. Outings are reservations, not confirmed trips."
-      />
+function Board({ data, sources }: { data: PrioritiesData; sources: LiveSources }) {
+  const [items, setItems] = useState(data.items);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-      <Priority
-        n={3}
-        id="building"
-        title="The building plan has large bills coming and almost none of them has a price."
-        facts={[
-          <>Exterior painting of both vessels, $60,156, is approved and scheduled for spring or summer 2027.</>,
-          <>
-            The locker room remodel is the plan&apos;s number one priority and has no price. About 25 projects planned for FY27 to FY32 have
-            no price either, including the FY30 dry-dock group: both roofs, siding, the boathouse floor and water damage.
-          </>,
-          <>In 2023 the club spent $64,800 on house projects against a $30,000 budget.</>,
-          <>
-            Members&apos; top repair requests in the 2026 survey: the dock (about 25 comments, 12 &ldquo;needs improvement&rdquo; votes)
-            and the gym (about 19 comments, 14 votes).
-          </>,
-        ]}
-        meaning="Without prices the board cannot tell whether dues and savings will cover the next five years, or whether the dry-dock year will force a special assessment. The longer pricing waits, the fewer choices the club has."
-        question="What will the next five years of building work cost, and how will the club pay for it?"
-        careful="Building figures are from the House Committee's capital planner and capital requests (reviewed Sep 2026); its actual-cost columns are empty, and its files are kept in one member's personal Google account."
-      />
+  /** Reads the list again after a change, without leaving the page. */
+  const reload = useCallback(async () => {
+    try {
+      const res = await fetch("/api/executive", { cache: "no-store" });
+      if (res.ok) setItems(((await res.json()) as PrioritiesData).items);
+    } catch {
+      // The change was saved; the list on screen catches up on the next visit.
+    }
+  }, []);
+
+  const run = useCallback(
+    async (action: () => Promise<string | null>) => {
+      setBusy(true);
+      setError(null);
+      const problem = await action();
+      setBusy(false);
+      if (problem) setError(problem);
+      else {
+        setEditing(null);
+        await reload();
+      }
+      return problem;
+    },
+    [reload],
+  );
+
+  const move = (index: number, by: number) => {
+    const next = [...items];
+    const [moved] = next.splice(index, 1);
+    next.splice(index + by, 0, moved);
+    setItems(next);
+    void run(() => send("/api/executive/order", "POST", { ids: next.map((p) => p.id) }));
+  };
+
+  const remove = (p: Priority) => {
+    if (!window.confirm(`Remove "${p.title}" from the page? This cannot be undone.`)) return;
+    void run(() => send(`/api/executive/items/${p.id}`, "DELETE"));
+  };
+
+  return (
+    <>
+      <Intro heading={pageHeading(items.length)} />
+      {data.source === "sample" && <p className="sample-banner">Sample data: the figures are invented, not the club&apos;s.</p>}
+      {items.length > 0 && (
+        <ol className="exec-summary" aria-label="Each priority in one line">
+          {items.map((p) => (
+            <li key={p.id}>
+              <a href={`#p-${p.id}`}>
+                <Figured text={p.summary} sources={sources} />
+              </a>
+            </li>
+          ))}
+        </ol>
+      )}
+      {items.length === 0 && <p className="exec-footer">There are no priorities on the page yet.</p>}
+      {error && (
+        <p className="status-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {items.map((p, i) =>
+        editing === p.id ? (
+          <PriorityForm
+            key={p.id}
+            start={p}
+            busy={busy}
+            sources={sources}
+            onCancel={() => setEditing(null)}
+            onSave={(input) => run(() => send(`/api/executive/items/${p.id}`, "PUT", input))}
+          />
+        ) : (
+          <section key={p.id} id={`p-${p.id}`} className="exec-priority" aria-labelledby={`h-${p.id}`} data-testid="priority">
+            <p className="exec-number" aria-hidden="true">
+              {i + 1}
+            </p>
+            <div>
+              <h2 id={`h-${p.id}`} className="exec-title">
+                <Figured text={p.title} sources={sources} />
+              </h2>
+              {p.facts.length > 0 && (
+                <>
+                  <h3 className="exec-label">What the data says</h3>
+                  <ul className="exec-facts">
+                    {p.facts.map((f, j) => (
+                      <li key={j}>
+                        <Figured text={f} sources={sources} />
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {p.meaning && (
+                <>
+                  <h3 className="exec-label">What it means</h3>
+                  <p>
+                    <Figured text={p.meaning} sources={sources} />
+                  </p>
+                </>
+              )}
+              {p.question && (
+                <p className="exec-question">
+                  <strong>Question for the board:</strong> <Figured text={p.question} sources={sources} />
+                </p>
+              )}
+              {p.careful && (
+                <p className="exec-careful">
+                  <strong>Read with care:</strong> <Figured text={p.careful} sources={sources} />
+                </p>
+              )}
+              {data.canEdit && (
+                <div className="exec-tools" role="group" aria-label={`Change priority ${i + 1}`}>
+                  <button type="button" className="exec-button" disabled={busy} onClick={() => setEditing(p.id)}>
+                    Edit
+                  </button>
+                  <button type="button" className="exec-button" disabled={busy || i === 0} onClick={() => move(i, -1)}>
+                    Move up
+                  </button>
+                  <button type="button" className="exec-button" disabled={busy || i === items.length - 1} onClick={() => move(i, 1)}>
+                    Move down
+                  </button>
+                  <button type="button" className="exec-button exec-danger" disabled={busy} onClick={() => remove(p)}>
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        ),
+      )}
+
+      {data.canEdit &&
+        (editing === "new" ? (
+          <PriorityForm
+            start={EMPTY}
+            busy={busy}
+            sources={sources}
+            onCancel={() => setEditing(null)}
+            onSave={(input) => run(() => send("/api/executive/items", "POST", input))}
+          />
+        ) : (
+          <p className="exec-add">
+            <button type="button" className="exec-button" disabled={busy || items.length >= MAX_ITEMS} onClick={() => setEditing("new")}>
+              Add a priority
+            </button>
+            {items.length >= MAX_ITEMS && <span className="exec-pending"> The page holds up to {MAX_ITEMS}.</span>}
+          </p>
+        ))}
 
       <section className="exec-footer" aria-labelledby="exec-missing">
         <h2 id="exec-missing" className="exec-label">
-          What all three are missing
+          What these are missing
         </h2>
         <p>
           A board target. None of these has a number the board has agreed to aim for, so there is no way yet to say whether the club is
           on track. One target for each would turn this page into a scorecard.
         </p>
       </section>
+
+      <EditAccess canEdit={data.canEdit} editingSetUp={data.editingSetUp} />
     </>
+  );
+}
+
+function EditAccess({ canEdit, editingSetUp }: { canEdit: boolean; editingSetUp: boolean }) {
+  const [wrong] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("wrong"));
+  if (canEdit) {
+    return (
+      <form className="exec-access" method="post" action="/api/executive/lock">
+        <p>You can edit this page on this device.</p>
+        <button type="submit" className="exec-button">
+          Stop editing on this device
+        </button>
+      </form>
+    );
+  }
+  return (
+    <form id="edit" className="exec-access" method="post" action="/api/executive/unlock">
+      <h2 className="exec-label">For the executive team</h2>
+      {editingSetUp ? (
+        <>
+          <label htmlFor="exec-password">Editing password</label>
+          <div className="exec-access-row">
+            <input id="exec-password" name="password" type="password" autoComplete="current-password" required minLength={8} />
+            <button type="submit" className="exec-button">
+              Unlock editing
+            </button>
+          </div>
+          {wrong && (
+            <p className="status-error" role="alert">
+              That password was not right. Try again.
+            </p>
+          )}
+        </>
+      ) : (
+        <p>Editing has not been set up yet: the site needs an editing password (DASHBOARD_EXECUTIVE_PASSWORD in its private settings).</p>
+      )}
+    </form>
+  );
+}
+
+function PriorityForm({
+  start,
+  busy,
+  sources,
+  onSave,
+  onCancel,
+}: {
+  start: PriorityInput;
+  busy: boolean;
+  sources: LiveSources;
+  onSave: (input: PriorityInput) => Promise<string | null>;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState({ ...start, facts: start.facts.join("\n") });
+  const set = (key: keyof typeof draft) => (e: { target: { value: string } }) => setDraft({ ...draft, [key]: e.target.value });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    void onSave({ ...draft, facts: draft.facts.split("\n") });
+  };
+  const isNew = start.title === "";
+  return (
+    <form className="exec-form" onSubmit={submit} aria-label={isNew ? "New priority" : "Edit priority"}>
+      <h2 className="exec-title">{isNew ? "New priority" : "Edit priority"}</h2>
+      <label>
+        Heading
+        <input value={draft.title} onChange={set("title")} maxLength={LIMITS.title} required />
+      </label>
+      <label>
+        One-line summary (shown in the list at the top)
+        <input value={draft.summary} onChange={set("summary")} maxLength={LIMITS.summary} required />
+      </label>
+      <label>
+        What the data says (one point per line)
+        <textarea value={draft.facts} onChange={set("facts")} rows={6} />
+      </label>
+      <label>
+        What it means
+        <textarea value={draft.meaning} onChange={set("meaning")} rows={3} maxLength={LIMITS.meaning} />
+      </label>
+      <label>
+        Question for the board
+        <input value={draft.question} onChange={set("question")} maxLength={LIMITS.question} />
+      </label>
+      <label>
+        Read with care
+        <textarea value={draft.careful} onChange={set("careful")} rows={2} maxLength={LIMITS.careful} />
+      </label>
+      <details className="exec-codes">
+        <summary>Live figures you can put in the text</summary>
+        <p>Type a code with its double braces, for example {"{{waitlist_now}}"}. The page shows the current number in its place.</p>
+        <div className="exec-codes-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Shows</th>
+                <th scope="col">Now</th>
+              </tr>
+            </thead>
+            <tbody>
+              {LIVE_FIGURES.map((f) => {
+                const v = f.value(sources);
+                return (
+                  <tr key={f.code}>
+                    <td>
+                      <code>{`{{${f.code}}}`}</code>
+                    </td>
+                    <td>{f.what}</td>
+                    <td>{v === undefined ? "(loading)" : (v ?? "—")}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <div className="exec-tools">
+        <button type="submit" className="exec-button" disabled={busy}>
+          {isNew ? "Add to the page" : "Save"}
+        </button>
+        <button type="button" className="exec-button" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

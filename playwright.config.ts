@@ -55,6 +55,8 @@ export default defineConfig({
         CLUB_STAFF_LOGINS: "alex.staffer@example.org=Alex Staffer; sam.deskwell@example.org=Sam Deskwell",
         // Test-only; the board's shared password for the Financials page.
         DASHBOARD_FINANCIALS_PASSWORD: "playwright-only-financials-0001",
+        // Test-only; the executive team's shared password for editing the executive page.
+        DASHBOARD_EXECUTIVE_PASSWORD: "playwright-only-executive-0001",
         // Test-only and fake; a test build must keep using the test outbox even when the real sender's settings are present,
         // so the sign-in tests fail if it ever tries to email through Resend instead.
         RESEND_API_KEY: "re_playwright_only_fake_key_0001",

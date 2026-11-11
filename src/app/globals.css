@@ -1735,3 +1735,128 @@ main.frame {
     padding-left: 36px;
   }
 }
+
+.exec-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.exec-button {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--waterloo);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--cyberspace);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.exec-button:hover:not(:disabled) {
+  background: var(--oyster-50);
+}
+
+.exec-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.exec-danger {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.exec-add {
+  margin-top: 32px;
+}
+
+.exec-form {
+  display: grid;
+  gap: 14px;
+  max-width: 900px;
+  margin-top: 48px;
+  padding: 24px;
+  border: 2px solid var(--waterloo);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.exec-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 16px;
+  color: var(--slate);
+}
+
+.exec-form input,
+.exec-form textarea,
+.exec-access input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 17px;
+  color: var(--ink);
+  background: var(--white);
+  box-sizing: border-box;
+}
+
+.exec-codes summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.exec-codes-table {
+  overflow-x: auto;
+}
+
+.exec-codes table {
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.exec-codes th,
+.exec-codes td {
+  padding: 4px 10px 4px 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.exec-access {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hairline);
+  max-width: 560px;
+  display: grid;
+  gap: 8px;
+}
+
+.exec-access-row {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .exec-access-row {
+    flex-direction: column;
+  }
+  .exec-form {
+    padding: 16px;
+  }
+}
+
+.exec-form > *,
+.exec-priority > * {
+  min-width: 0;
+}
+
+.exec-codes code {
+  overflow-wrap: anywhere;
+}
