@@ -98,6 +98,52 @@ function tally(data: ReservationData, selected: ReadonlySet<string>, keyOf: (c: 
   return map;
 }
 
+/** The years the data covers, oldest first ("2025", "2026"). */
+export function yearsIn(data: ReservationData): string[] {
+  return [...new Set(data.cells.map((c) => c[0].slice(0, 4)))].sort();
+}
+
+/** The data limited to one year (null keeps every year), with its first and last day worked out again. */
+export function forYear(data: ReservationData, year: string | null): ReservationData {
+  if (year === null) return data;
+  const cells = data.cells.filter((c) => c[0].startsWith(`${year}-`));
+  const days = cells.map((c) => c[0]).sort();
+  return { ...data, first: days[0] ?? "", through: days[days.length - 1] ?? "", cells };
+}
+
+export interface MonthAcrossYears {
+  /** "01" to "12". */
+  month: string;
+  /** Short month name, "Jan". */
+  label: string;
+  /** Reservations of the chosen types in this month of each year, in the order of `years`; null where the data does not reach that month. */
+  counts: (number | null)[];
+  /** True where that year's month is only partly covered by the data. */
+  partial: boolean[];
+}
+
+/** Each calendar month, side by side for every year, so a month can be compared with the same month a year earlier. */
+export function monthsAcrossYears(data: ReservationData, selected: ReadonlySet<string>): { years: string[]; months: MonthAcrossYears[] } {
+  const years = yearsIn(data);
+  if (!data.first) return { years, months: [] };
+  const counts = tally(data, selected, (c) => c[0].slice(0, 7));
+  const months: MonthAcrossYears[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const mm = pad2(m);
+    const row: MonthAcrossYears = { month: mm, label: formatMonth(`2000-${mm}`), counts: [], partial: [] };
+    for (const y of years) {
+      const key = `${y}-${mm}`;
+      const start = `${key}-01`;
+      const end = monthEnd(Number(y), m);
+      const covered = end >= data.first && start <= data.through;
+      row.counts.push(covered ? (counts.get(key) ?? []).reduce((s, n) => s + n, 0) : null);
+      row.partial.push(covered && (start < data.first || end > data.through));
+    }
+    months.push(row);
+  }
+  return { years, months };
+}
+
 /** Monday of the week a day falls in. */
 export const weekStart = (day: string) => dayOffset(day, -weekdayIndex(day));
 
@@ -279,16 +325,21 @@ const SAMPLE_TYPES: [string, number, number[], number][] = [
 
 /** Made-up reservations for development and tests. Nothing here is real club data. */
 export function sampleReservations(): ReservationData {
-  const rand = rng(404);
   const through = "2026-10-12";
+  // 2026 keeps its own seed so its figures stay as they were; 2025 is a second, slightly quieter year.
+  const rows = [...sampleRows("2026-01-01", through, rng(404), 1), ...sampleRows("2025-01-01", "2025-12-31", rng(405), 0.9)];
+  return fromCounts(rows, through, "sample");
+}
+
+function sampleRows(from: string, to: string, rand: () => number, scale: number): CountRow[] {
   const rows: CountRow[] = [];
-  for (let day = "2026-01-01"; day <= through; day = dayOffset(day, 1)) {
+  for (let day = from; day <= to; day = dayOffset(day, 1)) {
     const month = Number(day.slice(5, 7));
     const season = month >= 6 && month <= 9 ? 1 : 0.4;
     const weekend = weekdayIndex(day) >= 5;
     const tally = new Map<string, number>();
     for (const [type, perDay, hours, weekendWeight] of SAMPLE_TYPES) {
-      const n = Math.round(perDay * season * (weekend ? weekendWeight : 1) * (0.6 + rand() * 0.8));
+      const n = Math.round(perDay * scale * season * (weekend ? weekendWeight : 1) * (0.6 + rand() * 0.8));
       for (let i = 0; i < n; i++) {
         const key = `${hours[Math.floor(rand() * hours.length)]}|${type}`;
         tally.set(key, (tally.get(key) ?? 0) + 1);
@@ -299,5 +350,5 @@ export function sampleReservations(): ReservationData {
       rows.push({ day, hour: Number(hour), item_type, reservations });
     }
   }
-  return fromCounts(rows, through, "sample");
+  return rows;
 }

@@ -12,10 +12,14 @@ import {
   typeColor,
   typeSummary,
   weekStart,
+  forYear,
+  monthsAcrossYears,
+  yearsIn,
   type CountRow,
 } from "./reservations";
 
-const data = sampleReservations();
+/** The sample's 2026, which the page shows first; the tests for more than one year are at the end. */
+const data = forYear(sampleReservations(), "2026");
 const all = new Set(data.types);
 const sum = (xs: number[]) => xs.reduce((s, n) => s + n, 0);
 const grand = sum(data.cells.map((c) => c[3]));
@@ -102,7 +106,7 @@ describe("reservation types", () => {
   it("gives the same answers on repeated use", () => {
     const first = [byWeek(data, all), byMonth(data, all), typeSummary(data, all)];
     for (let i = 0; i < 5; i++) expect([byWeek(data, all), byMonth(data, all), typeSummary(data, all)]).toEqual(first);
-    expect(sampleReservations()).toEqual(data);
+    expect(forYear(sampleReservations(), "2026")).toEqual(data);
   });
 });
 
@@ -173,5 +177,52 @@ describe("top types and other", () => {
     expect(driverOf(["Gym", "Dock"], buckets, buckets[2])).toBe("Dock");
     expect(topTypeIn(["Gym", "Dock"], buckets.slice(0, 2))).toBe("Gym");
     expect(topTypeIn(["Gym", "Dock"], [])).toBeNull();
+  });
+});
+
+describe("more than one year", () => {
+  const rows: CountRow[] = [
+    { day: "2025-03-04", hour: 7, item_type: "Shell", reservations: 3 },
+    { day: "2025-03-20", hour: 9, item_type: "Gym Space", reservations: 2 },
+    { day: "2025-12-31", hour: 8, item_type: "Shell", reservations: 1 },
+    { day: "2026-03-02", hour: 7, item_type: "Shell", reservations: 5 },
+    { day: "2026-04-15", hour: 7, item_type: "Gym Space", reservations: 4 },
+  ];
+  const two = fromCounts(rows, "2026-04-15");
+
+  it("lists the years the data covers, oldest first", () => {
+    expect(yearsIn(two)).toEqual(["2025", "2026"]);
+    expect(yearsIn(fromCounts([], "2026-01-01"))).toEqual([]);
+  });
+
+  it("limits the data to one year and works out its first and last day again", () => {
+    const y25 = forYear(two, "2025");
+    expect([y25.first, y25.through, sum(y25.cells.map((c) => c[3]))]).toEqual(["2025-03-04", "2025-12-31", 6]);
+    const y26 = forYear(two, "2026");
+    expect([y26.first, y26.through, sum(y26.cells.map((c) => c[3]))]).toEqual(["2026-03-02", "2026-04-15", 9]);
+    expect(y26.types).toEqual(two.types); // colors and order never shift when the year changes
+    expect(forYear(two, null)).toBe(two);
+    expect(forYear(two, "2024").first).toBe("");
+  });
+
+  it("puts each month next to the same month a year earlier, for the chosen types", () => {
+    const { years, months } = monthsAcrossYears(two, new Set(two.types));
+    expect(years).toEqual(["2025", "2026"]);
+    expect(months).toHaveLength(12);
+    const mar = months[2];
+    expect([mar.label, mar.counts]).toEqual(["Mar", [5, 5]]);
+    expect(mar.partial).toEqual([true, false]); // the data starts on Mar 4, 2025
+    expect(months[3].counts).toEqual([0, 4]); // April 2025 is covered but quiet
+    expect(months[3].partial).toEqual([false, true]); // the data ends on Apr 15, 2026
+    expect(months[4].counts).toEqual([0, null]); // May 2026 has not been reached
+    expect(months[0].counts).toEqual([null, 0]); // Jan 2025 is before the data starts
+    expect(monthsAcrossYears(two, new Set(["Shell"])).months[2].counts).toEqual([3, 5]);
+  });
+
+  it("gives the sample a second year without changing the first", () => {
+    const sample = sampleReservations();
+    expect(yearsIn(sample)).toEqual(["2025", "2026"]);
+    const y26 = forYear(sample, "2026");
+    expect([y26.first, y26.through]).toEqual(["2026-01-01", "2026-10-12"]);
   });
 });
