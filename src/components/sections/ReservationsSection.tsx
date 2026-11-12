@@ -101,6 +101,8 @@ function Reservations({ data: all }: { data: ReservationData }) {
   /** The year the page is looking at; null is every year together. Starts on the latest year. */
   const [year, setYear] = useState<string | null>(() => years[years.length - 1] ?? null);
   const data = useMemo(() => forYear(all, year), [all, year]);
+  /** The year-over-year line compares the latest year to date with the year before, so it only belongs beside the latest year. */
+  const onLatestYear = years.length <= 1 || year === years[years.length - 1];
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(data.types));
   const [mode, setMode] = useState<Mode>("count");
   const [picking, setPicking] = useState(false);
@@ -269,7 +271,7 @@ function Reservations({ data: all }: { data: ReservationData }) {
                   reservations{!picking || chosen.length === data.types.length ? "" : ` for ${chosen.length === 1 ? chosen[0] : `${chosen.length} types`}`}, {formatDay(data.first)} to{" "}
                   {formatDay(data.through)}.
                 </p>
-                {yoy && (!picking || chosen.length === data.types.length) && (
+                {yoy && onLatestYear && (!picking || chosen.length === data.types.length) && (
                   <p className="hero-support" data-testid="res-yoy">
                     From {yoy.fromLabel} to {yoy.toLabel}, reservations are {Math.abs(yoy.change)}% {yoy.change >= 0 ? "higher" : "lower"} than in{" "}
                     {yoy.previousYear} ({fmtInt(yoy.thisYear)} against {fmtInt(yoy.lastYear)}).

@@ -144,14 +144,20 @@ test("the year switch opens on the latest year, changes the headline, and the mo
   const years = group(page, "Year");
   const total = page.getByTestId("res-total");
   const yearTotal = (y: string | null) => forYear(all, y).cells.reduce((s, c) => s + c[3], 0);
+  const yoy = page.getByTestId("res-yoy");
   await expect(years.getByRole("button", { name: "2026", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(yoy).toBeVisible();
   for (let i = 0; i < 3; i++) {
     await years.getByRole("button", { name: "2025", exact: true }).click();
     await expect(total).toHaveText(fmt(yearTotal("2025")));
+    // The year-over-year line is about the latest year, so it goes away for another year or all years.
+    await expect(yoy).toHaveCount(0);
     await years.getByRole("button", { name: "All years" }).click();
     await expect(total).toHaveText(fmt(yearTotal(null)));
+    await expect(yoy).toHaveCount(0);
     await years.getByRole("button", { name: "2026", exact: true }).click();
     await expect(total).toHaveText(fmt(yearTotal("2026")));
+    await expect(yoy).toBeVisible();
   }
   const card = page.locator(".card", { hasText: "Each month against the same month of the year before" });
   await expect(card.getByRole("group", { name: "Reservations each month, one column for each year" })).toBeVisible();
