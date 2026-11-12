@@ -7,6 +7,8 @@ import {
   byWeek,
   byWeekday,
   fromCounts,
+  groupType,
+  TYPE_ORDER,
   orderTypes,
   sampleReservations,
   typeColor,
@@ -26,7 +28,7 @@ const grand = sum(data.cells.map((c) => c[3]));
 
 describe("reservation types", () => {
   it("orders known types first, in a fixed order, and keeps unknown ones after", () => {
-    expect(orderTypes(["Kayak", "Shell", "Zip Line", "Gym Space"])).toEqual(["Gym Space", "Shell", "Kayak", "Zip Line"]);
+    expect(orderTypes(["Kayak & Paddle Board", "Shell", "Zip Line", "Gym Space"])).toEqual(["Gym Space", "Shell", "Kayak & Paddle Board", "Zip Line"]);
     expect(typeColor("Shell")).not.toBe(typeColor("Gym Space"));
     expect(typeColor("Zip Line")).toBe(typeColor("Events")); // anything unknown is neutral gray
   });
@@ -38,7 +40,7 @@ describe("reservation types", () => {
       { day: "2026-05-09", hour: 9, item_type: "Kayak", reservations: 5 },
     ];
     const d = fromCounts(rows, "2026-05-05");
-    expect(d).toMatchObject({ first: "2026-05-01", through: "2026-05-02", types: ["Shell", "Kayak"] });
+    expect(d).toMatchObject({ first: "2026-05-01", through: "2026-05-02", types: ["Shell", "Kayak & Paddle Board"] });
     expect(d.cells).toEqual([
       ["2026-05-01", 7, 0, 3],
       ["2026-05-02", 9, 1, 2],
@@ -90,8 +92,8 @@ describe("reservation types", () => {
     expect(rows).toHaveLength(data.types.length);
     expect(sum(rows.map((r) => r.total))).toBe(grand);
     expect(rows.map((r) => r.total)).toEqual([...rows.map((r) => r.total)].sort((a, b) => b - a));
-    const two = typeSummary(data, new Set(["Shell", "Kayak"]));
-    expect(two.map((r) => r.type).sort()).toEqual(["Kayak", "Shell"]);
+    const two = typeSummary(data, new Set(["Shell", "Kayak & Paddle Board"]));
+    expect(two.map((r) => r.type).sort()).toEqual(["Kayak & Paddle Board", "Shell"]);
     expect(sum(two.map((r) => r.share))).toBeGreaterThanOrEqual(99);
     expect(typeSummary({ ...data, cells: [] }, all).every((r) => r.peakWeekday === "—")).toBe(true);
   });
@@ -147,29 +149,39 @@ describe("preparing the iCrew reservations export", () => {
   });
 });
 
-describe("top types and other", () => {
-  it("keeps the busiest types, adds the rest up as Other, and keeps every total", async () => {
-    const { byMonth, collapseTypes, sampleReservations, typesByVolume } = await import("./reservations");
-    const data = sampleReservations();
-    const all = new Set(data.types);
-    const months = byMonth(data, all);
-    const v = collapseTypes(data, months, 4);
-    expect(v.types).toHaveLength(5);
-    expect(v.types[4]).toBe("Other");
-    const busiest = typesByVolume(data).slice(0, 4).map((i) => data.types[i]);
-    expect([...v.types.slice(0, 4)].sort()).toEqual([...busiest].sort());
-    v.buckets.forEach((b, i) => expect(b.total).toBe(months[i].total));
-    // Asking again gives the same answer.
-    expect(collapseTypes(data, months, 4)).toEqual(v);
+describe("type groups", () => {
+  it("shows kayaks with paddle boards and the club room with work space, adding their counts", () => {
+    const rows: CountRow[] = [
+      { day: "2026-05-01", hour: 7, item_type: "Kayak", reservations: 2 },
+      { day: "2026-05-01", hour: 7, item_type: "Paddle Board", reservations: 3 },
+      { day: "2026-05-01", hour: 8, item_type: "Paddle Board", reservations: 1 },
+      { day: "2026-05-01", hour: 9, item_type: "Room Space", reservations: 4 },
+      { day: "2026-05-01", hour: 9, item_type: "Work Space", reservations: 6 },
+      { day: "2026-05-01", hour: 9, item_type: "Fitness", reservations: 1 },
+      { day: "2026-05-01", hour: 9, item_type: "Events", reservations: 2 },
+      { day: "2026-05-01", hour: 9, item_type: "Dock Space", reservations: 5 },
+    ];
+    const d = fromCounts(rows, "2026-05-05");
+    expect(d.types).toEqual(["Dock Space", "Kayak & Paddle Board", "Room & Work Space", "Fitness", "Events"]);
+    expect(d.cells).toEqual([
+      ["2026-05-01", 7, 1, 5],
+      ["2026-05-01", 8, 1, 1],
+      ["2026-05-01", 9, 2, 10],
+      ["2026-05-01", 9, 3, 1],
+      ["2026-05-01", 9, 4, 2],
+      ["2026-05-01", 9, 0, 5],
+    ]);
+    expect(sum(d.cells.map((c) => c[3]))).toBe(sum(rows.map((r) => r.reservations)));
   });
 
-  it("leaves short lists alone", async () => {
-    const { collapseTypes } = await import("./reservations");
-    const data = { source: "sample" as const, first: "2026-01-01", through: "2026-01-02", types: ["A", "B"], cells: [] };
-    const out = collapseTypes(data, [], 4);
-    expect(out.types).toEqual(["A", "B"]);
+  it("names exactly seven types, with no Other, each with its own color", () => {
+    expect(TYPE_ORDER).toEqual(["Gym Space", "Dock Space", "Shell", "Kayak & Paddle Board", "Room & Work Space", "Fitness", "Events"]);
+    expect(new Set(TYPE_ORDER.map(typeColor)).size).toBe(TYPE_ORDER.length);
+    expect(groupType("Kayak")).toBe("Kayak & Paddle Board");
+    expect(groupType("Work Space")).toBe("Room & Work Space");
+    expect(groupType("Shell")).toBe("Shell");
+    expect(data.types).not.toContain("Other");
   });
-
   it("names what drives the peak and what leads a set of buckets", async () => {
     const { driverOf, topTypeIn } = await import("./reservations");
     const b = (key: string, counts: number[]) => ({ key, label: key, axis: key, counts, total: counts.reduce((s, n) => s + n, 0), complete: true });
