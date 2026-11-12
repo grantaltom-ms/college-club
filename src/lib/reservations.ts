@@ -15,26 +15,38 @@ export interface ReservationData {
 }
 
 /** The order types are stacked and listed in. Anything new from iCrew goes after these. */
-export const TYPE_ORDER = ["Gym Space", "Dock Space", "Shell", "Room Space", "Paddle Board", "Work Space", "Fitness", "Kayak", "Events"];
+export const TYPE_ORDER = ["Gym Space", "Dock Space", "Shell", "Kayak & Paddle Board", "Room & Work Space", "Fitness", "Events"];
 
 /**
- * One fixed color per type (never reassigned when you filter). Eight hues from a palette checked
+ * iCrew types that the page shows together under one name (Grant, Nov 12): kayaks with paddle boards,
+ * and the club room with work space. Any other type keeps its own name.
+ */
+export const TYPE_GROUPS: Record<string, string> = {
+  Kayak: "Kayak & Paddle Board",
+  "Paddle Board": "Kayak & Paddle Board",
+  "Room Space": "Room & Work Space",
+  "Work Space": "Room & Work Space",
+};
+
+export const groupType = (itemType: string) => TYPE_GROUPS[itemType] ?? itemType;
+
+/**
+ * One fixed color per type (never reassigned when you filter). Hues from a palette checked
  * for color-blind separation, plus neutral gray for Events, which are sign-ups rather than a thing booked.
  */
 const TYPE_COLORS: Record<string, string> = {
   "Gym Space": "#2a78d6",
   "Dock Space": "#eb6834",
   Shell: "#1baf7a",
-  "Room Space": "#eda100",
-  "Paddle Board": "#e87ba4",
-  "Work Space": "#008300",
+  "Kayak & Paddle Board": "#e87ba4",
+  "Room & Work Space": "#eda100",
   Fitness: "#6250d6",
-  Kayak: "#e34948",
   Events: "#8b9096",
 };
-const OTHER_COLOR = "#8b9096";
+/** A type iCrew adds later, with no color of its own yet: neutral gray, like Events. */
+const NEW_TYPE_COLOR = "#8b9096";
 
-export const typeColor = (type: string) => TYPE_COLORS[type] ?? OTHER_COLOR;
+export const typeColor = (type: string) => TYPE_COLORS[type] ?? NEW_TYPE_COLOR;
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -50,17 +62,28 @@ export interface CountRow {
   reservations: number;
 }
 
-/** Builds the data from per-day counts. Days after `today` are left out until they happen. */
+/**
+ * Builds the data from per-day counts, with the iCrew types put into the page's groups (`TYPE_GROUPS`).
+ * Days after `today` are left out until they happen.
+ */
 export function fromCounts(rows: CountRow[], today: string, source: "live" | "sample" = "live"): ReservationData {
   const kept = rows.filter((r) => r.day <= today && r.reservations > 0);
-  const types = orderTypes(kept.map((r) => r.item_type));
+  const types = orderTypes(kept.map((r) => groupType(r.item_type)));
   const days = kept.map((r) => r.day).sort();
+  const sums = new Map<string, Cell>();
+  for (const r of kept) {
+    const type = types.indexOf(groupType(r.item_type));
+    const key = `${r.day}|${r.hour}|${type}`;
+    const cell = sums.get(key);
+    if (cell) cell[3] += r.reservations;
+    else sums.set(key, [r.day, r.hour, type, r.reservations]);
+  }
   return {
     source,
     first: days[0] ?? "",
     through: days[days.length - 1] ?? "",
     types,
-    cells: kept.map((r) => [r.day, r.hour, types.indexOf(r.item_type), r.reservations]),
+    cells: [...sums.values()],
   };
 }
 
@@ -255,25 +278,6 @@ export function typesByVolume(data: ReservationData): number[] {
   const totals = data.types.map(() => 0);
   for (const c of data.cells) totals[c[2]] += c[3];
   return data.types.map((_, i) => i).sort((a, b) => totals[b] - totals[a] || a - b);
-}
-
-/**
- * Keeps the `keep` busiest types as they are and adds the rest into one "Other" column, so a chart shows a few
- * colors instead of nine. Returns the type names and colors that go with the new counts.
- */
-export function collapseTypes(data: ReservationData, buckets: Bucket[], keep: number): { types: string[]; colors: string[]; buckets: Bucket[] } {
-  const order = typesByVolume(data);
-  if (order.length <= keep + 1) return { types: data.types, colors: data.types.map(typeColor), buckets };
-  const kept = order.slice(0, keep).sort((a, b) => a - b);
-  const rest = order.slice(keep);
-  return {
-    types: [...kept.map((i) => data.types[i]), "Other"],
-    colors: [...kept.map((i) => typeColor(data.types[i])), OTHER_COLOR],
-    buckets: buckets.map((b) => {
-      const counts = [...kept.map((i) => b.counts[i]), rest.reduce((s, i) => s + b.counts[i], 0)];
-      return { ...b, counts, total: counts.reduce((s, n) => s + n, 0) };
-    }),
-  };
 }
 
 /** The type that adds the most to `peak` above the average of the other buckets: what drives a busy month or hour. */

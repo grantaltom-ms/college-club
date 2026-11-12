@@ -10,7 +10,6 @@ import {
   byHour,
   byMonth,
   byWeekday,
-  collapseTypes,
   driverOf,
   forYear,
   monthsAcrossYears,
@@ -82,18 +81,15 @@ type Mode = "count" | "share";
 /** One color per year in the year-against-year chart: older years gray, the latest in the dashboard blue. */
 const YEAR_COLORS = ["#8b9096", "#2a78d6", "#eb6834"];
 
-/** How many of the busiest types get their own color before the rest are added up as "Other". */
-const TOP_TYPES = 4;
-
 interface View {
   types: string[];
   colors: string[];
   buckets: Bucket[];
 }
 
-/** In the default view the busiest few types keep their color and the rest become "Other". */
-function shape(data: ReservationData, buckets: Bucket[], picking: boolean): View {
-  return picking ? { types: data.types, colors: data.types.map(typeColor), buckets } : collapseTypes(data, buckets, TOP_TYPES);
+/** Every type keeps its own color; kayaks with paddle boards and room with work space are already grouped. */
+function shape(data: ReservationData, buckets: Bucket[]): View {
+  return { types: data.types, colors: data.types.map(typeColor), buckets };
 }
 
 function Reservations({ data: all }: { data: ReservationData }) {
@@ -113,9 +109,9 @@ function Reservations({ data: all }: { data: ReservationData }) {
 
   const allSelected = useMemo(() => new Set(data.types), [data.types]);
   const active = picking ? selected : allSelected;
-  const months = useMemo(() => shape(data, byMonth(data, active), picking), [data, active, picking]);
-  const weekdays = useMemo(() => shape(data, byWeekday(data, active), picking), [data, active, picking]);
-  const hours = useMemo(() => shape(data, byHour(data, active), picking), [data, active, picking]);
+  const months = useMemo(() => shape(data, byMonth(data, active)), [data, active]);
+  const weekdays = useMemo(() => shape(data, byWeekday(data, active)), [data, active]);
+  const hours = useMemo(() => shape(data, byHour(data, active)), [data, active]);
   const summary = useMemo(() => typeSummary(data, active), [data, active]);
   const across = useMemo(() => monthsAcrossYears(all, active), [all, active]);
   const total = summary.reduce((s, r) => s + r.total, 0);
@@ -142,7 +138,7 @@ function Reservations({ data: all }: { data: ReservationData }) {
     }));
 
   const table = (first: string, v: View) => {
-    const shown = v.types.filter((t, i) => t === "Other" || !picking || selected.has(t) || v.buckets.some((b) => b.counts[i] > 0));
+    const shown = v.types.filter((t, i) => !picking || selected.has(t) || v.buckets.some((b) => b.counts[i] > 0));
     const cols = picking ? chosen : shown;
     return {
       headers: [first, ...cols, "Total"],
@@ -159,13 +155,13 @@ function Reservations({ data: all }: { data: ReservationData }) {
     ? "Each column shows the mix: what share of that column each type is."
     : picking
       ? "Each column stacks the chosen types."
-      : `Each column stacks the ${TOP_TYPES} busiest types, with the rest as Other.`;
+      : "Each column stacks every type.";
   const top = summary[0];
 
   const peakMonth = months.buckets.filter((b) => b.complete).reduce<Bucket | null>((best, b) => (!best || b.total > best.total ? b : best), null);
   const monthDriver = peakMonth ? driverOf(months.types, months.buckets, peakMonth) : null;
   const monthTitle = peakMonth
-    ? `Reservations peak in ${peakMonth.label}${monthDriver && monthDriver !== "Other" ? `, driven by ${monthDriver.toLowerCase()}` : ""}`
+    ? `Reservations peak in ${peakMonth.label}${monthDriver ? `, driven by ${monthDriver.toLowerCase()}` : ""}`
     : "By month";
   const busiestDay = weekdays.buckets.reduce<Bucket | null>((best, b) => (!best || b.total > best.total ? b : best), null);
   const weekendTop = topTypeIn(weekdays.types, weekdays.buckets.slice(5));
@@ -215,7 +211,7 @@ function Reservations({ data: all }: { data: ReservationData }) {
           <div className="filter-row" role="group" aria-label="View">
             <span className="filter-label">Types</span>
             <button type="button" className="chip" aria-pressed={!picking} onClick={() => setPicking(false)}>
-              Top {TOP_TYPES} and other
+              All types
             </button>
             <button type="button" className="chip" aria-pressed={picking} onClick={() => setPicking(true)}>
               Pick types
