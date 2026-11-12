@@ -1,14 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
-import { sampleReservations } from "../../src/lib/reservations";
+import { forYear, sampleReservations } from "../../src/lib/reservations";
 
-const sample = sampleReservations();
+/** The whole sample (2025 and 2026) is served; the page opens on the latest year, so the expected figures are 2026's. */
+const all = sampleReservations();
+const sample = forYear(all, "2026");
 const grandTotal = sample.cells.reduce((s, c) => s + c[3], 0);
 const typeTotal = (type: string) => sample.cells.filter((c) => c[2] === sample.types.indexOf(type)).reduce((s, c) => s + c[3], 0);
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 /** Serve invented sample reservations from the endpoint, so no test touches the real database. */
 async function mockReservations(page: Page) {
-  const body = JSON.stringify(sample);
+  const body = JSON.stringify(all);
   await page.route("**/api/reservations", (route) => route.fulfill({ status: 200, contentType: "application/json", body }));
   return body;
 }
@@ -123,7 +125,7 @@ test("the page never receives names, and the phone layout does not scroll sidewa
 
 test("shows a plain error and recovers when the reservation data fails to load", async ({ page }) => {
   let fail = true;
-  const body = JSON.stringify(sample);
+  const body = JSON.stringify(all);
   await page.route("**/api/reservations", (route) =>
     fail
       ? route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "The reservation figures could not be loaded." }) })
@@ -134,4 +136,35 @@ test("shows a plain error and recovers when the reservation data fails to load",
   fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByTestId("res-total")).toBeVisible();
+});
+
+test("the year switch opens on the latest year, changes the headline, and the month-against-month chart compares the years", async ({ page }) => {
+  await mockReservations(page);
+  await page.goto("/reservations");
+  const years = group(page, "Year");
+  const total = page.getByTestId("res-total");
+  const yearTotal = (y: string | null) => forYear(all, y).cells.reduce((s, c) => s + c[3], 0);
+  const yoy = page.getByTestId("res-yoy");
+  await expect(years.getByRole("button", { name: "2026", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(yoy).toBeVisible();
+  for (let i = 0; i < 3; i++) {
+    await years.getByRole("button", { name: "2025", exact: true }).click();
+    await expect(total).toHaveText(fmt(yearTotal("2025")));
+    // The year-over-year line is about the latest year, so it goes away for another year or all years.
+    await expect(yoy).toHaveCount(0);
+    await years.getByRole("button", { name: "All years" }).click();
+    await expect(total).toHaveText(fmt(yearTotal(null)));
+    await expect(yoy).toHaveCount(0);
+    await years.getByRole("button", { name: "2026", exact: true }).click();
+    await expect(total).toHaveText(fmt(yearTotal("2026")));
+    await expect(yoy).toBeVisible();
+  }
+  const card = page.locator(".card", { hasText: "Each month against the same month of the year before" });
+  await expect(card.getByRole("group", { name: "Reservations each month, one column for each year" })).toBeVisible();
+  await card.getByRole("button", { name: "View as table" }).click();
+  await expect(card.getByRole("columnheader")).toHaveText(["Month", "2025", "2026"]);
+  await expect(card.getByRole("row")).toHaveCount(13);
+  // The sample's 2026 stops in October, so December 2026 has no figure and October is only part of a month.
+  await expect(card.getByRole("row", { name: /^Dec/ }).getByRole("cell").last()).toHaveText("–");
+  await expect(card.getByRole("row", { name: /^Oct/ }).getByRole("cell").last()).toContainText("(part month)");
 });

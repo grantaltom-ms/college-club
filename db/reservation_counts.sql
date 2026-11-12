@@ -23,3 +23,9 @@ alter table public.reservation_counts enable row level security;
 --   2. truncate public.reservation_counts;
 --   3. Import reservation_counts.csv into the table with the Supabase Table Editor
 --      (it has the columns day, hour, item_type, reservations; id fills itself in).
+-- An export that covers only part of the history (an older year, or the newest
+-- weeks) is added instead of replacing everything: skip step 2 and first remove
+-- only the days the file covers, for example
+--   delete from public.reservation_counts where day between '2025-01-01' and '2025-12-31';
+-- then import. The Reservations page shows every year the table holds, with a
+-- Year switch that opens on the latest year.

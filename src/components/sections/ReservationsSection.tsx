@@ -12,9 +12,12 @@ import {
   byWeekday,
   collapseTypes,
   driverOf,
+  forYear,
+  monthsAcrossYears,
   topTypeIn,
   typeColor,
   typeSummary,
+  yearsIn,
   type Bucket,
   type ReservationData,
 } from "@/lib/reservations";
@@ -76,6 +79,9 @@ export function ReservationsSection() {
 
 type Mode = "count" | "share";
 
+/** One color per year in the year-against-year chart: older years gray, the latest in the dashboard blue. */
+const YEAR_COLORS = ["#8b9096", "#2a78d6", "#eb6834"];
+
 /** How many of the busiest types get their own color before the rest are added up as "Other". */
 const TOP_TYPES = 4;
 
@@ -90,7 +96,13 @@ function shape(data: ReservationData, buckets: Bucket[], picking: boolean): View
   return picking ? { types: data.types, colors: data.types.map(typeColor), buckets } : collapseTypes(data, buckets, TOP_TYPES);
 }
 
-function Reservations({ data }: { data: ReservationData }) {
+function Reservations({ data: all }: { data: ReservationData }) {
+  const years = useMemo(() => yearsIn(all), [all]);
+  /** The year the page is looking at; null is every year together. Starts on the latest year. */
+  const [year, setYear] = useState<string | null>(() => years[years.length - 1] ?? null);
+  const data = useMemo(() => forYear(all, year), [all, year]);
+  /** The year-over-year line compares the latest year to date with the year before, so it only belongs beside the latest year. */
+  const onLatestYear = years.length <= 1 || year === years[years.length - 1];
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(data.types));
   const [mode, setMode] = useState<Mode>("count");
   const [picking, setPicking] = useState(false);
@@ -105,6 +117,7 @@ function Reservations({ data }: { data: ReservationData }) {
   const weekdays = useMemo(() => shape(data, byWeekday(data, active), picking), [data, active, picking]);
   const hours = useMemo(() => shape(data, byHour(data, active), picking), [data, active, picking]);
   const summary = useMemo(() => typeSummary(data, active), [data, active]);
+  const across = useMemo(() => monthsAcrossYears(all, active), [all, active]);
   const total = summary.reduce((s, r) => s + r.total, 0);
 
   const toggle = (type: string) =>
@@ -176,6 +189,7 @@ function Reservations({ data }: { data: ReservationData }) {
       <p className="page-sub">
         Every reservation in iCrew, {formatDay(data.first, true)} to {formatDay(data.through, true)}, by what was reserved. A
         reservation counts on the day and hour it starts.
+        {years.length > 1 && ` The iCrew history here runs from ${formatDay(all.first, true)} to ${formatDay(all.through, true)}.`}
       </p>
       {data.source === "sample" && (
         <p className="sample-banner" role="note">
@@ -185,6 +199,19 @@ function Reservations({ data }: { data: ReservationData }) {
 
       <div className="stack">
         <div className="filter-bar">
+          {years.length > 1 && (
+            <div className="filter-row" role="group" aria-label="Year">
+              <span className="filter-label">Year</span>
+              {[...years].reverse().map((y) => (
+                <button key={y} type="button" className="chip" aria-pressed={year === y} onClick={() => setYear(y)}>
+                  {y}
+                </button>
+              ))}
+              <button type="button" className="chip" aria-pressed={year === null} onClick={() => setYear(null)}>
+                All years
+              </button>
+            </div>
+          )}
           <div className="filter-row" role="group" aria-label="View">
             <span className="filter-label">Types</span>
             <button type="button" className="chip" aria-pressed={!picking} onClick={() => setPicking(false)}>
@@ -244,7 +271,7 @@ function Reservations({ data }: { data: ReservationData }) {
                   reservations{!picking || chosen.length === data.types.length ? "" : ` for ${chosen.length === 1 ? chosen[0] : `${chosen.length} types`}`}, {formatDay(data.first)} to{" "}
                   {formatDay(data.through)}.
                 </p>
-                {yoy && (!picking || chosen.length === data.types.length) && (
+                {yoy && onLatestYear && (!picking || chosen.length === data.types.length) && (
                   <p className="hero-support" data-testid="res-yoy">
                     From {yoy.fromLabel} to {yoy.toLabel}, reservations are {Math.abs(yoy.change)}% {yoy.change >= 0 ? "higher" : "lower"} than in{" "}
                     {yoy.previousYear} ({fmtInt(yoy.thisYear)} against {fmtInt(yoy.lastYear)}).
@@ -307,6 +334,38 @@ function Reservations({ data }: { data: ReservationData }) {
             <ChartCard title={monthTitle} subtitle={`${how} The latest month is not finished.`} legend={legend(months)} table={table("Month", months)}>
               {chart(months, "Reservations by type, by month")}
             </ChartCard>
+
+            {across.years.length > 1 && (
+              <ChartCard
+                title={`Each month against the same month of ${across.years.length === 2 ? "the year before" : "other years"}`}
+                subtitle={`Number of reservations${!picking || chosen.length === data.types.length ? "" : " for the chosen types"}, one column for each year. A month the data only partly covers is marked "part month"; a month the data does not reach has no column.`}
+                legend={across.years.map((y, i) => ({ label: y, color: YEAR_COLORS[i % YEAR_COLORS.length] }))}
+                table={{
+                  headers: ["Month", ...across.years],
+                  rows: across.months.map((m) => [
+                    m.label,
+                    ...m.counts.map((n, i) => (n === null ? "–" : `${fmtInt(n)}${m.partial[i] ? " (part month)" : ""}`)),
+                  ]),
+                }}
+              >
+                <GroupedColumnChart
+                  groups={across.months.map((m) => ({
+                    key: m.month,
+                    xLabel: m.label,
+                    values: m.counts.map((n) => n ?? 0),
+                    tooltip: [
+                      m.label,
+                      ...across.years.map((y, i) =>
+                        m.counts[i] === null ? `${y}: no data` : `${y}: ${fmtInt(m.counts[i] ?? 0)} reservations${m.partial[i] ? " (part month)" : ""}`,
+                      ),
+                    ] as [string, ...string[]],
+                  }))}
+                  colors={across.years.map((_, i) => YEAR_COLORS[i % YEAR_COLORS.length])}
+                  ariaLabel="Reservations each month, one column for each year"
+                  height={280}
+                />
+              </ChartCard>
+            )}
 
             <ChartCard title={dayTitle} subtitle={`${how} Totals over the whole period.`} legend={legend(weekdays)} table={table("Day", weekdays)}>
               {chart(weekdays, "Reservations by type, by day of the week")}
