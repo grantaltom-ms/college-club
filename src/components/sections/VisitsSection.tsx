@@ -157,7 +157,7 @@ function Visits({ data }: { data: DashboardData }) {
             headers: ["Joined", "Members", "Under 1 a month", "Share", "Not started yet"],
             rows: cohorts.map((c) => [c.label, fmtInt(c.members), fmtInt(c.quiet), `${c.quietShare}%`, fmtInt(c.notStarted)]),
           }}
-          percent={{ of: 1, columns: [2, 4], note: "Share of that group's members. The Share column was already a percentage." }}
+          percent={{ of: 1, columns: [2], note: "Share of that group's members. Not started yet stays a count: those people are not in Members." }}
         >
           <CohortChart cohorts={cohorts} />
         </ChartCard>

@@ -3,6 +3,7 @@ import { sampleShells } from "../../src/lib/shells";
 import { sampleReservations } from "../../src/lib/reservations";
 import { sampleMembership } from "../../src/lib/membership";
 import { formatShare, readCell } from "../../src/lib/percent-table";
+import { mockDashboard } from "./helpers";
 
 /** Invented sample data only, so no test touches the real database. */
 async function mockAll(page: Page) {
@@ -97,5 +98,23 @@ test("tables where a share means nothing do not offer it", async ({ page }) => {
     await card.getByRole("button", { name: "View as table" }).click();
     await expect(card.getByRole("table")).toBeVisible();
     await expect(percentButton(card)).toHaveCount(0);
+  }
+});
+
+test("on the join cohort table only Under 1 a month becomes a share; Not started yet stays a count", async ({ page }) => {
+  await mockDashboard(page);
+  await page.goto("/visits");
+  const card = page.getByRole("region", { name: /are the quietest/ });
+  await card.getByRole("button", { name: "View as table" }).click();
+  const numbers = await cells(card);
+  await percentButton(card).click();
+  await expect(card.getByText(/Not started yet stays a count/)).toBeVisible();
+  const shares = await cells(card);
+  for (let r = 0; r < numbers.length; r++) {
+    const members = readCell(numbers[r][1])!.value;
+    expect(shares[r][1]).toBe(numbers[r][1]);
+    expect(shares[r][2]).toBe(formatShare(readCell(numbers[r][2])!.value, members));
+    expect(shares[r][3]).toBe(numbers[r][3]);
+    expect(shares[r][4]).toBe(numbers[r][4]);
   }
 });
