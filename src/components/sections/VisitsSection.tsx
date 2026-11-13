@@ -131,6 +131,7 @@ function Visits({ data }: { data: DashboardData }) {
             headers: ["Membership type", "Members", ...BAND_ORDER.map((b) => BAND_LABELS[b]), "Under 1 a month"],
             rows: types.map((t) => [t.type, fmtInt(t.members), ...t.counts.map(fmtInt), `${t.quietShare}%`]),
           }}
+          percent={{ of: 1, columns: BAND_ORDER.map((_, i) => i + 2), note: "Each visit group's share of that type's members." }}
         >
           <StackedBarChart
             ariaLabel="Visit groups by membership type"
@@ -156,6 +157,7 @@ function Visits({ data }: { data: DashboardData }) {
             headers: ["Joined", "Members", "Under 1 a month", "Share", "Not started yet"],
             rows: cohorts.map((c) => [c.label, fmtInt(c.members), fmtInt(c.quiet), `${c.quietShare}%`, fmtInt(c.notStarted)]),
           }}
+          percent={{ of: 1, columns: [2, 4], note: "Share of that group's members. The Share column was already a percentage." }}
         >
           <CohortChart cohorts={cohorts} />
         </ChartCard>

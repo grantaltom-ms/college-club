@@ -146,6 +146,13 @@ function Reservations({ data: all }: { data: ReservationData }) {
     };
   };
 
+  /** "Show as %" on the type tables: each type's share of the row's Total, which reads 100%. */
+  const typePercent = (t: { headers: string[] }) => ({
+    of: t.headers.length - 1,
+    columns: t.headers.map((_, i) => i).slice(1),
+    note: "Each type's share of that row's total.",
+  });
+
   const tick = share ? (n: number) => `${n}%` : undefined;
   const chart = (v: View, label: string) => (
     <GroupedColumnChart groups={groups(v)} colors={v.colors} ariaLabel={label} stacked tick={tick} height={280} />
@@ -327,7 +334,7 @@ function Reservations({ data: all }: { data: ReservationData }) {
               </div>
             </section>
 
-            <ChartCard title={monthTitle} subtitle={`${how} The latest month is not finished.`} legend={legend(months)} table={table("Month", months)}>
+            <ChartCard title={monthTitle} subtitle={`${how} The latest month is not finished.`} legend={legend(months)} table={table("Month", months)} percent={typePercent(table("Month", months))}>
               {chart(months, "Reservations by type, by month")}
             </ChartCard>
 
@@ -343,6 +350,7 @@ function Reservations({ data: all }: { data: ReservationData }) {
                     ...m.counts.map((n, i) => (n === null ? "–" : `${fmtInt(n)}${m.partial[i] ? " (part month)" : ""}`)),
                   ]),
                 }}
+                percent={{ of: "column", columns: across.years.map((_, i) => i + 1), note: "Each month's share of that year's reservations." }}
               >
                 <GroupedColumnChart
                   groups={across.months.map((m) => ({
@@ -363,11 +371,11 @@ function Reservations({ data: all }: { data: ReservationData }) {
               </ChartCard>
             )}
 
-            <ChartCard title={dayTitle} subtitle={`${how} Totals over the whole period.`} legend={legend(weekdays)} table={table("Day", weekdays)}>
+            <ChartCard title={dayTitle} subtitle={`${how} Totals over the whole period.`} legend={legend(weekdays)} table={table("Day", weekdays)} percent={typePercent(table("Day", weekdays))}>
               {chart(weekdays, "Reservations by type, by day of the week")}
             </ChartCard>
 
-            <ChartCard title={hourTitle} subtitle={`${how} By the hour a reservation starts.`} legend={legend(hours)} table={table("Start hour", hours)}>
+            <ChartCard title={hourTitle} subtitle={`${how} By the hour a reservation starts.`} legend={legend(hours)} table={table("Start hour", hours)} percent={typePercent(table("Start hour", hours))}>
               {chart(hours, "Reservations by type, by start hour")}
             </ChartCard>
           </>

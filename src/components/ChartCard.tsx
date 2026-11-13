@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
+import { toPercentTable, type PercentSpec } from "@/lib/percent-table";
 
 export interface LegendItem {
   label: string;
@@ -15,12 +16,17 @@ interface Props {
   table: { headers: string[]; rows: (string | number)[][] };
   /** Shown under the chart or the table, whichever is open: a summary line, or notes that belong to this chart. */
   footer?: ReactNode;
+  /** Offers "Show as %" on the table: which total each number becomes a share of. Left out for tables where a share means nothing. */
+  percent?: PercentSpec;
   children: ReactNode;
 }
 
-export function ChartCard({ title, subtitle, legend, table, footer, children }: Props) {
+export function ChartCard({ title, subtitle, legend, table, footer, percent, children }: Props) {
   const [view, setView] = useState<"chart" | "table">("chart");
+  const [asPercent, setAsPercent] = useState(false);
   const id = useId();
+  const showPercent = Boolean(percent) && asPercent;
+  const shown = percent && showPercent ? toPercentTable(table, percent) : table;
 
   return (
     <section className="card" aria-labelledby={`${id}-title`}>
@@ -53,6 +59,15 @@ export function ChartCard({ title, subtitle, legend, table, footer, children }: 
       {view === "chart" ? (
         children
       ) : (
+        <>
+        {percent && (
+          <div className="table-tools">
+            <button type="button" className="link-button" aria-pressed={showPercent} onClick={() => setAsPercent(!showPercent)}>
+              {showPercent ? "Show numbers" : "Show as %"}
+            </button>
+            {showPercent && <p className="table-note">{percent.note}</p>}
+          </div>
+        )}
         <div className="table-scroll" tabIndex={0} role="region" aria-label={`${title}, as a table`}>
           <table className="data-table num">
             <thead>
@@ -65,7 +80,7 @@ export function ChartCard({ title, subtitle, legend, table, footer, children }: 
               </tr>
             </thead>
             <tbody>
-              {table.rows.map((row) => (
+              {shown.rows.map((row) => (
                 <tr key={String(row[0])}>
                   {row.map((cell, i) => (
                     <td key={i} className={i > 0 ? "right" : undefined}>
@@ -77,6 +92,7 @@ export function ChartCard({ title, subtitle, legend, table, footer, children }: 
             </tbody>
           </table>
         </div>
+        </>
       )}
       {footer}
     </section>

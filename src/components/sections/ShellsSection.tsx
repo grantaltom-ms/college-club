@@ -363,6 +363,7 @@ function Shells({ data }: { data: ShellData }) {
             subtitle={compareSubtitle}
             legend={compareLegend}
             table={compareTable}
+            percent={{ of: "column", columns: compareTable.headers.map((_, i) => i).slice(1, -1), note: "Each month's share of that column's outings." }}
           >
             <GroupedColumnChart
               groups={compareGroups}
@@ -428,6 +429,7 @@ function Shells({ data }: { data: ShellData }) {
             headers: ["Boat", "Type", ...boats.years.map((y) => `${y}, to ${cutoffLabel}`), ...(boats.years.length > 1 ? ["Change"] : [])],
             rows: boats.rows.map((b) => [b.boat, seatLabel(b.seats), ...b.sameDates.map(fmtInt), ...(boats.years.length > 1 ? [changeText(b.change)] : [])]),
           }}
+          percent={{ of: "column", columns: boats.years.map((_, i) => i + 2), note: "Each boat's share of that year's outings, every boat counted." }}
         >
           <div className="boats num" role="list" aria-label="Outings by boat">
             {shownBoats.map((b) => (
@@ -478,6 +480,7 @@ function Shells({ data }: { data: ShellData }) {
           title={`${earlyShare}% of outings in ${year} started before 9 am`}
           subtitle={peak ? `By the hour each outing started. Busiest start: ${peak.label}.` : "By the hour each outing started."}
           table={{ headers: ["Start hour", "Outings"], rows: hours.map((h) => [h.label, fmtInt(h.outings)]) }}
+          percent={{ of: "column", columns: [1], note: "Each start hour's share of the year's outings." }}
         >
           <ColumnChart columns={hourColumns} ariaLabel={`Shell outings by start hour, ${year}`} baseColor={BASE} height={220} />
         </ChartCard>

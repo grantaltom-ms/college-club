@@ -170,6 +170,7 @@ function Membership({ data }: { data: MembershipData }) {
             headers: ["Month", "Left", "Applied"],
             rows: months.map((m) => [monthLabel(m), m.resignations, m.applicants]),
           }}
+          percent={{ of: "column", columns: [1, 2], note: "Each month's share of all leavers, and of all applicants, over these months." }}
         >
           <GroupedColumnChart
             ariaLabel="Resignations and applicants by month"
@@ -285,6 +286,7 @@ function WhyMembersLeave({ months }: { months: MembershipMonth[] }) {
             return [monthLabel(m), parts ? fmtInt(parts[0]) : "—", parts ? fmtInt(parts[1]) : "—", parts ? fmtInt(parts[2]) : "—", fmtInt(m.resignations)];
           }),
         }}
+        percent={{ of: 4, columns: [1, 2, 3], note: "Each reason's share of that month's resignations on the monthly sheet." }}
         footer={
           <div className="chart-footer">
             {summary && (
@@ -358,6 +360,7 @@ function MembershipMix({ months }: { months: MembershipMonth[] }) {
             return [monthLabel(m), ...(parts ?? [null, null, null, null, null]).map(cell), cell(m.totalAllCategories)];
           }),
         }}
+        percent={{ of: CATEGORY_LABELS.length + 1, columns: CATEGORY_LABELS.map((_, i) => i + 1), note: `Each category's share of that month's ${ALL_CATEGORIES} total.` }}
         footer={
           <div className="chart-footer">
             {gaps.length > 0 && (
