@@ -1860,3 +1860,22 @@ main.frame {
 .exec-codes code {
   overflow-wrap: anywhere;
 }
+
+/* "Show as %" above a chart card's table. */
+.table-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.table-tools .link-button[aria-pressed="true"] {
+  background: var(--oyster-50);
+}
+
+.table-note {
+  margin: 0;
+  font-size: 15px;
+  color: var(--slate);
+}
