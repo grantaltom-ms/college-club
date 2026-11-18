@@ -99,6 +99,7 @@ function Timing({ data }: { data: DashboardData }) {
           subtitle={monthSub}
           legend={compare.years.map((y, i) => ({ label: String(y), color: yearColors[i] }))}
           table={{ headers: monthHeaders, rows: monthTable }}
+          percent={{ of: "column", columns: compare.years.map((_, i) => i + 1), note: "Each month's share of that year's door entries." }}
         >
           <GroupedColumnChart
             groups={monthGroups}
@@ -124,6 +125,7 @@ function Timing({ data }: { data: DashboardData }) {
             headers: ["Day", "Average per day", ...heat.hours.map((h) => hourLabelShort(h))],
             rows: heat.rows.map((r, i) => [r.name, fmtInt(weekdays[i].perDay), ...r.cells.map((c) => c.perDay.toFixed(1))]),
           }}
+          percent={{ of: "row", columns: heat.hours.map((_, i) => i + 2), note: "Each hour's share of that day's entries. The average per day stays a number." }}
         >
           <HeatmapChart data={heat} ariaLabel="Average door entries by day of the week and hour" />
         </ChartCard>
