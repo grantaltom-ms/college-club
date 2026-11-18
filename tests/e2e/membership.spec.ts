@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { sampleLeavers } from "../../src/lib/leavers";
 import { sampleMembership } from "../../src/lib/membership";
 import { membershipSeedData, membershipSeedRows, oldShapeRows } from "../../src/lib/membership-seed.testkit";
 import { toMembershipMonth, type MembershipRow } from "../../src/lib/supabase";
@@ -47,6 +48,9 @@ test("a membership source that fails shows a plain message and a way to try agai
 async function mockSeed(page: Page) {
   const body = JSON.stringify(membershipSeedData());
   await page.route("**/api/membership", (route) => route.fulfill({ status: 200, contentType: "application/json", body }));
+  // The resignation section has its own source; answer it as the live table would, so the page settles with no sample banner.
+  const leavers = JSON.stringify({ ...sampleLeavers(), source: "live" });
+  await page.route("**/api/membership/leavers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: leavers }));
 }
 
 const section = (page: Page, testId: string) => page.getByTestId(testId);
@@ -63,6 +67,10 @@ const HEADINGS = [
   "Paying members over time",
   "Leavers and applicants each month",
   "Why members leave",
+  "Who resigns for not using it",
+  "Visits in the months before resigning",
+  "Resignations by how often members came",
+  "What resigners have in common",
   "Membership mix",
   "Waitlist over time",
   "Month by month",
@@ -77,6 +85,8 @@ test.describe("the membership page with the 28-month data", () => {
   });
 
   test("runs from Jul 2024 to Oct 2026 and keeps the sections in the order the brief gives", async ({ page }) => {
+    // Wait for the resignation section (its own source) so the heading list is the settled page, not a moment mid-load.
+    await expect(page.getByTestId("leavers-insights")).toBeVisible();
     await expect(page.locator(".sample-banner")).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2 })).toHaveText(HEADINGS);
     const rows = page.getByTestId("membership-table").locator("tbody tr");

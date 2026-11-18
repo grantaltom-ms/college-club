@@ -1,3 +1,4 @@
+import { analyzeLeavers, LEAVE_REASONS, type LeaveReason, type LeaverAnalysis, type ResignationRecord } from "./leavers";
 import { buildRoster, ROSTER_SOURCE, type QbRow } from "./roster";
 import { normalizeShellOwnership, sameDateCutoff, SHELL_MEMBER_FROM, type Outing, type RowerCount, type ShellData } from "./shells";
 import {
@@ -207,6 +208,40 @@ export async function loadLiveData(cfg: { url: string; key: string }): Promise<D
       months: monthRows.map(toDoorMonth),
     },
   };
+}
+
+/* ---------- Named resignations, joined to usage (counts only leave the server) ---------- */
+
+export interface ResignationRow {
+  member_name: string;
+  resigned_on: string;
+  reason: string;
+}
+
+/** A row of `resignations` as the server reads it. A reason that is not one of the three is read as "other". */
+export function toResignation(r: ResignationRow): ResignationRecord {
+  const reason = (LEAVE_REASONS as readonly string[]).includes(r.reason) ? (r.reason as LeaveReason) : "other";
+  return { name: r.member_name, resignedOn: r.resigned_on, reason };
+}
+
+/** Names stay here: the answer is the analysis, which holds only counts, averages and percentages. */
+export async function loadLeavers(cfg: { url: string; key: string }): Promise<LeaverAnalysis> {
+  const [resignationRows, memberRows, qbRows] = await Promise.all([
+    fetchAll<ResignationRow>(cfg, "resignations", "resigned_on.asc"),
+    fetchAll<MemberRow>(cfg, "members", "member_name.asc"),
+    fetchAll<QbRow>(cfg, "qb_members", "qb_name.asc"),
+  ]);
+  // Without the roster there is no one to compare with, so fail loudly rather than report that nobody stayed.
+  if (qbRows.length === 0) throw new Error("qb_members is empty: load the QuickBooks member list first");
+  const dataThrough = memberRows[0]?.data_through ?? "2026-09-27";
+  const usage = memberRows.map(toMember);
+  const resignations = resignationRows.map(toResignation);
+  // A household whose roster row has not been taken off yet is a leaver, matched by its usage record as well as its
+  // QuickBooks name (the two can be spelled differently), so it is never counted as a stayer too.
+  const resigned = new Set(resignations.map((r) => r.name));
+  const stillMembers = qbRows.filter((r) => !resigned.has(r.qb_name) && !(r.usage_member_name && resigned.has(r.usage_member_name)));
+  const roster = buildRoster(stillMembers, usage, dataThrough);
+  return analyzeLeavers(resignations, usage, roster.members, dataThrough, "live");
 }
 
 /* ---------- Membership counts ---------- */

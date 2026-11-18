@@ -45,6 +45,8 @@ The table has 18 columns: the original eight figures and a note, then nine added
 
 First time: run `db/membership_monthly.sql` in the Supabase SQL editor. If the table was made before Nov 2026, running the same file adds the nine new columns to it (`add column if not exists`), so it is safe to run again. To load or refresh: `truncate` the table, then import `db/membership_monthly.csv` with the Supabase Table Editor, matching columns by name (an empty cell loads as null). Until the table is loaded, the Membership tab shows a plain "could not be loaded" message, the home page shows the same in its Membership card, and the rest of the site is unaffected. If the table is loaded but the nine new columns are still empty, the "Why members leave" and "Membership mix" sections say they have not been loaded yet and the rest of the page works.
 
+**Who resigns for not using it** (the section after "Why members leave") reads a separate table, `resignations`: one row per named resignation (the name as in `members.member_name`, the board date, and a reason of `moved`, `not_using` or `other`). It holds names, so the server joins it to `members` and `qb_members` and sends only counts, averages and percentages (`/api/membership/leavers`, logic in `src/lib/leavers.ts`). First time: run `db/resignations.sql`. Each month: add that month's resignations as new rows (never truncate); the files with real names are kept outside this repo. Until the table has rows, only this section says so; the rest of the page is unaffected.
+
 Three things in the data are shown as they are, not smoothed over:
 
 - **Jun 2025 has no reason or category split** (the cells are empty). It is a gap in those charts and a dash in their tables, never a zero and never an invented split.
