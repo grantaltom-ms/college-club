@@ -148,6 +148,23 @@ describe("analyzeLeavers", () => {
   });
 });
 
+describe("members known only by a door-entry total", () => {
+  it("are left out of the months and the last-visit traits, never counted as absent", () => {
+    const { usage, stayers, resignations } = club();
+    const doorOnly = member("Door Only", zero(), { visitDays: 40, band: "4+/month", lastVisit: null });
+    const lowDoorOnly = member("Low Door Only", zero(), { visitDays: 5, band: "Under 1/month", lastVisit: null });
+    const base = analyzeLeavers(resignations, usage, stayers, THROUGH, "live");
+    const a = analyzeLeavers(resignations, [...usage, doorOnly, lowDoorOnly], [...stayers, doorOnly, lowDoorOnly], THROUGH, "live");
+    const months = (x: typeof a, key: string) => x.groups.find((g) => g.key === key)!.monthsBefore;
+    expect(months(a, "allStayed")).toEqual(months(base, "allStayed"));
+    expect(months(a, "lowStayed")).toEqual(months(base, "lowStayed"));
+    const quiet = (x: typeof a) => x.traits.find((t) => t.key === "quiet")!.values.lowStayed;
+    expect(quiet(a)).toBe(quiet(base));
+    // They still count as people in their group.
+    expect(a.groups.find((g) => g.key === "lowStayed")!.people).toBe(base.groups.find((g) => g.key === "lowStayed")!.people + 1);
+  });
+});
+
 describe("seasonSplit", () => {
   const month = (m: number, notUsing: number | null) => ({ year: 2026, month: m, resignationsNotUsing: notUsing }) as MembershipMonth;
   it("adds 'not using it' resignations in Oct to Mar against Apr to Sep, skipping months with no split", () => {

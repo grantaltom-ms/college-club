@@ -106,6 +106,12 @@ function monthIndex(day: string, dataYear: string): number | null {
   return day.slice(0, 4) === dataYear ? Number(day.slice(5, 7)) - 1 : null;
 }
 
+/**
+ * Visits are known only as a total (a door fob with no iCrew record: the roster has entries but no months or last visit).
+ * Such a person is left out of anything that needs the months or the last visit, never counted as absent.
+ */
+export const totalsOnly = (m: Member) => m.visitDays > 0 && m.lastVisit === null && m.monthly.every((v) => v === 0);
+
 interface Person {
   member: Member;
   /** The day this person's "before" is counted back from: the resignation, or the data end for someone who stayed. */
@@ -119,6 +125,7 @@ function averagesBefore(people: Person[], dataThrough: string): (number | null)[
     let sum = 0;
     let n = 0;
     for (const p of people) {
+      if (totalsOnly(p.member)) continue;
       // A resignation after the data ends is counted from the data end's month, so a month with no data is never read as zero.
       const anchorMonth = monthIndex(p.anchor > dataThrough ? dataThrough : p.anchor, year);
       if (anchorMonth === null) continue;
@@ -140,7 +147,8 @@ function summerOnly(m: Member): boolean {
   return m.monthly.every((v, i) => v === 0 || (i >= 5 && i <= 7));
 }
 
-function quietFor90Days(p: Person, dataThrough: string): boolean {
+function quietFor90Days(p: Person, dataThrough: string): boolean | null {
+  if (totalsOnly(p.member)) return null;
   const end = p.anchor > dataThrough ? dataThrough : p.anchor;
   return p.member.lastVisit === null || daysBetween(p.member.lastVisit, end) > 90;
 }
@@ -155,7 +163,7 @@ function joinedRecently(p: Person): boolean {
 const TRAIT_TESTS: { key: string; label: string; test: (p: Person, dataThrough: string) => boolean | null }[] = [
   { key: "none", label: "No visits at all this year", test: (p) => p.member.visitDays === 0 },
   { key: "quiet", label: "No visit in the 3 months before (or never)", test: quietFor90Days },
-  { key: "summer", label: "Came only in summer (June to August)", test: (p) => summerOnly(p.member) },
+  { key: "summer", label: "Came only in summer (June to August)", test: (p) => (totalsOnly(p.member) ? null : summerOnly(p.member)) },
   {
     key: "weekend",
     label: "Half or more of door entries on weekends (of those with door entries)",
@@ -272,7 +280,7 @@ function insightsFor(a: LeaverAnalysis, people: Record<GroupKey, Person[]>): str
   }
 
   // 3. "Moved" that looks like "not using".
-  const movedButAbsent = people.otherReasons.filter((p) => p.member.visitDays === 0 || quietFor90Days(p, a.dataThrough)).length;
+  const movedButAbsent = people.otherReasons.filter((p) => p.member.visitDays === 0 || quietFor90Days(p, a.dataThrough) === true).length;
   if (movedButAbsent > 0) {
     out.push(
       `${plural(movedButAbsent, "member")} who gave another reason (usually moving) had also not visited in the 3 months before resigning, so "not using it" may be undercounted.`,
@@ -282,7 +290,7 @@ function insightsFor(a: LeaverAnalysis, people: Record<GroupKey, Person[]>): str
   // 4. Drop-off: were the "not using" resigners already gone?
   const n = people.notUsing.length;
   if (n > 0) {
-    const quiet = people.notUsing.filter((p) => quietFor90Days(p, a.dataThrough)).length;
+    const quiet = people.notUsing.filter((p) => quietFor90Days(p, a.dataThrough) === true).length;
     out.push(
       quiet === n
         ? `None of the ${plural(n, "member")} who resigned for not using it had visited in the 3 months before: by the time they resigned, they had already stopped coming.`

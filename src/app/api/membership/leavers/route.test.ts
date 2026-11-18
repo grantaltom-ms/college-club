@@ -95,6 +95,20 @@ describe("GET /api/membership/leavers", () => {
     expect(text).not.toContain(KEY);
   });
 
+  it("does not count a resigned household as a stayer when QuickBooks spells its name differently", async () => {
+    const t = tables();
+    stub({ ...t, qb_members: [...t.qb_members, { ...qbRow("Invented L. Leaver"), usage_member_name: "Invented Leaver", link: "spelling" }] });
+    const body = await (await GET()).json();
+    const people = Object.fromEntries(body.groups.map((g: { key: string; people: number }) => [g.key, g.people]));
+    expect(people).toMatchObject({ notUsing: 1, allStayed: 1 });
+  });
+
+  it("answers 502 rather than 'nobody stayed' when the roster is empty", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    stub({ ...tables(), qb_members: [] });
+    expect((await GET()).status).toBe(502);
+  });
+
   it("gives the invented sample while developing, and refuses in production with no database", async () => {
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
