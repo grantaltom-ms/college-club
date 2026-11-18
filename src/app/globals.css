@@ -346,6 +346,13 @@ main.frame {
   font-size: 16px;
 }
 
+.leavers-caution {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--waterloo);
+  background: var(--oyster-50);
+}
+
 /* ---------- Overview hero ---------- */
 
 .hero {

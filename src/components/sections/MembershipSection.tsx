@@ -4,6 +4,7 @@ import { ChartCard } from "@/components/ChartCard";
 import { ColumnChart } from "@/components/ColumnChart";
 import { GroupedColumnChart } from "@/components/GroupedColumnChart";
 import { useJson } from "@/components/useJson";
+import { LeaversSection } from "@/components/sections/LeaversSection";
 import {
   categoryParts,
   latestMonth,
@@ -185,6 +186,7 @@ function Membership({ data }: { data: MembershipData }) {
         </ChartCard>
 
         <WhyMembersLeave months={months} />
+        <LeaversSection months={months} />
         <MembershipMix months={months} />
         <Waitlist months={months} />
 
