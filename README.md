@@ -85,6 +85,20 @@ First time: run `db/event_scoreboard.sql` in the Supabase SQL editor (it turns r
 
 Two parts of the page are written text, not table data, and are changed by editing `src/app/(dashboard)/events/page.tsx`: the "Where members stand" snapshot cards (each carries its as-of date in a comment) and the "Board targets" table, whose targets all read "Not set yet — board to set" until the board sets them. With no database set up, a development or preview server shows three invented events, labelled sample.
 
+## The email list builder (on the Email tab)
+
+The top of the Email tab (`/email`) is a list builder: describe a group of members in plain words ("joined in the last three months and interested in rowing"), check who they are, save them as a Mailchimp tag that refreshes every night, and have Claude write a draft campaign to them in Mailchimp. **It never sends anything**: the email is checked and sent by a person, in Mailchimp. Below it, the campaign figures are unchanged except that each tile starts folded; click a bar to open it.
+
+**Set up once (Grant, in Supabase and Vercel):**
+
+1. Run `db/saved_email_lists.sql` in the Supabase SQL editor (the saved lists: names, filters and the Mailchimp tag, never a member's name or address).
+2. Optional, for better rowing filters: run `db/member_interests.sql` (interests from application answers) and `db/member_rowing.sql` (times rowed), then import their files with the Table Editor. Until they are loaded, interests come only from Mailchimp's own interest groups and "times rowed" is empty.
+3. In Vercel's private settings set `DASHBOARD_EMAIL_LISTS_PASSWORD` (at least 8 characters, a different password from Financials; share it with staff who build lists), `ANTHROPIC_API_KEY` (a Claude API key; `EMAIL_LISTS_MODEL` may name another model), `CRON_SECRET` (at least 16 random characters; Vercel uses it for the nightly refresh in `vercel.json`) and check that `MAILCHIMP_API_KEY` is a key that can write (tags and draft campaigns), not a read-only one. Then redeploy.
+
+**What leaves the club's server:** Claude gets only the words typed into the two boxes, today's date and the list of interest names, never a member's name or address. Mailchimp gets the addresses on each saved list's tag. The page shows names and addresses, so it is behind the list builder password, and the server refuses every request without it.
+
+**Members emailed recently:** the list says who got any campaign in the last 7 days, and a tick box leaves them out (Grant, Nov 18: warn, but let me proceed).
+
 ## The Goals page
 
 `/goals` ("Goals and Action Items for Tech and Communications") is a living to-do list for the technology and member-communications work: items with a status, due date, owner and group, subitems under any item, and a running log of notes on each. Everything is edited on the page itself.

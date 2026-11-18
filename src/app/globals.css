@@ -1867,3 +1867,189 @@ main.frame {
 .exec-codes code {
   overflow-wrap: anywhere;
 }
+
+/* ---------- Email page: folded tiles and the list builder (Nov 18) ---------- */
+
+.fold {
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.fold-summary {
+  cursor: pointer;
+  padding: 14px 20px;
+  min-height: 44px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  list-style-position: inside;
+}
+
+.fold-summary:hover {
+  background: var(--oyster-50);
+}
+
+.fold[open] > .fold-summary {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.fold-body {
+  padding: 16px;
+}
+
+.fold-body > .card,
+.fold-body > .hero,
+.fold-body > .callout {
+  border: none;
+  box-shadow: none;
+  margin: 0;
+}
+
+.lists-card {
+  margin-bottom: 32px;
+}
+
+.lists-figures-title {
+  font-size: 22px;
+  margin: 8px 0 16px;
+}
+
+.lists-panel,
+.lists-finder,
+.lists-found,
+.lists-saved,
+.lists-saved-item,
+.lists-draft,
+.lists-save {
+  display: grid;
+  gap: 10px;
+}
+
+.lists-panel {
+  gap: 24px;
+  margin-top: 12px;
+}
+
+.lists-label,
+.lists-h3,
+.lists-h4 {
+  font-weight: 600;
+}
+
+.lists-h3 {
+  font-size: 18px;
+  margin-top: 8px;
+}
+
+.lists-h4 {
+  font-size: 17px;
+}
+
+.lists-textarea,
+.lists-save .search {
+  max-width: none;
+  width: 100%;
+  resize: vertical;
+}
+
+.lists-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lists-actions .link-button,
+.lists-save .link-button {
+  min-height: 40px;
+  justify-self: start;
+}
+
+.lists-words {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.lists-count {
+  font-size: 17px;
+}
+
+.lists-warn {
+  padding: 10px 14px;
+  border-left: 4px solid var(--sun);
+  background: var(--sun-tint);
+  color: var(--ink);
+}
+
+.lists-ok {
+  padding: 10px 14px;
+  border-left: 4px solid var(--waterloo);
+  background: var(--oyster-50);
+}
+
+.lists-check {
+  display: block;
+  margin-top: 6px;
+}
+
+.lists-emails {
+  display: block;
+  font-size: 14px;
+  color: var(--slate);
+  overflow-wrap: anywhere;
+}
+
+.lists-table td {
+  vertical-align: top;
+}
+
+.lists-more > summary {
+  cursor: pointer;
+  min-height: 32px;
+  color: var(--waterloo-dark);
+}
+
+.lists-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.lists-field {
+  display: grid;
+  gap: 4px;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lists-field .search {
+  max-width: none;
+}
+
+.lists-editor > .finance-lock-note,
+.lists-editor > .lists-actions {
+  grid-column: 1 / -1;
+}
+
+.lists-saved-item {
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+}
+
+.lists-draft-body {
+  padding: 12px 16px;
+  border: 1px dashed var(--debonair);
+  border-radius: 4px;
+  background: var(--paper);
+}
+
+.lists-draft-body p + p {
+  margin-top: 10px;
+}
+
+.lists-lock-out {
+  margin-top: 20px;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChartCard } from "@/components/ChartCard";
 import { ColumnChart } from "@/components/ColumnChart";
 import {
@@ -70,6 +70,19 @@ export function EmailSection() {
       )}
       {state.status === "ready" && <Email data={state.data} />}
     </>
+  );
+}
+
+/**
+ * Each tile on the Email page starts folded, as a bar with its title: click it to open the tile (Grant, Nov 18), so the list
+ * builder at the top of the page comes first. A plain <details>, so it opens with a keyboard and a screen reader too.
+ */
+function Fold({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <details className="fold">
+      <summary className="fold-summary">{title}</summary>
+      <div className="fold-body">{children}</div>
+    </details>
   );
 }
 
@@ -195,6 +208,7 @@ function Email({ data }: { data: EmailData }) {
 
       <div className="stack">
         {latest && (
+          <Fold title={`Latest Watercooler: ${fmtInt(latest.delivered)} people`}>
           <section className="hero" aria-label="Headline">
             <p className="hero-number num" data-testid="email-reach">
               {fmtInt(latest.delivered)}
@@ -208,9 +222,11 @@ function Email({ data }: { data: EmailData }) {
               </p>
             </div>
           </section>
+          </Fold>
         )}
 
         {list.length > 0 && (
+          <Fold title={`List size, last ${list.length} Watercoolers`}>
           <ChartCard
             title={`List size, last ${list.length} Watercoolers`}
             subtitle={
@@ -239,15 +255,19 @@ function Email({ data }: { data: EmailData }) {
               emphasisColor="#8c3b2f"
             />
           </ChartCard>
+          </Fold>
         )}
 
+        <Fold title="Weekly Watercooler against everything else">
         <section className="card" aria-label="Weekly Watercooler compared with everything else">
           <h2 className="card-title">{groupTitle}</h2>
           <p className="card-sub">Every send since {fmtDate(campaigns[0].sentOn)}. One-off emails usually carry a single clear ask.</p>
           <SummaryTable list={groups} />
         </section>
+        </Fold>
 
         {quarters.length > 0 && (
+          <Fold title="Watercooler click rate by quarter">
           <ChartCard
             title={quarterTitle}
             subtitle="Only the weekly newsletter, so the trend is not pulled around by one-off surveys and notices. Hover a column for the number of sends behind it."
@@ -265,20 +285,26 @@ function Email({ data }: { data: EmailData }) {
               tick={(n) => `${n}%`}
             />
           </ChartCard>
+          </Fold>
         )}
 
+        <Fold title="Best five by click rate">
         <section className="card" aria-label="Best emails by click rate">
           <h2 className="card-title">Best five by click rate</h2>
           <p className="card-sub">Sends of 100 or more. An email sent to two lists on the same day counts once.</p>
           <CampaignTable list={best} />
         </section>
+        </Fold>
 
+        <Fold title="Most recent twelve">
         <section className="card" aria-label="Most recent emails">
           <h2 className="card-title">Most recent twelve</h2>
           <p className="card-sub">Watch the delivered count: the list size changes how every other number reads.</p>
           <CampaignTable list={recent} filtered={hasFiltered} />
         </section>
+        </Fold>
 
+        <Fold title="Limits of this data">
         <aside className="callout" aria-label="Limits of this data">
           <h3>Limits of this data</h3>
           <p>
@@ -297,6 +323,7 @@ function Email({ data }: { data: EmailData }) {
             totals divided by delivered emails, so they can differ slightly from the figures Mailchimp shows per email.
           </p>
         </aside>
+        </Fold>
       </div>
     </>
   );

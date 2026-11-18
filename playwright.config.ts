@@ -6,6 +6,8 @@ const PORT_LIVE_SITE = 3102;
 const PORT_POSTGRES = 3103;
 const PORT_DEMO_GATE = 3104;
 const PORT_LIVE_DEMO_LINK = 3105;
+const PORT_EMAIL_LISTS = 3106;
+const PORT_FAKE_EMAIL_APIS = 3107;
 
 // The booking specs also run against a server whose records live in Postgres. That needs a local or throwaway
 // Postgres (CLUB_TEST_DATABASE_URL, which CI always sets); without one, only the in-memory run happens.
@@ -108,6 +110,30 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       env: { CCS_ALLOW_SAMPLE_DATA: "1", VERCEL_ENV: "production", CLUB_IPAD_SECRET: "playwright-only-ipad-secret-0001", CCS_DEMO_PASSWORD: "playwright-only-demo-0001", CCS_DEMO_URL: "https://demo.example.org" },
+    },
+    {
+      // A stand-in for Mailchimp and the Claude API (scripts/fake-email-apis.ts): the list builder's tests never reach the real services.
+      command: `node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/fake-email-apis.ts ${PORT_FAKE_EMAIL_APIS}`,
+      url: `http://localhost:${PORT_FAKE_EMAIL_APIS}/fake/state`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      // The dashboard with the list builder switched on and pointed at the stand-in services, with the invented members.
+      command: `npx next start -p ${PORT_EMAIL_LISTS}`,
+      url: `http://localhost:${PORT_EMAIL_LISTS}/api/dashboard`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      env: {
+        CCS_ALLOW_SAMPLE_DATA: "1",
+        // Test-only and fake. MAILCHIMP_API_BASE is only obeyed where invented data is allowed.
+        DASHBOARD_EMAIL_LISTS_PASSWORD: "playwright-only-lists-0001",
+        MAILCHIMP_API_KEY: "playwright0fake-us1",
+        MAILCHIMP_API_BASE: `http://localhost:${PORT_FAKE_EMAIL_APIS}/3.0`,
+        ANTHROPIC_API_KEY: "sk-ant-playwright-only-fake",
+        ANTHROPIC_BASE_URL: `http://localhost:${PORT_FAKE_EMAIL_APIS}`,
+        CRON_SECRET: "playwright-only-cron-secret-0001",
+      },
     },
     ...(E2E_DB
       ? [

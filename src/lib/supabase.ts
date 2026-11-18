@@ -21,7 +21,7 @@ import {
 
 const PAGE = 1000;
 
-interface MemberRow {
+export interface MemberRow {
   member_name: string;
   usage_band: string;
   visits_per_month: number | string | null;
