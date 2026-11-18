@@ -17,6 +17,7 @@
     "mail:test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local src/club/auth/send-test-email.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
     "@fontsource/cinzel": "^5.3.0",
     "@fontsource/eb-garamond": "^5.3.0",
     "@fontsource/figtree": "^5.3.0",

@@ -91,13 +91,22 @@ const FIELDS = [
   "reports.clicks.unique_clicks",
 ].join(",");
 
+/**
+ * Where Mailchimp's API is. Tests may point it at a stand-in server with MAILCHIMP_API_BASE, which is obeyed only where
+ * invented data is allowed and never on the live site.
+ */
+export function mailchimpBase(dc: string, env: Record<string, string | undefined> = process.env): string {
+  const testBase = env.MAILCHIMP_API_BASE && (env.NODE_ENV !== "production" || env.CCS_ALLOW_SAMPLE_DATA === "1") && env.VERCEL_ENV !== "production";
+  return testBase ? env.MAILCHIMP_API_BASE!.replace(/\/$/, "") : `https://${dc}.api.mailchimp.com/3.0`;
+}
+
 /** Reads every sent campaign for one audience from Mailchimp, read-only. */
 export async function loadCampaigns(cfg: NonNullable<ReturnType<typeof mailchimpConfig>>): Promise<Campaign[]> {
   const out: Campaign[] = [];
   const auth = "Basic " + Buffer.from(`ccs:${cfg.key}`).toString("base64");
   for (let offset = 0; offset < 5000; offset += 500) {
     const url =
-      `https://${cfg.dc}.api.mailchimp.com/3.0/reports?count=500&offset=${offset}` +
+      `${mailchimpBase(cfg.dc)}/reports?count=500&offset=${offset}` +
       `&since_send_time=${cfg.since}T00:00:00%2B00:00&fields=${FIELDS}`;
     const res = await fetch(url, { headers: { Authorization: auth }, next: { revalidate: 3600 } });
     if (!res.ok) throw new Error(`Mailchimp answered ${res.status}`);
