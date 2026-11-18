@@ -115,6 +115,22 @@ test("a description with a part no filter covers says so, and the filters can be
   await expect(card.getByTestId("lists-words")).toContainText("Membership type: Intermediate or Resident");
 });
 
+test("a list can be built with the filters alone, with no description and no Claude", async ({ page }) => {
+  const card = await unlock(page);
+  const claudeBefore = (await fakeState(page)).calls.filter((c) => /messages/.test(c)).length;
+  await card.getByRole("button", { name: "Set the filters by hand instead" }).click();
+  const filters = card.getByRole("region", { name: "Filters set by hand" }).or(card.getByLabel("Filters set by hand"));
+  await filters.getByRole("checkbox", { name: "Intermediate", exact: true }).check();
+  await filters.getByRole("button", { name: "Show members for these filters" }).click();
+  await expect(card.getByTestId("lists-words")).toContainText("Membership type: Intermediate");
+  await expect(card.getByRole("table", { name: "Who will get the email" })).toBeVisible();
+  await card.getByLabel("Name for this list").fill("Intermediate by hand");
+  await card.getByRole("button", { name: "Save as a Mailchimp list" }).click();
+  await expect(card.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  await expect(card.getByRole("article", { name: "Saved list: Intermediate by hand" })).toBeVisible();
+  expect((await fakeState(page)).calls.filter((c) => /messages/.test(c)).length).toBe(claudeBefore);
+});
+
 test("saving several lists and drafting to each keeps working (repeated use)", async ({ page }) => {
   const card = await unlock(page);
   const before = (await fakeState(page)).campaigns.length;
@@ -141,7 +157,7 @@ test("saving several lists and drafting to each keeps working (repeated use)", a
   expect((await fakeState(page)).campaigns.length).toBe(before + 3);
   // The page still opens cleanly with every list on it.
   await page.reload();
-  await expect(page.getByRole("article", { name: /^Saved list: / })).toHaveCount(4);
+  await expect(page.getByRole("article", { name: /^Saved list: / })).toHaveCount(5);
 });
 
 test("the nightly refresh needs its secret", async ({ request }) => {

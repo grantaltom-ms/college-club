@@ -14,3 +14,8 @@ export async function POST(request: NextRequest) {
     return json(resultBody(await loadPool(now), parsed.rule, now));
   });
 }
+
+/** What the hand filters can offer (the interests loaded, how far the figures go), so filters can be set without Claude. No people. */
+export async function GET(request: NextRequest) {
+  return withLists(request, false, async () => json({ info: (await loadPool(new Date())).info }));
+}

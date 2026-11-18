@@ -34,13 +34,21 @@ interface RowingRow {
   period_to: string;
 }
 
-/** A table that has not been made yet reads as empty, so the builder still works with what is loaded. */
-async function optional<T>(cfg: Cfg, table: string, order: string): Promise<T[]> {
+/**
+ * A table that has not been made yet (Supabase answers 404) reads as empty, so the builder still works with what is
+ * loaded. Any other failure is thrown: treating it as empty would let a refresh take real people off a Mailchimp tag,
+ * or put people who do not match on it.
+ */
+export async function optional<T>(cfg: Cfg, table: string, order: string): Promise<T[]> {
   try {
     return await fetchAll<T>(cfg, table, order);
   } catch (error) {
-    console.warn(`${table} could not be read; treating it as empty`, error instanceof Error ? error.message : error);
-    return [];
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === `Supabase returned 404 for ${table}`) {
+      console.warn(`${table} has not been made yet; treating it as empty`);
+      return [];
+    }
+    throw error;
   }
 }
 

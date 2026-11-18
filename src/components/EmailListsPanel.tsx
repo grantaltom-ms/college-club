@@ -90,6 +90,23 @@ function Finder({ onSaved }: { onSaved: () => void }) {
   const [found, setFound] = useState<Found | null>(null);
   const [name, setName] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  // Filters set by hand before anything is found: works without Claude, and after a description could not be read.
+  const [manual, setManual] = useState<PoolInfo | null>(null);
+
+  async function startByHand() {
+    setBusy("preview");
+    setError(null);
+    setSaved(null);
+    try {
+      const res = await fetch("/api/email-lists/preview", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data?.error ?? "The filters could not be loaded. Try again.");
+      else setManual(data.info as PoolInfo);
+    } catch {
+      setError("The server could not be reached. Check your connection and try again.");
+    }
+    setBusy(null);
+  }
 
   async function find() {
     setBusy("find");
@@ -106,12 +123,13 @@ function Finder({ onSaved }: { onSaved: () => void }) {
       return;
     }
     const { reading, words, result, info } = r.data;
+    setManual(null);
     setFound({ request: description, listName: reading.listName, notUnderstood: reading.notUnderstood, rule: reading.rule, words, result, info });
     setName(reading.listName);
   }
 
   async function preview(rule: ListRule) {
-    if (!found) return;
+    if (!found && !manual) return;
     setBusy("preview");
     setError(null);
     const r = await post<{ words: string[]; result: ListResult; info: PoolInfo }>("/api/email-lists/preview", { rule });
@@ -120,7 +138,9 @@ function Finder({ onSaved }: { onSaved: () => void }) {
       setError(r.error);
       return;
     }
-    setFound({ ...found, rule, words: r.data.words, result: r.data.result, info: r.data.info });
+    const base = found ?? { request: "", listName: "", notUnderstood: [] };
+    setFound({ ...base, rule, words: r.data.words, result: r.data.result, info: r.data.info });
+    setManual(null);
   }
 
   async function save() {
@@ -157,6 +177,11 @@ function Finder({ onSaved }: { onSaved: () => void }) {
         <button type="button" className="link-button" disabled={busy !== null || description.trim().length < 3} onClick={find}>
           {busy === "find" ? "Finding members…" : "Find members"}
         </button>
+        {!found && !manual && (
+          <button type="button" className="link-button" disabled={busy !== null} onClick={startByHand}>
+            Set the filters by hand instead
+          </button>
+        )}
       </div>
       {error && (
         <p className="status-error" role="alert">
@@ -168,9 +193,14 @@ function Finder({ onSaved }: { onSaved: () => void }) {
           {saved}
         </p>
       )}
+      {manual && !found && (
+        <div className="lists-found" aria-label="Filters set by hand">
+          <RuleEditor rule={EMPTY_RULE} info={manual} busy={busy === "preview"} onApply={preview} open />
+        </div>
+      )}
       {found && (
         <div className="lists-found" aria-label="Members found">
-          <h3 className="lists-h3">How the description was read</h3>
+          <h3 className="lists-h3">{found.request ? "How the description was read" : "The filters"}</h3>
           <ul className="lists-words" data-testid="lists-words">
             {found.words.map((w) => (
               <li key={w}>{w}</li>
@@ -279,7 +309,7 @@ function PeopleTable({ people, label }: { people: ResultPerson[]; label: string 
 
 const numOrNull = (v: string) => (v.trim() === "" ? null : Number(v));
 
-function RuleEditor({ rule, info, busy, onApply }: { rule: ListRule; info: PoolInfo; busy: boolean; onApply: (rule: ListRule) => void }) {
+function RuleEditor({ rule, info, busy, onApply, open = false }: { rule: ListRule; info: PoolInfo; busy: boolean; onApply: (rule: ListRule) => void; open?: boolean }) {
   const [draft, setDraft] = useState<ListRule>(rule);
   const [lastRule, setLastRule] = useState(rule);
   // A new reading from Claude replaces what was typed here (the React way to reset state from a prop).
@@ -303,7 +333,7 @@ function RuleEditor({ rule, info, busy, onApply }: { rule: ListRule; info: PoolI
   );
   const interests = [...new Set([...info.interests, ...draft.interestsAny])];
   return (
-    <details className="lists-more">
+    <details className="lists-more" open={open || undefined}>
       <summary>Change the filters by hand</summary>
       <div className="lists-editor">
         {numberBox("joinedWithinMonths", "Joined within the last (months)")}

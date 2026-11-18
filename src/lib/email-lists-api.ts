@@ -76,7 +76,7 @@ export async function loadPool(now: Date = new Date()): Promise<Pool> {
       base = await loadLivePool(cfg);
     } catch (error) {
       console.error("Member list could not be loaded", error instanceof Error ? error.message : error);
-      throw new ListStoreError(502, "The member list could not be loaded. Check that qb_members and members are loaded in Supabase.");
+      throw new ListStoreError(502, "The member list could not be loaded. Check that qb_members and members are loaded in Supabase, and that member_interests and member_rowing can be read if they have been made. Nothing was changed in Mailchimp.");
     }
   } else if (sampleAllowed()) {
     base = samplePool(today);

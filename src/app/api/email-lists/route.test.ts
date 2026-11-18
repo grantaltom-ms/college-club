@@ -4,7 +4,8 @@ import { createFake, type FakeState } from "@/lib/email-lists-fake.testkit";
 import { EMAIL_LISTS_COOKIE, makeListsToken } from "@/lib/email-lists-lock";
 import { GET } from "./route";
 import { POST as FIND } from "./find/route";
-import { POST as PREVIEW } from "./preview/route";
+import { GET as FILTERS, POST as PREVIEW } from "./preview/route";
+import { optional } from "@/lib/email-lists-data";
 import { POST as SAVE } from "./lists/route";
 import { POST as REFRESH } from "./lists/[id]/refresh/route";
 import { POST as DRAFT } from "./lists/[id]/draft/route";
@@ -150,5 +151,46 @@ describe("the list builder's server", () => {
     const text = await res.text();
     expect(text).not.toContain("unittest0fake");
     expect(JSON.parse(text).error).toMatch(/Mailchimp/);
+  });
+
+  it("offers the hand filters without a description, and without anyone's name or address", async () => {
+    expect((await FILTERS(request("/api/email-lists/preview", { method: "GET", pass: false }))).status).toBe(401);
+    const res = await FILTERS(request("/api/email-lists/preview", { method: "GET" }));
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const body = JSON.parse(text);
+    expect(Object.keys(body)).toEqual(["info"]);
+    expect(body.info.interests).toContain("rowing");
+    expect(text).not.toMatch(/example\.org|Sample /);
+    expect(fake.claudeRequests).toHaveLength(0);
+  });
+
+  it("reads a table that is not made yet as empty, but never treats a failed read as empty", async () => {
+    const cfg = { url: "http://supabase.test", key: "service-key-unit-test" };
+    const answer = (status: number) => vi.fn(async () => new Response(status === 200 ? "[]" : JSON.stringify({ message: "nope" }), { status }));
+    vi.stubGlobal("fetch", answer(404));
+    await expect(optional(cfg, "member_interests", "member_number")).resolves.toEqual([]);
+    for (const status of [500, 401, 503]) {
+      vi.stubGlobal("fetch", answer(status));
+      await expect(optional(cfg, "member_rowing", "member_number")).rejects.toThrow(`Supabase returned ${status} for member_rowing`);
+    }
+  });
+
+  it("refreshes nothing in Mailchimp when an optional table cannot be read", async () => {
+    vi.stubEnv("SUPABASE_URL", "http://supabase.test");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-key-unit-test");
+    const f = createFake();
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith("http://supabase.test")) {
+        if (url.includes("member_rowing")) return new Response("{}", { status: 500 });
+        return new Response("[]", { status: 200 });
+      }
+      return f.handle(input, init);
+    });
+    const res = await PREVIEW(request("/api/email-lists/preview", { body: { rule: ROWING } }));
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toContain("member_rowing");
+    expect(f.state.calls.some((c) => /segments/.test(c) && /POST|PATCH|DELETE/.test(c))).toBe(false);
   });
 });
